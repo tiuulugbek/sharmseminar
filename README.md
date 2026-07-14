@@ -79,7 +79,7 @@ After=network.target
 [Service]
 WorkingDirectory=/opt/sharm-bot/sharm-seminar
 EnvironmentFile=/opt/sharm-bot/.env
-ExecStart=/opt/sharm-bot/venv/bin/gunicorn -w 2 -b 127.0.0.1:8000 server:app
+ExecStart=/opt/sharm-bot/venv/bin/gunicorn -w 2 -b 127.0.0.1:18080 server:app
 Restart=always
 
 [Install]

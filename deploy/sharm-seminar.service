@@ -1,0 +1,15 @@
+[Unit]
+Description=Sharm Seminar Flask API and admin panel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/sharm_bot/sharm-seminar
+EnvironmentFile=/root/sharm_bot/.env
+ExecStart=/root/sharm_bot/venv/bin/gunicorn --workers 2 --bind 127.0.0.1:18080 --access-logfile /root/sharm_bot/sharm-seminar-access.log --error-logfile /root/sharm_bot/sharm-seminar-error.log server:app
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

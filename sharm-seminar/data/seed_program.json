@@ -1,0 +1,391 @@
+[
+ {
+  "date": "8-avgust",
+  "dow": "Shanba",
+  "title": "Kelish kuni",
+  "subtitle": "Welcome to Acoustic 2026",
+  "blocks": [
+   {
+    "label": null,
+    "items": [
+     {
+      "time": "08:30",
+      "text": "Toshkent xalqaro aeroportida kutib olish"
+     },
+     {
+      "time": "",
+      "text": "Sharm Al-Sheyhga yetib borish"
+     },
+     {
+      "time": "",
+      "text": "Mehmonxonaga transfer"
+     },
+     {
+      "time": "",
+      "text": "Ro'yxatdan o'tish"
+     },
+     {
+      "time": "",
+      "text": "Xonalarga joylashish"
+     },
+     {
+      "time": "",
+      "text": "Erkin vaqt"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "date": "9-avgust",
+  "dow": "Yakshanba",
+  "title": "Moslashuv va tayyorgarlik kuni",
+  "subtitle": "",
+  "blocks": [
+   {
+    "label": "Ertalab",
+    "items": [
+     {
+      "time": "",
+      "text": "Mehmonxona hududi bilan tanishish"
+     },
+     {
+      "time": "",
+      "text": "Plyaj va dam olish"
+     },
+     {
+      "time": "",
+      "text": "Networking"
+     }
+    ]
+   },
+   {
+    "label": "Tushdan keyin — Seminar oldi tayyorgarligi",
+    "items": [
+     {
+      "time": "",
+      "text": "Ishtirokchilarni yakuniy ro'yxatdan o'tkazish"
+     },
+     {
+      "time": "",
+      "text": "Tarjimonlar va trenerlar uchrashuvi"
+     },
+     {
+      "time": "",
+      "text": "Texnik jihozlarni sinovdan o'tkazish"
+     },
+     {
+      "time": "",
+      "text": "Trening zallarini tayyorlash"
+     }
+    ]
+   },
+   {
+    "label": "Welcome Dinner",
+    "items": [
+     {
+      "time": "20:00",
+      "text": "Tanishuv kechasi"
+     },
+     {
+      "time": "",
+      "text": "Ishtirokchilar bilan tanishish"
+     },
+     {
+      "time": "",
+      "text": "Seminar dasturini taqdim etish"
+     },
+     {
+      "time": "",
+      "text": "Guruh fotosurati"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "date": "10-avgust",
+  "dow": "Dushanba",
+  "title": "SIGNIA DAY",
+  "subtitle": "",
+  "blocks": [
+   {
+    "label": null,
+    "items": [
+     {
+      "time": "10:00–11:00",
+      "text": "Mavzu"
+     },
+     {
+      "time": "11:00–11:15",
+      "text": "Cofe break"
+     },
+     {
+      "time": "11:15–12:15",
+      "text": "Master class"
+     },
+     {
+      "time": "12:15–14:00",
+      "text": "Tushlik"
+     },
+     {
+      "time": "14:00–15:00",
+      "text": "Mavzu"
+     },
+     {
+      "time": "15:00–15:15",
+      "text": "Cofe break"
+     },
+     {
+      "time": "15:15–16:30",
+      "text": "Mavzu"
+     },
+     {
+      "time": "16:30–16:40",
+      "text": "Signia xodimlari bilan umumiy surat"
+     },
+     {
+      "time": "16:40",
+      "text": "Erkin vaqt"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "date": "11-avgust",
+  "dow": "Seshanba",
+  "title": "GN RESOUND DAY",
+  "subtitle": "",
+  "blocks": [
+   {
+    "label": null,
+    "items": [
+     {
+      "time": "10:00–11:00",
+      "text": "Mavzu"
+     },
+     {
+      "time": "11:00–11:15",
+      "text": "Cofe break"
+     },
+     {
+      "time": "11:15–12:15",
+      "text": "Master class"
+     },
+     {
+      "time": "12:15–14:00",
+      "text": "Tushlik"
+     },
+     {
+      "time": "14:00–15:00",
+      "text": "Mavzu"
+     },
+     {
+      "time": "15:00–15:15",
+      "text": "Cofe break"
+     },
+     {
+      "time": "15:15–16:30",
+      "text": "Mavzu"
+     },
+     {
+      "time": "16:30–16:40",
+      "text": "GN ReSound xodimlari bilan umumiy surat"
+     },
+     {
+      "time": "16:40",
+      "text": "Erkin vaqt"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "date": "12-avgust",
+  "dow": "Chorshanba",
+  "title": "ACOUSTIC DAY",
+  "subtitle": "Acoustic Academy",
+  "blocks": [
+   {
+    "label": "Acoustic Academy",
+    "items": [
+     {
+      "time": "",
+      "text": "Acoustic Vision"
+     },
+     {
+      "time": "",
+      "text": "Xizmat ko'rsatish standartlari"
+     },
+     {
+      "time": "",
+      "text": "CRM va mijoz bilan ishlash"
+     },
+     {
+      "time": "",
+      "text": "Sotuv va marketing"
+     },
+     {
+      "time": "",
+      "text": "Referral tizimi"
+     },
+     {
+      "time": "",
+      "text": "HR va KPI"
+     },
+     {
+      "time": "",
+      "text": "Filiallarni boshqarish"
+     },
+     {
+      "time": "",
+      "text": "Power BI va sun'iy intellekt"
+     },
+     {
+      "time": "",
+      "text": "Markaziy Osiyoda rivojlanish strategiyasi"
+     }
+    ]
+   },
+   {
+    "label": "Panel Discussion — “Acoustic 2030”",
+    "items": []
+   },
+   {
+    "label": "Yakuniy sessiya",
+    "items": [
+     {
+      "time": "",
+      "text": "Sertifikatlar topshirish"
+     },
+     {
+      "time": "",
+      "text": "Eng faol ishtirokchilarni taqdirlash"
+     },
+     {
+      "time": "",
+      "text": "Gala Dinner"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "date": "13-avgust",
+  "dow": "Payshanba",
+  "title": "Sayohat va dam olish",
+  "subtitle": "",
+  "blocks": [
+   {
+    "label": "Ekskursiya",
+    "items": [
+     {
+      "time": "",
+      "text": "Ras Mohammed Milliy bog'i yoki"
+     },
+     {
+      "time": "",
+      "text": "Qayiq sayohati"
+     },
+     {
+      "time": "",
+      "text": "Snorkeling va dengiz dam olish"
+     }
+    ]
+   },
+   {
+    "label": "Kechqurun",
+    "items": [
+     {
+      "time": "",
+      "text": "Networking Dinner"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "date": "14-avgust",
+  "dow": "Juma",
+  "title": "Madaniy va jamoaviy dastur",
+  "subtitle": "",
+  "blocks": [
+   {
+    "label": "Variantlar",
+    "items": [
+     {
+      "time": "",
+      "text": "Cho'l Safari"
+     },
+     {
+      "time": "",
+      "text": "ATV safari"
+     },
+     {
+      "time": "",
+      "text": "Beduin qishlog'iga tashrif"
+     },
+     {
+      "time": "",
+      "text": "Soho Square"
+     },
+     {
+      "time": "",
+      "text": "Eski Sharm bozori"
+     }
+    ]
+   },
+   {
+    "label": "Kechqurun — Farewell Dinner",
+    "items": [
+     {
+      "time": "",
+      "text": "Yakuniy xulosalar"
+     },
+     {
+      "time": "",
+      "text": "Acoustic 2027 anjumani haqida e'lon"
+     },
+     {
+      "time": "",
+      "text": "Esdalik sovg'alari"
+     },
+     {
+      "time": "",
+      "text": "Jamoaviy suratga tushish"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "date": "15-avgust",
+  "dow": "Shanba",
+  "title": "Qaytish kuni",
+  "subtitle": "",
+  "blocks": [
+   {
+    "label": null,
+    "items": [
+     {
+      "time": "",
+      "text": "Nonushta"
+     },
+     {
+      "time": "",
+      "text": "Mehmonxonadan chiqish"
+     },
+     {
+      "time": "",
+      "text": "Aeroportga transfer"
+     },
+     {
+      "time": "",
+      "text": "Toshkent va boshqa davlatlarga jo'nab ketish"
+     }
+    ]
+   }
+  ]
+ }
+]

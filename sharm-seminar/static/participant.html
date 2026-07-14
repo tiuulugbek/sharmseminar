@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>ACOUSTIC 2026 · Sharm seminar</title>
+<style>
+:root{
+  --indigo:#2E2C6E;--indigo-2:#3F3C8F;--indigo-ink:#1A1848;--orange:#F07E1A;--orange-2:#FF9E44;
+  --sea:#1B9AAA;--bg:#0E0D2B;--card:#FFFFFF;--ink:#1B1A2E;--muted:#7A7990;--line:#ECEDF4;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;line-height:1.5}
+.wrap{max-width:460px;margin:0 auto;min-height:100vh;background:#F4F5FA;
+  box-shadow:0 0 60px rgba(0,0,0,.4);overflow:hidden;position:relative}
+
+/* hero */
+.hero{position:relative;padding:34px 24px 78px;color:#fff;overflow:hidden;
+  background:radial-gradient(120% 90% at 80% -10%,#5B4BC4 0%,#2E2C6E 42%,#1A1848 100%)}
+.hero .waves{position:absolute;inset:0;opacity:.5}
+.hero .waves path{fill:none;stroke:var(--orange);stroke-width:2.4;stroke-linecap:round}
+.hero .logo{height:30px;background:#fff;border-radius:8px;padding:6px 9px;display:inline-block;position:relative;z-index:2}
+.hero .kicker{position:relative;z-index:2;margin-top:22px;font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:#B9B6EA;font-weight:700}
+.hero h1{position:relative;z-index:2;font-size:34px;font-weight:900;letter-spacing:-.02em;margin-top:6px;line-height:1}
+.hero .sub{position:relative;z-index:2;font-size:14px;color:#D7D5F5;margin-top:8px;font-weight:500}
+.hero .meta{position:relative;z-index:2;display:flex;gap:16px;margin-top:16px;font-size:13px;color:#EDECFB;font-weight:600;flex-wrap:wrap}
+.hero .meta span{display:inline-flex;align-items:center;gap:6px}
+
+/* participant card */
+.pcard{position:relative;z-index:5;margin:-58px 20px 0;background:#fff;border-radius:20px;
+  box-shadow:0 18px 44px rgba(20,18,60,.28);padding:22px 22px 20px;overflow:hidden}
+.pcard .ribbon{position:absolute;top:0;left:0;right:0;height:6px;background:linear-gradient(90deg,var(--orange),var(--orange-2))}
+.pcard .hi{font-size:12.5px;color:var(--muted);font-weight:600}
+.pcard .nm{font-size:25px;font-weight:900;letter-spacing:-.02em;color:var(--indigo-ink);margin-top:3px;line-height:1.1}
+.pcard .pid{display:inline-block;margin-top:9px;font-size:12px;font-weight:800;letter-spacing:.06em;
+  color:var(--orange-2);background:#FEF1E3;padding:4px 11px;border-radius:8px}
+.pcard .rows{margin-top:16px;display:flex;flex-direction:column;gap:11px}
+.prow{display:flex;align-items:center;gap:12px;font-size:13.5px}
+.prow .ic{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:14px;background:#F1F2FA;flex-shrink:0}
+.prow .lab{color:var(--muted);font-weight:600;width:82px;flex-shrink:0}
+.prow .val{font-weight:700;color:var(--ink)}
+.gchip{display:inline-flex;align-items:center;gap:6px;font-weight:800;font-size:13px;color:#fff;padding:3px 12px;border-radius:999px}
+
+/* responsibility highlight */
+.resp{margin:18px 20px 0;border-radius:18px;padding:18px 20px;color:#fff;position:relative;overflow:hidden;
+  box-shadow:0 12px 30px rgba(20,18,60,.18)}
+.resp .rk{font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-weight:800;opacity:.9}
+.resp .rlist{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+.resp .ri{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:800}
+.resp .ri .b{width:8px;height:8px;border-radius:50%;background:#fff}
+
+/* section */
+.sec{margin:26px 20px 0}
+.sec-h{display:flex;align-items:baseline;gap:9px;margin-bottom:12px}
+.sec-h .eb{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--orange-2)}
+.sec-h h2{font-size:19px;font-weight:800;color:var(--indigo-ink);letter-spacing:-.01em}
+
+/* program day */
+.day{background:#fff;border-radius:16px;margin-bottom:12px;overflow:hidden;box-shadow:0 4px 18px rgba(20,18,60,.06)}
+.day-h{display:flex;align-items:center;gap:14px;padding:15px 16px;cursor:pointer;user-select:none}
+.day-h .dnum{width:46px;height:46px;border-radius:13px;background:linear-gradient(150deg,var(--indigo-2),var(--indigo));
+  color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0}
+.day-h .dnum b{font-size:17px;font-weight:900;line-height:1}
+.day-h .dnum s{font-size:8.5px;text-decoration:none;letter-spacing:.08em;opacity:.85;margin-top:2px}
+.day-h .dt{flex:1;min-width:0}
+.day-h .dt .t{font-size:15.5px;font-weight:800;color:var(--indigo-ink);line-height:1.15}
+.day-h .dt .s{font-size:12px;color:var(--muted);font-weight:600;margin-top:2px}
+.day-h .chev{color:var(--muted);transition:.25s;font-size:13px}
+.day.open .chev{transform:rotate(90deg)}
+.day-b{max-height:0;overflow:hidden;transition:max-height .32s ease}
+.day.open .day-b{max-height:1400px}
+.day-b .inner{padding:2px 16px 14px}
+.blk{margin-top:12px}
+.blk .bl{font-size:11.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--orange-2);margin-bottom:7px}
+.item{display:flex;gap:12px;padding:7px 0;border-top:1px solid var(--line)}
+.item:first-child{border-top:none}
+.item .tm{font-size:12px;font-weight:800;color:var(--indigo);font-variant-numeric:tabular-nums;
+  min-width:78px;flex-shrink:0;padding-top:1px}
+.item .tx{font-size:13.5px;color:var(--ink);font-weight:500}
+.item.notime .tm{min-width:14px}
+.item.notime .tm::before{content:"•";color:var(--orange)}
+
+/* checkin timeline */
+.cptl{background:#fff;border-radius:16px;padding:16px;box-shadow:0 4px 18px rgba(20,18,60,.06);display:flex;flex-direction:column;gap:2px}
+.cpln{display:flex;align-items:center;gap:12px;padding:9px 2px}
+.cpln .cc{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;
+  background:#EEF0F7;color:var(--muted);border:2px solid #E3E5F0}
+.cpln.done .cc{background:var(--sea);border-color:var(--sea);color:#fff}
+.cpln .cn{flex:1;font-weight:700;font-size:14px}
+.cpln.done .cn{color:var(--indigo-ink)}
+.cpln .ct{font-size:12px;font-weight:800;color:var(--sea)}
+
+.foot{text-align:center;padding:30px 24px 40px;color:var(--muted);font-size:11.5px}
+.foot .lg{height:18px;opacity:.5;margin-bottom:10px}
+.load{padding:80px 24px;text-align:center;color:#B9B6EA;font-weight:600}
+.err{margin:60px 24px;background:#fff;border-radius:18px;padding:30px;text-align:center}
+.err h3{color:var(--indigo-ink);font-size:18px}.err p{color:var(--muted);margin-top:8px;font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap" id="wrap"><div class="load">Yuklanmoqda…</div></div>
+
+<script>
+const PID=(location.pathname.match(/\/p\/([^\/?#]+)/)||[])[1]||new URLSearchParams(location.search).get('id');
+const GHEX=['#8A8FB0','#5B7CFA','#F07E1A','#12B886','#E4508B','#8A63D2'];
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+
+async function boot(){
+  if(!PID){return fail("ID topilmadi");}
+  let d;
+  try{const r=await fetch('/api/p/'+encodeURIComponent(PID));
+    if(r.status===404)return fail("Bu ID bo'yicha ishtirokchi topilmadi");
+    if(!r.ok)throw 0; d=await r.json();}
+  catch(e){return fail("Ma'lumotni yuklab bo'lmadi. Internetni tekshiring.");}
+  render(d);
+}
+function fail(msg){document.getElementById('wrap').innerHTML=
+  `<div class="err"><h3>ACOUSTIC 2026</h3><p>${esc(msg)}</p></div>`;}
+
+function render(d){
+  const p=d.participant, m=d.meta||{}, g=p.group||0, logo=d.seminarLogo||'';
+  const first=p.fio.split(' ').slice(-1)[0]||p.fio; // ism odatda oxirida emas — to'liq ko'rsatamiz
+  const roommates=(d.roommates||[]).join(', ');
+  const roleBlock=(d.roles&&d.roles.length)?`
+    <div class="resp" style="background:linear-gradient(135deg,${d.roles[0].color},${shade(d.roles[0].color)})">
+      <div class="rk">Sizning mas'uliyatingiz</div>
+      <div class="rlist">${d.roles.map(r=>`<div class="ri"><span class="b"></span>${esc(r.label)}</div>`).join('')}</div>
+    </div>`:'';
+
+  const gLabel = g?`Guruh ${g}`:'Guruhsiz';
+  const leaderRow = d.groupLeader?`
+    <div class="prow"><div class="ic">★</div><div class="lab">Guruhboshi</div><div class="val">${esc(d.groupLeader)}${p.leader?' (Siz)':''}</div></div>`:'';
+  const roomRow = roommates?`
+    <div class="prow"><div class="ic">🤝</div><div class="lab">Xona sherigi</div><div class="val">${esc(roommates)}</div></div>`:'';
+
+  const days = (d.program||[]).map((day,i)=>{
+    const blocks=(day.blocks||[]).map(b=>`
+      <div class="blk">${b.label?`<div class="bl">${esc(b.label)}</div>`:''}
+        ${(b.items||[]).map(it=>`<div class="item ${it.time?'':'notime'}">
+          <div class="tm">${esc(it.time||'')}</div><div class="tx">${esc(it.text)}</div></div>`).join('')}
+      </div>`).join('');
+    const dnum=(day.date||'').split('-')[0]||'';
+    return `<div class="day ${i===0?'open':''}" onclick="this.classList.toggle('open')">
+      <div class="day-h">
+        <div class="dnum"><b>${esc(dnum)}</b><s>AVG</s></div>
+        <div class="dt"><div class="t">${esc(day.title)}</div>
+          <div class="s">${esc(day.dow||'')}${day.subtitle?' · '+esc(day.subtitle):''}</div></div>
+        <span class="chev">▶</span>
+      </div>
+      <div class="day-b"><div class="inner">${blocks||'<div class="item notime"><div class="tm"></div><div class="tx">Batafsil e\'lon qilinadi</div></div>'}</div></div>
+    </div>`;
+  }).join('');
+
+  const cps=(d.checkpoints||[]);
+  const timeline=cps.length?`<div class="sec"><div class="sec-h"><span class="eb">Holat</span><h2>Ro'yxatdan o'tish</h2></div>
+    <div class="cptl">${cps.map(c=>{const ts=(d.checkins||{})[c.key];return `
+      <div class="cpln ${ts?'done':''}"><div class="cc">${ts?'✓':(c.icon||'•')}</div>
+      <div class="cn">${esc(c.label)}</div>${ts?`<div class="ct">${esc(ts)}</div>`:''}</div>`;}).join('')}</div></div>`:'';
+
+  document.getElementById('wrap').innerHTML=`
+    <div class="hero">
+      <svg class="waves" viewBox="0 0 460 200" preserveAspectRatio="none">
+        <path d="M-20 150 Q115 60 230 150 T480 150"/><path d="M-20 172 Q115 92 230 172 T480 172"/>
+        <path d="M-20 128 Q115 34 230 128 T480 128"/></svg>
+      ${logo?`<img class="logo" src="${logo}">`:''}
+      <div class="kicker">${esc(m.subtitle||'Xalqaro seminar-trening')}</div>
+      <h1>${esc(m.title||'ACOUSTIC 2026')}</h1>
+      <div class="meta"><span>📅 ${esc(m.dates||'')}</span><span>📍 ${esc(m.location||'')}</span></div>
+    </div>
+
+    <div class="pcard"><div class="ribbon"></div>
+      <div class="hi">Xush kelibsiz,</div>
+      <div class="nm">${esc(p.fio)}</div>
+      <div class="pid">${esc(p.id)}</div>
+      <div class="rows">
+        <div class="prow"><div class="ic">👥</div><div class="lab">Guruhingiz</div>
+          <div class="val"><span class="gchip" style="background:${GHEX[g]||GHEX[0]}">${gLabel}</span></div></div>
+        ${leaderRow}${roomRow}
+      </div>
+    </div>
+
+    ${roleBlock}
+
+    <div class="sec"><div class="sec-h"><span class="eb">Dastur</span><h2>Seminar tartibi</h2></div>${days}</div>
+    ${timeline}
+
+    <div class="foot">${logo?`<img class="lg" src="${logo}"><br>`:''}
+      ACOUSTIC · eshitish markazlari tarmog'i<br>Sharm El Sheikh · 2026</div>`;
+
+}
+function shade(hex){ // biroz to'qroq variant
+  try{const n=parseInt(hex.slice(1),16);let r=(n>>16)-26,g=((n>>8)&255)-26,b=(n&255)-26;
+    r=Math.max(0,r);g=Math.max(0,g);b=Math.max(0,b);
+    return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);}catch(e){return hex;}
+}
+boot();
+</script>
+</body>
+</html>

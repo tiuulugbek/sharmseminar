@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Acoustic · Sharm seminar</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+<style>
+:root{
+  --indigo:#2E2C6E; --indigo-2:#3F3C8F; --indigo-ink:#211F52;
+  --orange:#F07E1A; --orange-2:#E06A0A; --orange-soft:#FDEBD8;
+  --bg:#F4F5F9; --surface:#FFFFFF; --ink:#1B1A2E; --muted:#6C6B80;
+  --line:#E6E7F1; --line-2:#D9DAE8;
+  --rt-single:#FFF2B2; --rt-double:#D1E8FF; --rt-triple:#D1F2D1; --rt-posh:#E5D1F4;
+  --g1:#5B7CFA; --g2:#F07E1A; --g3:#12B886; --g4:#E4508B; --g5:#8A63D2;
+  --ok:#12B886; --shadow:0 1px 2px rgba(33,31,82,.06),0 8px 24px rgba(33,31,82,.06);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  background:var(--bg);color:var(--ink);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select,textarea{font-family:inherit;font-size:14px}
+.tnum{font-variant-numeric:tabular-nums}
+
+.app{display:grid;grid-template-columns:236px 1fr;min-height:100vh}
+.side{background:var(--indigo);color:#EDECF7;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+.brand{padding:20px 18px 16px;display:flex;align-items:center;gap:11px;border-bottom:1px solid rgba(255,255,255,.10)}
+.brand img{height:26px;background:#fff;border-radius:6px;padding:5px 7px}
+.brand .sub{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#B7B5E0;margin-top:3px}
+.brand b{font-size:13px;font-weight:700;letter-spacing:.02em}
+.nav{padding:12px 10px;display:flex;flex-direction:column;gap:3px;flex:1}
+.nav button{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:9px;color:#C9C7EC;font-size:13.5px;font-weight:500;text-align:left;transition:.13s}
+.nav button .ic{width:18px;text-align:center;opacity:.85}
+.nav button:hover{background:rgba(255,255,255,.07);color:#fff}
+.nav button.on{background:#fff;color:var(--indigo);font-weight:600}
+.side .foot{padding:14px;font-size:11px;color:#8886BE;border-top:1px solid rgba(255,255,255,.10)}
+.side .foot .mode{display:inline-flex;align-items:center;gap:5px;margin-top:8px;font-weight:600}
+.wave path{fill:none;stroke:var(--orange);stroke-width:5;stroke-linecap:round}
+
+.main{min-width:0}
+.top{position:sticky;top:0;z-index:20;background:rgba(244,245,249,.82);backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--line);padding:16px 26px;display:flex;align-items:center;gap:16px}
+.top h1{font-size:19px;font-weight:700;letter-spacing:-.01em;color:var(--indigo-ink)}
+.top .desc{font-size:12.5px;color:var(--muted);margin-top:1px}
+.top .sp{flex:1}
+.lang{display:flex;background:var(--surface);border:1px solid var(--line-2);border-radius:8px;overflow:hidden}
+.lang button{padding:6px 12px;font-size:12px;font-weight:600;color:var(--muted)}
+.lang button.on{background:var(--indigo);color:#fff}
+.view{padding:24px 26px 60px;max-width:1220px}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+.btn{display:inline-flex;align-items:center;gap:7px;padding:9px 15px;border-radius:9px;font-size:13px;font-weight:600;border:1px solid var(--line-2);background:var(--surface);color:var(--ink);transition:.13s}
+.btn:hover{border-color:var(--indigo);color:var(--indigo)}
+.btn.pri{background:var(--indigo);border-color:var(--indigo);color:#fff}
+.btn.pri:hover{background:var(--indigo-ink)}
+.btn.acc{background:var(--orange);border-color:var(--orange);color:#fff}
+.btn.acc:hover{background:var(--orange-2)}
+.btn.sm{padding:6px 11px;font-size:12px;border-radius:8px}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:600;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--orange-2)}
+.muted{color:var(--muted)}
+
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+.stat{padding:18px}
+.stat .k{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.stat .v{font-size:34px;font-weight:800;letter-spacing:-.02em;color:var(--indigo-ink);margin-top:6px;line-height:1}
+.stat .n{font-size:12px;color:var(--muted);margin-top:5px}
+.grid2{display:grid;grid-template-columns:1.15fr .85fr;gap:16px}
+.panel{padding:18px 20px}
+.panel h3{font-size:14px;font-weight:700;color:var(--indigo-ink)}
+.panel .ph{display:flex;align-items:baseline;gap:8px;margin-bottom:16px}
+.bar-row{display:flex;align-items:center;gap:12px;margin:11px 0}
+.bar-row .lbl{width:120px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px}
+.bar{flex:1;height:10px;background:var(--bg);border-radius:6px;overflow:hidden}
+.bar span{display:block;height:100%;border-radius:6px;transition:width .5s cubic-bezier(.2,.7,.2,1)}
+.bar-row .val{width:66px;text-align:right;font-size:12.5px;font-weight:700;color:var(--indigo-ink)}
+.cp-row .lbl{width:132px}
+
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.search{flex:1;min-width:200px;position:relative}
+.search input{width:100%;padding:9px 12px 9px 34px;border:1px solid var(--line-2);border-radius:9px;background:var(--surface)}
+.search .mag{position:absolute;left:11px;top:9px;color:var(--muted)}
+select.f{padding:8px 11px;border:1px solid var(--line-2);border-radius:9px;background:var(--surface);color:var(--ink);font-weight:500}
+.tablewrap{overflow-x:auto;border-radius:14px;border:1px solid var(--line);background:var(--surface);box-shadow:var(--shadow)}
+table{width:100%;border-collapse:collapse;min-width:760px}
+th{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface)}
+td{padding:9px 14px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tbody tr:hover{background:#FAFAFE}
+.id{font-size:11.5px;font-weight:700;color:var(--indigo);letter-spacing:.02em}
+.rg{font-weight:700;font-size:11.5px;padding:2px 8px;border-radius:6px}
+.gsel{padding:5px 8px;border:1px solid var(--line-2);border-radius:7px;font-weight:600;font-size:12.5px;background:var(--surface)}
+.star{font-size:16px;line-height:1;padding:3px 6px;border-radius:6px}
+.star.on{color:var(--orange)}.star.off{color:var(--line-2)}
+.leadtag{font-size:10px;font-weight:800;color:#fff;background:var(--orange);padding:1px 6px;border-radius:5px;letter-spacing:.04em}
+.cellinput{width:100%;max-width:130px;padding:5px 8px;border:1px solid var(--line-2);border-radius:7px}
+
+.grp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.grp{padding:0;overflow:hidden}
+.grp .hd{padding:14px 16px;color:#fff;display:flex;align-items:center;justify-content:space-between}
+.grp .hd .t{font-size:15px;font-weight:700}
+.grp .hd .c{font-size:12px;font-weight:600;opacity:.9}
+.grp .bd{max-height:340px;overflow-y:auto}
+.grp .mrow{display:flex;align-items:center;gap:9px;padding:8px 14px;border-bottom:1px solid var(--line);font-size:12.5px}
+.grp .mrow:last-child{border-bottom:none}
+.grp .mrow .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.grp .mrow .setlead{font-size:15px;color:var(--line-2)}
+.grp .mrow .setlead.on{color:var(--orange)}
+.grp .empty{padding:22px 14px;text-align:center;color:var(--muted);font-size:12.5px}
+
+/* ---------- badge designer ---------- */
+.des{display:grid;grid-template-columns:1fr 300px;gap:18px;align-items:start}
+.des-stage-wrap{background:linear-gradient(135deg,#EDEEF6,#F7F8FC);border:1px solid var(--line);border-radius:16px;
+  padding:26px;display:flex;justify-content:center;box-shadow:var(--shadow);overflow:auto}
+.stage{transform-origin:top center}
+.badge-box{position:relative;overflow:hidden;border-radius:3mm;box-shadow:0 6px 26px rgba(33,31,82,.22)}
+.badge-box.editing .be{cursor:grab}
+.badge-box.editing .be:hover{outline:1.5px solid rgba(46,44,110,.35)}
+.badge-box.editing .be.sel{outline:2px dashed var(--orange);outline-offset:1px}
+.be{position:absolute}
+.betext{overflow:hidden}
+.beqr canvas{display:block}
+.punch{position:absolute;top:2.5mm;left:50%;transform:translateX(-50%);width:14mm;height:3mm;border-radius:2mm;
+  background:rgba(0,0,0,.12);border:.4mm solid rgba(0,0,0,.18)}
+
+.props{position:sticky;top:88px;display:flex;flex-direction:column;gap:14px}
+.pblock{padding:14px 16px}
+.pblock h4{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--orange-2);margin-bottom:12px}
+.addrow{display:flex;flex-wrap:wrap;gap:7px}
+.addrow .btn{padding:7px 10px;font-size:12px}
+.frow{display:flex;align-items:center;gap:10px;margin:9px 0}
+.frow label{width:70px;font-size:12px;font-weight:600;color:var(--muted)}
+.frow input[type=number],.frow input[type=text],.frow select{flex:1;padding:6px 9px;border:1px solid var(--line-2);border-radius:8px}
+.frow input[type=color]{width:38px;height:30px;border:1px solid var(--line-2);border-radius:8px;padding:2px;background:#fff}
+.seg{display:flex;border:1px solid var(--line-2);border-radius:8px;overflow:hidden;flex:1}
+.seg button{flex:1;padding:6px;font-size:12px;font-weight:600;color:var(--muted)}
+.seg button.on{background:var(--indigo);color:#fff}
+.nofocus{color:var(--muted);font-size:12.5px;text-align:center;padding:12px 0}
+.logo-up{display:flex;align-items:center;gap:10px}
+.logo-up .prev{width:44px;height:44px;border:1px solid var(--line-2);border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#fff}
+.logo-up .prev img{max-width:100%;max-height:100%}
+
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--indigo-ink);color:#fff;padding:11px 20px;border-radius:11px;font-size:13px;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.25);opacity:0;transition:.25s;z-index:100;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+.burger{display:none;font-size:20px;padding:4px 8px;border-radius:8px;background:var(--surface);border:1px solid var(--line-2)}
+.scrim{display:none;position:fixed;inset:0;background:rgba(20,19,50,.4);z-index:55}
+.scrim.show{display:block}
+@media(max-width:920px){
+  .app{grid-template-columns:1fr}
+  .side{position:fixed;left:-260px;z-index:60;width:236px;transition:.2s}
+  .side.open{left:0}
+  .stat-grid{grid-template-columns:repeat(2,1fr)}
+  .grid2{grid-template-columns:1fr}
+  .des{grid-template-columns:1fr}
+  .props{position:static}
+  .burger{display:inline-flex!important}
+}
+
+/* ---------- print ---------- */
+#printwrap{display:none}
+@media print{
+  .app,.scrim,.toast{display:none!important}
+  #printwrap{display:flex!important;flex-wrap:wrap;gap:0}
+  .pbadge{position:relative;overflow:hidden;page-break-after:always;outline:.2mm solid #ccc}
+  @page{margin:8mm;size:auto}
+}
+</style>
+</head>
+<body>
+<div class="scrim" id="scrim" onclick="toggleNav(false)"></div>
+<div class="app">
+  <aside class="side" id="side">
+    <div class="brand">
+      <img src="data:image/png;base64,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" alt="Acoustic">
+      <div><b>Sharm seminar</b><div class="sub">Boshqaruv</div></div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="foot">
+      <svg class="wave" width="34" height="16" viewBox="0 0 34 16"><path d="M3 13 Q17 -2 31 13"/><path d="M7 13 Q17 3 27 13"/></svg>
+      <div style="margin-top:8px">Acoustic markazlari tarmog'i</div>
+      <div class="mode" id="modeTag"></div>
+    </div>
+  </aside>
+  <div class="main">
+    <div class="top">
+      <button class="burger" onclick="toggleNav(true)">☰</button>
+      <div><h1 id="vtitle">Boshqaruv paneli</h1><div class="desc" id="vdesc"></div></div>
+      <div class="sp"></div>
+      <div class="lang">
+        <button id="lang-uz" class="on" onclick="setLang('uz')">UZ</button>
+        <button id="lang-ru" onclick="setLang('ru')">RU</button>
+      </div>
+    </div>
+    <div class="view" id="view"><div class="muted" style="padding:40px">Yuklanmoqda…</div></div>
+  </div>
+</div>
+<div id="printwrap"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===== base data + assets ===== */
+const BASE = [{"id": "ACO-001", "fio": "Fedyuk Yury", "jinsi": "MR", "fuqarolik": "RUSSIA", "xona_turi": "1 kishilik", "xona_guruhi": "S01", "kelish": "Umumiy"}, {"id": "ACO-002", "fio": "Dolzhenko Vladimir", "jinsi": "MR", "fuqarolik": "RUSSIA", "xona_turi": "1 kishilik", "xona_guruhi": "S02", "kelish": "Umumiy"}, {"id": "ACO-003", "fio": "Fedorov Aleksei", "jinsi": "MR", "fuqarolik": "RUSSIA", "xona_turi": "1 kishilik", "xona_guruhi": "S03", "kelish": "Umumiy"}, {"id": "ACO-004", "fio": "Musaev Sardorjon", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "1 kishilik", "xona_guruhi": "S04", "kelish": "Umumiy"}, {"id": "ACO-005", "fio": "Denis Malenkikh", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "1 kishilik", "xona_guruhi": "S05", "kelish": "Umumiy"}, {"id": "ACO-006", "fio": "Lilja Nilsson Eva Maria", "jinsi": "MRS", "fuqarolik": "SWEDEN", "xona_turi": "1 kishilik", "xona_guruhi": "S06", "kelish": "Chet eldan alohida"}, {"id": "ACO-007", "fio": "Rakhimzhanova Gulmira", "jinsi": "MRS", "fuqarolik": "KAZAKHSTAN", "xona_turi": "1 kishilik", "xona_guruhi": "S07", "kelish": "Chet eldan alohida"}, {"id": "ACO-008", "fio": "Vakhobjonov Jakhonmirza", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D01", "kelish": "Umumiy"}, {"id": "ACO-009", "fio": "Mirzaev Ravshan", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D01", "kelish": "Umumiy"}, {"id": "ACO-010", "fio": "Pirmatov Yuldosh", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D02", "kelish": "Umumiy"}, {"id": "ACO-011", "fio": "Abdullaev Mamanazar", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D02", "kelish": "Umumiy"}, {"id": "ACO-012", "fio": "Abdukhamidov Tursunali", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D03", "kelish": "Umumiy"}, {"id": "ACO-013", "fio": "Siddikov Odiljon", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D03", "kelish": "Umumiy"}, {"id": "ACO-014", "fio": "Yunusova Yulduzkhon", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D04", "kelish": "Umumiy"}, {"id": "ACO-015", "fio": "Khamdamov Azizbek", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D04", "kelish": "Umumiy"}, {"id": "ACO-016", "fio": "Alibaeva Gulshat", "jinsi": "MRS", "fuqarolik": "KAZAKHSTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D05", "kelish": "Umumiy"}, {"id": "ACO-017", "fio": "Karshieva Sojida", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D05", "kelish": "Umumiy"}, {"id": "ACO-018", "fio": "Siddikova Madina", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D06", "kelish": "Umumiy"}, {"id": "ACO-019", "fio": "Siddikov Erkinjon", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D06", "kelish": "Umumiy"}, {"id": "ACO-020", "fio": "Karlibaeva Bekzada", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D07", "kelish": "Umumiy"}, {"id": "ACO-021", "fio": "Sharapov Alliyar", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D07", "kelish": "Umumiy"}, {"id": "ACO-022", "fio": "Saydullaev Umid", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D08", "kelish": "Umumiy"}, {"id": "ACO-023", "fio": "Egamberdiev Umidbek", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D08", "kelish": "Umumiy"}, {"id": "ACO-024", "fio": "Pulatov Jurabek", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D09", "kelish": "Umumiy"}, {"id": "ACO-025", "fio": "Rakhimov Khojiakbar", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D09", "kelish": "Umumiy"}, {"id": "ACO-026", "fio": "Nasriddinov Mukhsin", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D10", "kelish": "Umumiy"}, {"id": "ACO-027", "fio": "Khusanov Davron", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D10", "kelish": "Umumiy"}, {"id": "ACO-028", "fio": "Numonov Adhamjon", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D11", "kelish": "Umumiy"}, {"id": "ACO-029", "fio": "Chorshanbiev Fakhriyor", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D11", "kelish": "Umumiy"}, {"id": "ACO-030", "fio": "Abdullaeva Sarvinoz", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D12", "kelish": "Umumiy"}, {"id": "ACO-031", "fio": "Jumaev Aziz", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D12", "kelish": "Umumiy"}, {"id": "ACO-032", "fio": "Kamolov Miraziz", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D13", "kelish": "Umumiy"}, {"id": "ACO-033", "fio": "Orynbaev Rasul", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D13", "kelish": "Umumiy"}, {"id": "ACO-034", "fio": "Saidov Abdulvoris", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D14", "kelish": "Umumiy"}, {"id": "ACO-035", "fio": "Saidov Shokhjakhon", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D14", "kelish": "Umumiy"}, {"id": "ACO-036", "fio": "Khasanova Gulrukh", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D15", "kelish": "Umumiy"}, {"id": "ACO-037", "fio": "Mirzaev Shavkat", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D15", "kelish": "Umumiy"}, {"id": "ACO-038", "fio": "Akramova Mashkhura", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D16", "kelish": "Umumiy"}, {"id": "ACO-039", "fio": "Akramova Safiya", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D16", "kelish": "Umumiy"}, {"id": "ACO-040", "fio": "Sayfutdinova Nozima", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D17", "kelish": "Umumiy"}, {"id": "ACO-041", "fio": "Mumindjanova Nargiza", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D17", "kelish": "Umumiy"}, {"id": "ACO-042", "fio": "Ziyoev Khudoyberdy", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D18", "kelish": "Umumiy"}, {"id": "ACO-043", "fio": "Abdulazizov Farrukh", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D18", "kelish": "Umumiy"}, {"id": "ACO-044", "fio": "Pakhritdinov Shakhobitdin", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D19", "kelish": "Umumiy"}, {"id": "ACO-045", "fio": "Sobirjonov Otabek", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D19", "kelish": "Umumiy"}, {"id": "ACO-046", "fio": "Salimova Muyassar", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D20", "kelish": "Umumiy"}, {"id": "ACO-047", "fio": "Salimov Doniyor", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D20", "kelish": "Umumiy"}, {"id": "ACO-048", "fio": "Ziyaeva Khakimakhon", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D21", "kelish": "Umumiy"}, {"id": "ACO-049", "fio": "Madaminova Nigora", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D21", "kelish": "Umumiy"}, {"id": "ACO-050", "fio": "Davronova Rakhshona", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D22", "kelish": "Umumiy"}, {"id": "ACO-051", "fio": "Normatov Ismoil", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D22", "kelish": "Umumiy"}, {"id": "ACO-052", "fio": "Tukhtasinov Nurbek", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D23", "kelish": "Umumiy"}, {"id": "ACO-053", "fio": "Azamjonov Iskandar", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D23", "kelish": "Umumiy"}, {"id": "ACO-054", "fio": "Kurganbaev Dilmurod", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D24", "kelish": "Umumiy"}, {"id": "ACO-055", "fio": "Ismoilov Shakhzodbek", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D24", "kelish": "Umumiy"}, {"id": "ACO-056", "fio": "Ziyaev Bakhriddin", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D25", "kelish": "Umumiy"}, {"id": "ACO-057", "fio": "Nishanov Tokhir", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D25", "kelish": "Umumiy"}, {"id": "ACO-058", "fio": "Arslonova Hilola", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D26", "kelish": "Umumiy"}, {"id": "ACO-059", "fio": "Arslanov Ravshan", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D26", "kelish": "Umumiy"}, {"id": "ACO-060", "fio": "Arslanova Sanobar", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D27", "kelish": "Umumiy"}, {"id": "ACO-061", "fio": "Arslonov Abdurakhmon", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D27", "kelish": "Umumiy"}, {"id": "ACO-062", "fio": "Digai Valeriia", "jinsi": "MRS", "fuqarolik": "RUSSIA", "xona_turi": "2 kishilik", "xona_guruhi": "D28", "kelish": "Umumiy"}, {"id": "ACO-063", "fio": "Karimova Gulnoza", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D28", "kelish": "Umumiy"}, {"id": "ACO-064", "fio": "Kobilova Shahodat", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D29", "kelish": "Umumiy"}, {"id": "ACO-065", "fio": "Lutfullaeva Gulnoza", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D29", "kelish": "Umumiy"}, {"id": "ACO-066", "fio": "Fayzullayev Ali", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D30", "kelish": "Umumiy"}, {"id": "ACO-067", "fio": "Nuriddinov Khusniddin", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D30", "kelish": "Umumiy"}, {"id": "ACO-068", "fio": "Kumashova Aidai", "jinsi": "MRS", "fuqarolik": "KYRGYZ REPUBLIC", "xona_turi": "2 kishilik", "xona_guruhi": "D31", "kelish": "Umumiy"}, {"id": "ACO-069", "fio": "Gainazarova Akmaral", "jinsi": "MRS", "fuqarolik": "KYRGYZ REPUBLIC", "xona_turi": "2 kishilik", "xona_guruhi": "D31", "kelish": "Umumiy"}, {"id": "ACO-070", "fio": "Imanalieva Gulmairam", "jinsi": "MRS", "fuqarolik": "KYRGYZ REPUBLIC", "xona_turi": "2 kishilik", "xona_guruhi": "D32", "kelish": "Umumiy"}, {"id": "ACO-071", "fio": "Djuraeva Dono", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D32", "kelish": "Umumiy"}, {"id": "ACO-072", "fio": "Tagaev Bekbolot", "jinsi": "MR", "fuqarolik": "KYRGYZ REPUBLIC", "xona_turi": "2 kishilik", "xona_guruhi": "D33", "kelish": "Umumiy"}, {"id": "ACO-073", "fio": "Lapasov Nurali", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D33", "kelish": "Umumiy"}, {"id": "ACO-074", "fio": "Tojiboev Akmal", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D34", "kelish": "Umumiy"}, {"id": "ACO-075", "fio": "Mirzajonov Qodirjon", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D34", "kelish": "Umumiy"}, {"id": "ACO-076", "fio": "Buronov Jasurbek", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D35", "kelish": "Umumiy"}, {"id": "ACO-077", "fio": "Nurullaev Akhtamjon", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D35", "kelish": "Umumiy"}, {"id": "ACO-078", "fio": "Djaparov Inomjan", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D36", "kelish": "Umumiy"}, {"id": "ACO-079", "fio": "Djaparova Komila", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D36", "kelish": "Umumiy"}, {"id": "ACO-080", "fio": "Abdurakhimov Usmonbek", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D37", "kelish": "Umumiy"}, {"id": "ACO-081", "fio": "Abdurakhimova Khilolakhon", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D37", "kelish": "Umumiy"}, {"id": "ACO-082", "fio": "Farajov Nijat", "jinsi": "MR", "fuqarolik": "Azerbaycan", "xona_turi": "2 kishilik", "xona_guruhi": "D38", "kelish": "Umumiy"}, {"id": "ACO-083", "fio": "Boymurzaev Bektemir", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D38", "kelish": "Umumiy"}, {"id": "ACO-084", "fio": "Ibragimova Dina", "jinsi": "MRS", "fuqarolik": "KAZAKHSTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T01", "kelish": "Umumiy"}, {"id": "ACO-085", "fio": "Syzdykova Assiya", "jinsi": "MRS", "fuqarolik": "KAZAKHSTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T01", "kelish": "Umumiy"}, {"id": "ACO-086", "fio": "Ibragimova Sara", "jinsi": "MRS", "fuqarolik": "KAZAKHSTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T01", "kelish": "Umumiy"}, {"id": "ACO-087", "fio": "Nasriddinova Laziza", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T02", "kelish": "Umumiy"}, {"id": "ACO-088", "fio": "Isakova Yulduz", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T02", "kelish": "Umumiy"}, {"id": "ACO-089", "fio": "Azzamova Zumrad", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T02", "kelish": "Umumiy"}, {"id": "ACO-090", "fio": "Mirzaabdullaev Tilavoldi", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T03", "kelish": "Umumiy"}, {"id": "ACO-091", "fio": "Yusupov Rustamjon", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T03", "kelish": "Umumiy"}, {"id": "ACO-092", "fio": "Mamurov Shokhrukhmirzo", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T03", "kelish": "Umumiy"}, {"id": "ACO-093", "fio": "Karimova Ziynatkhon", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T04", "kelish": "Umumiy"}, {"id": "ACO-094", "fio": "Karimov Kudratbek", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T04", "kelish": "Umumiy"}, {"id": "ACO-095", "fio": "Karimova Zebiniso", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T04", "kelish": "Umumiy"}, {"id": "ACO-096", "fio": "Rasulov Abdulaziz", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T05", "kelish": "Umumiy"}, {"id": "ACO-097", "fio": "Rasulov Umarbek", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T05", "kelish": "Umumiy"}, {"id": "ACO-098", "fio": "Karimova Nargiza", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T05", "kelish": "Umumiy"}, {"id": "ACO-099", "fio": "Mahmudov Sulton", "jinsi": "MR", "fuqarolik": "TAJIKISTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T06", "kelish": "Umumiy"}, {"id": "ACO-100", "fio": "Mahmudov Bakhtiyorkhon", "jinsi": "MR", "fuqarolik": "TAJIKISTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T06", "kelish": "Umumiy"}, {"id": "ACO-101", "fio": "Mirsaburov Mirsharaf", "jinsi": "MR", "fuqarolik": "TAJIKISTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T06", "kelish": "Umumiy"}, {"id": "ACO-102", "fio": "Niyazova Shakhlo", "jinsi": "MRS", "fuqarolik": "Oʻzbekiston", "xona_turi": "Posh club", "xona_guruhi": "P01", "kelish": "Umumiy"}, {"id": "ACO-103", "fio": "Abdurakhmonov Rauf", "jinsi": "MR", "fuqarolik": "Oʻzbekiston", "xona_turi": "Posh club", "xona_guruhi": "P01", "kelish": "Umumiy"}, {"id": "ACO-104", "fio": "Niyazov Bobir", "jinsi": "MR", "fuqarolik": "Oʻzbekiston", "xona_turi": "Posh club", "xona_guruhi": "P01", "kelish": "Umumiy"}];
+const ACOUSTIC = "data:image/png;base64,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";
+const BOT = "https://t.me/AcousticSharmBot?start=";
+const H = {'Content-Type':'application/json'};
+const PXMM = 96/25.4;      // px per mm @96dpi
+const bw=()=>(S.badge&&S.badge.w)||70;   // badge width mm
+const bh=()=>(S.badge&&S.badge.h)||110;  // badge height mm
+const editorScale=()=>Math.max(1.1,Math.min(2.2,620/(bh()*PXMM)));  // fit editor
+const SIZE_PRESETS=[[70,100],[70,110],[80,120],[90,130]];  // cm: 7x10, 7x11, 8x12, 9x13
+
+/* ===== i18n ===== */
+const T = {
+ uz:{dash:"Boshqaruv paneli",parts:"Ishtirokchilar",groups:"Guruhlar",badges:"Beyjik dizayneri",checkin:"Check-in",
+  total:"Jami ishtirokchi",assigned:"Guruhga biriktirilgan",leaders:"Guruhboshilar",foreign:"Chet eldan alohida",
+  byGroup:"Guruhlar bo'yicha taqsimot",cpProgress:"Check-in holati",search:"Ism yoki ID bo'yicha qidirish…",
+  allGroups:"Barcha guruhlar",allRooms:"Barcha xonalar",noGroup:"Guruhsiz",grp:"Guruh",room:"Xona turi",
+  roommate:"Sherik",leaderCol:"Guruhboshi",arrival:"Kelish",autoDist:"Avtomatik taqsimlash",clearAll:"Tozalash",
+  member:"a'zo",noMembers:"Hali a'zo yo'q",leaderTag:"Guruhboshi",printAll:"Barcha beyjiklarni chop etish",
+  roomNo:"Xona №",scanPh:"QR / ID kiriting (ACO-001) va Enter",checkedIn:"belgilangan",notYet:"belgilanmagan",
+  cpAero:"Aeroport",cpHotel:"Mehmonxona",cpSem:"Seminar",cpFood:"Ovqatlanish",saved:"Saqlandi",
+  distDone:"Guruhlarga taqsimlandi",cleared:"Guruhlar tozalandi",notFound:"Topilmadi",pos:"belgilandi",neg:"bekor qilindi",
+  vdesc_dash:"Umumiy holat va check-in monitoringi",vdesc_parts:"Guruh va guruhboshini shu yerda belgilang",
+  vdesc_groups:"5 guruh · sheriklar birga saqlanadi",vdesc_badges:"7×11 sm · yozuv va QR joyini o'zingiz suring",
+  vdesc_checkin:"Nuqta tanlang va ishtirokchini belgilang",
+  addField:"+ Maydon",addText:"+ Matn",addQR:"+ QR",addLogo:"+ Logo",addBand:"+ Rang chizig'i",
+  elements:"Elementlar",fieldName:"Ism familya",fieldId:"ID raqam",properties:"Element sozlamalari",
+  pickEl:"Element tanlang yoki suring",delEl:"Elementni o'chirish",samplePerson:"Namuna ishtirokchi",
+  badgeBg:"Beyjik foni",seminarLogo:"Seminar logotipi",uploadLogo:"Logo yuklash",resetTpl:"Standart shablon",
+  posX:"Chap (mm)",posY:"Yuqori (mm)",width:"Kenglik (mm)",height:"Balandlik (mm)",fsize:"Shrift (mm)",
+  color:"Rang",weight:"Qalinlik",align:"Tekislash",text:"Matn",qrsize:"QR o'lchami (mm)",field:"Maydon",
+  wNormal:"Oddiy",wBold:"Qalin",wBlack:"Juda qalin",front:"Old tomon",resetDone:"Standart shablon tiklandi",
+  badgeSize:"Beyjik o'lchami",bwCm:"Kenglik (sm)",bhCm:"Balandlik (sm)",sizeCustom:"Ixtiyoriy",
+  roles:"Mas'ullar",program:"Rejalar",vdesc_roles:"Mas'uliyatlarni belgilash — koordinator, sayr, dengiz va h.k.",
+  vdesc_program:"Seminar dasturi — ishtirokchi sahifasida ko'rinadi",
+  cpAdd:"+ Nuqta",cpDel:"O'chirish",cpAddQ:"Yangi check-in nuqta nomi:",cpIconQ:"Emoji (belgi):",cpDelQ:"Nuqtani o'chirasizmi? Belgilangan check-inlar ham o'chadi.",
+  addRole:"+ Yangi mas'uliyat",roleLabel:"Nomi",roleColor:"Rang",delRole:"O'chirish",assign:"Biriktirish",
+  noRole:"Mas'ul yo'q",assignedTo:"Biriktirilgan",pickRole:"Mas'uliyatni tanlang",
+  progDay:"Kun",progAddItem:"+ Band",progAddBlock:"+ Bo'lim",progTime:"Vaqt",progText:"Matn",progBlockLabel:"Bo'lim nomi",
+  eventMeta:"Tadbir ma'lumoti",metaTitle:"Sarlavha",metaSub:"Kichik sarlavha",metaDates:"Sanalar",metaLoc:"Manzil",
+  pageBase:"Sahifa manzili (domen)",qrHint:"QR skan qilinganda ishtirokchi sahifasi ochiladi",roleTag:"Mas'ul",openPage:"Sahifani ochish"},
+ ru:{dash:"Панель управления",parts:"Участники",groups:"Группы",badges:"Дизайнер бейджей",checkin:"Check-in",
+  total:"Всего участников",assigned:"Распределены в группы",leaders:"Старосты групп",foreign:"Прилетают отдельно",
+  byGroup:"Распределение по группам",cpProgress:"Статус check-in",search:"Поиск по имени или ID…",
+  allGroups:"Все группы",allRooms:"Все номера",noGroup:"Без группы",grp:"Группа",room:"Тип номера",
+  roommate:"Сосед",leaderCol:"Староста",arrival:"Прибытие",autoDist:"Авто-распределение",clearAll:"Очистить",
+  member:"чел.",noMembers:"Пока нет участников",leaderTag:"Староста",printAll:"Печать всех бейджей",
+  roomNo:"Номер",scanPh:"Введите QR / ID (ACO-001) и Enter",checkedIn:"отмечено",notYet:"не отмечено",
+  cpAero:"Аэропорт",cpHotel:"Отель",cpSem:"Семинар",cpFood:"Питание",saved:"Сохранено",
+  distDone:"Распределено по группам",cleared:"Группы очищены",notFound:"Не найдено",pos:"отмечен",neg:"снят",
+  vdesc_dash:"Общий статус и мониторинг check-in",vdesc_parts:"Назначьте группу и старосту здесь",
+  vdesc_groups:"5 групп · соседи вместе",vdesc_badges:"7×11 см · разместите текст и QR сами",
+  vdesc_checkin:"Выберите точку и отметьте участника",
+  addField:"+ Поле",addText:"+ Текст",addQR:"+ QR",addLogo:"+ Лого",addBand:"+ Полоса",
+  elements:"Элементы",fieldName:"Имя фамилия",fieldId:"ID номер",properties:"Свойства элемента",
+  pickEl:"Выберите или перетащите элемент",delEl:"Удалить элемент",samplePerson:"Пример участника",
+  badgeBg:"Фон бейджа",seminarLogo:"Логотип семинара",uploadLogo:"Загрузить лого",resetTpl:"Шаблон по умолчанию",
+  posX:"Слева (мм)",posY:"Сверху (мм)",width:"Ширина (мм)",height:"Высота (мм)",fsize:"Шрифт (мм)",
+  color:"Цвет",weight:"Насыщенность",align:"Выравнивание",text:"Текст",qrsize:"Размер QR (мм)",field:"Поле",
+  wNormal:"Обычный",wBold:"Жирный",wBlack:"Очень жирный",front:"Лицевая сторона",resetDone:"Шаблон сброшен",
+  badgeSize:"Размер бейджа",bwCm:"Ширина (см)",bhCm:"Высота (см)",sizeCustom:"Свой",
+  roles:"Ответственные",program:"Программа",vdesc_roles:"Назначение ответственных — координатор, экскурсии, море и т.д.",
+  vdesc_program:"Программа семинара — видна на странице участника",
+  cpAdd:"+ Точка",cpDel:"Удалить",cpAddQ:"Название новой точки check-in:",cpIconQ:"Эмодзи (значок):",cpDelQ:"Удалить точку? Отметки check-in тоже удалятся.",
+  addRole:"+ Новая роль",roleLabel:"Название",roleColor:"Цвет",delRole:"Удалить",assign:"Назначить",
+  noRole:"Нет ответственных",assignedTo:"Назначены",pickRole:"Выберите роль",
+  progDay:"День",progAddItem:"+ Пункт",progAddBlock:"+ Блок",progTime:"Время",progText:"Текст",progBlockLabel:"Название блока",
+  eventMeta:"О мероприятии",metaTitle:"Заголовок",metaSub:"Подзаголовок",metaDates:"Даты",metaLoc:"Место",
+  pageBase:"Адрес страницы (домен)",qrHint:"При сканировании QR открывается страница участника",roleTag:"Ответ.",openPage:"Открыть страницу"}
+};
+function t(k){return (T[S.lang]&&T[S.lang][k])||T.uz[k]||k;}
+const CPS=()=>S.checkpoints||[];
+const cpName=k=>{const c=(S.checkpoints||[]).find(x=>x.key===k);return c?c.label:k;};
+const cpIcon=k=>{const c=(S.checkpoints||[]).find(x=>x.key===k);return c?c.icon:'•';};
+const roleById=id=>(S.roles||[]).find(r=>r.id===id);
+const GCOL=['','var(--g1)','var(--g2)','var(--g3)','var(--g4)','var(--g5)'];
+const GHEX=['','#5B7CFA','#F07E1A','#12B886','#E4508B','#8A63D2'];
+const RTCOL={'1 kishilik':'var(--rt-single)','2 kishilik':'var(--rt-double)','3 kishilik':'var(--rt-triple)','Posh club':'var(--rt-posh)'};
+
+/* ===== default badge template (7x11cm front side) ===== */
+function defaultBadge(){return{
+ bg:"#FFFFFF", w:70, h:110,
+ elements:[
+  {id:"b_top", type:"band",  x:0,  y:0,   w:70, h:6,  color:"#F07E1A"},
+  {id:"e_logo",type:"logo",  x:22, y:11,  w:26},
+  {id:"e_name",type:"field", field:"name", x:4, y:52, w:62, size:7,  color:"#211F52", weight:800, align:"center"},
+  {id:"e_id",  type:"field", field:"id",   x:4, y:64, w:62, size:5,  color:"#E06A0A", weight:800, align:"center"},
+  {id:"e_qr",  type:"qr",    x:23, y:73, w:24},
+  {id:"b_bot", type:"band",  x:0,  y:100, w:70, h:10, color:"#2E2C6E"},
+  {id:"e_ftr", type:"text",  text:"SHARM SEMINAR", x:4, y:102.6, w:62, size:3.6, color:"#FFFFFF", weight:800, align:"center", letter:2}
+ ]};}
+
+/* ===== defaults ===== */
+const DEF_CPS=[{key:"aeroport",label:"Aeroport",icon:"✈️"},{key:"mehmonxona",label:"Mehmonxona",icon:"🏨"},
+  {key:"seminar",label:"Seminar",icon:"🎤"},{key:"ovqatlanish",label:"Ovqatlanish",icon:"🍽️"}];
+const DEF_ROLES=[{id:"coord",label:"Koordinator",color:"#2E2C6E"},{id:"prep",label:"Seminar tayyorgarligi",color:"#E4508B"},
+  {id:"logi",label:"Transfer / logistika",color:"#12B886"},{id:"sea",label:"Dengiz / qayiq sayohati",color:"#1B9AAA"},
+  {id:"city",label:"Shahar aylanish / madaniy",color:"#F07E1A"},{id:"event",label:"Gala / kechalar",color:"#8A63D2"}];
+const DEF_META={title:"ACOUSTIC 2026",subtitle:"Xalqaro seminar-trening",dates:"8–15 avgust 2026",location:"Sharm El Sheikh, Misr"};
+
+/* ===== state ===== */
+let S={participants:[],checkins:{},checkpoints:[],program:[],roles:[],meta:{},badge:null,seminarLogo:null,pageBase:null,lang:'uz'};
+let VIEW='dash', activeCP='aeroport', selEid=null, sampleIdx=0;
+
+/* ===== api layer (server -> localStorage -> memory) ===== */
+const api={
+ mode:'memory',
+ async boot(){
+   try{const r=await fetch('/api/bootstrap',{cache:'no-store'});
+     if(r.ok){this.mode='server';return await r.json();}}catch(e){}
+   try{const raw=localStorage.getItem('sharm');this.mode='local';
+     if(raw)return JSON.parse(raw);}catch(e){this.mode='memory';}
+   return null;
+ },
+ saveLocal(){ if(this.mode!=='local')return;
+   try{localStorage.setItem('sharm',JSON.stringify(
+     {participants:S.participants,checkins:S.checkins,checkpoints:S.checkpoints,program:S.program,
+      roles:S.roles,meta:S.meta,badge:S.badge,seminarLogo:S.seminarLogo,pageBase:S.pageBase}));}catch(e){} },
+ async _post(url,body){ if(this.mode==='server'){try{await fetch(url,{method:'POST',headers:H,body:JSON.stringify(body)});}catch(e){}} else this.saveLocal(); },
+ async patch(id,patch){ return this._post('/api/participant',{id,patch}); },
+ async bulk(items){ return this._post('/api/participants/bulk',{items}); },
+ async checkin(id,cp,on){ if(this.mode==='server'){try{const r=await fetch('/api/checkin',{method:'POST',headers:H,body:JSON.stringify({id,checkpoint:cp,on})});const j=await r.json();return j.ts;}catch(e){}} else this.saveLocal(); return on?nowHM():null; },
+ async saveBadge(){ return this._post('/api/badge',S.badge); },
+ async saveCheckpoints(){ return this._post('/api/checkpoints',{checkpoints:S.checkpoints}); },
+ async saveProgram(){ return this._post('/api/program',S.program); },
+ async saveRoles(){ return this._post('/api/roles',S.roles); },
+ async saveMeta(){ return this._post('/api/meta',S.meta); },
+ async savePageBase(){ return this._post('/api/pagebase',{base:S.pageBase}); },
+ async saveLogo(u){ if(this.mode==='server'){try{await fetch('/api/seminar-logo',{method:'POST',headers:H,body:JSON.stringify({dataUrl:u})});}catch(e){}} else this.saveLocal(); }
+};
+const nowHM=()=>{const d=new Date();const p=n=>String(n).padStart(2,'0');return p(d.getHours())+':'+p(d.getMinutes());};
+
+/* ===== helpers ===== */
+const P=()=>S.participants;
+const find=id=>P().find(p=>p.id===id);
+function groupCounts(){const c=[0,0,0,0,0,0];P().forEach(p=>{if(p.group)c[p.group]++;});return c;}
+function cpCount(k){return Object.keys(S.checkins[k]||{}).length;}
+function escapeHtml(s){return String(s==null?'':s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
+function toast(m){const el=document.getElementById('toast');el.textContent=m;el.classList.add('show');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),1600);}
+
+/* ===== nav / shell ===== */
+const NAV=[['dash','▦'],['parts','☰'],['groups','◍'],['roles','◆'],['program','▤'],['badges','❏'],['checkin','✓']];
+function renderNav(){document.getElementById('nav').innerHTML=NAV.map(([id,ic])=>
+  `<button class="${VIEW===id?'on':''}" onclick="go('${id}')"><span class="ic">${ic}</span>${t(id)}</button>`).join('');}
+function go(v){VIEW=v;selEid=null;toggleNav(false);render();}
+function toggleNav(open){document.getElementById('side').classList.toggle('open',open);document.getElementById('scrim').classList.toggle('show',open);}
+function setLang(l){S.lang=l;document.getElementById('lang-uz').classList.toggle('on',l==='uz');document.getElementById('lang-ru').classList.toggle('on',l==='ru');api.saveLocal();render();}
+
+function render(){
+  renderNav();
+  document.getElementById('vtitle').textContent=t(VIEW);
+  document.getElementById('vdesc').textContent=t('vdesc_'+VIEW);
+  const v=document.getElementById('view');
+  if(VIEW==='dash')v.innerHTML=renderDash();
+  else if(VIEW==='parts')renderParts(v);
+  else if(VIEW==='groups')v.innerHTML=renderGroups();
+  else if(VIEW==='roles')renderRoles(v);
+  else if(VIEW==='program')renderProgram(v);
+  else if(VIEW==='badges')renderDesigner(v);
+  else if(VIEW==='checkin')renderCheckin(v);
+}
+
+/* ===== dashboard ===== */
+function renderDash(){
+  const gc=groupCounts(),total=P().length,
+    assigned=P().filter(p=>p.group).length,leaders=P().filter(p=>p.leader).length,
+    foreign=P().filter(p=>p.kelish==='Chet eldan alohida').length,maxg=Math.max(1,...gc.slice(1));
+  const gbars=[1,2,3,4,5].map(g=>`<div class="bar-row"><div class="lbl"><span class="dot" style="background:${GCOL[g]}"></span>${t('grp')} ${g}</div>
+    <div class="bar"><span style="width:${gc[g]/maxg*100}%;background:${GCOL[g]}"></span></div><div class="val tnum">${gc[g]} ${t('member')}</div></div>`).join('');
+  const cpbars=CPS().map(c=>{const n=cpCount(c.key);return`<div class="bar-row cp-row"><div class="lbl">${c.icon||'•'} ${escapeHtml(c.label)}</div>
+    <div class="bar"><span style="width:${total?n/total*100:0}%;background:var(--ok)"></span></div><div class="val tnum">${n}/${total}</div></div>`;}).join('')||`<div class="muted" style="font-size:12.5px">Nuqta yo'q</div>`;
+  return `<div class="stat-grid">
+    <div class="card stat"><div class="k">${t('total')}</div><div class="v tnum">${total}</div><div class="n">7 single · 76 double · 18 triple · 3 posh</div></div>
+    <div class="card stat"><div class="k">${t('assigned')}</div><div class="v tnum">${assigned}</div><div class="n">${total-assigned} ${t('noGroup').toLowerCase()}</div></div>
+    <div class="card stat"><div class="k">${t('leaders')}</div><div class="v tnum">${leaders}<span style="font-size:18px;color:var(--muted)">/5</span></div><div class="n">5 ${t('groups').toLowerCase()}</div></div>
+    <div class="card stat"><div class="k">${t('foreign')}</div><div class="v tnum">${foreign}</div><div class="n">Shvetsiya · Qozog'iston</div></div></div>
+  <div class="grid2">
+    <div class="card panel"><div class="ph"><span class="eyebrow">05</span><h3>${t('byGroup')}</h3></div>${gbars}</div>
+    <div class="card panel"><div class="ph"><span class="eyebrow">04</span><h3>${t('cpProgress')}</h3></div>${cpbars}</div></div>`;
+}
+
+/* ===== participants ===== */
+let fSearch='',fGroup='',fRoom='';
+function renderParts(v){
+  v.innerHTML=`<div class="toolbar">
+    <div class="search"><span class="mag">⌕</span><input id="q" placeholder="${t('search')}" value="${fSearch}"></div>
+    <select class="f" id="fg"><option value="">${t('allGroups')}</option>
+      ${[1,2,3,4,5].map(g=>`<option value="${g}" ${fGroup==g?'selected':''}>${t('grp')} ${g}</option>`).join('')}
+      <option value="0" ${fGroup=='0'?'selected':''}>${t('noGroup')}</option></select>
+    <select class="f" id="fr"><option value="">${t('allRooms')}</option>
+      ${['1 kishilik','2 kishilik','3 kishilik','Posh club'].map(r=>`<option ${fRoom==r?'selected':''}>${r}</option>`).join('')}</select></div>
+    <div class="tablewrap"><table><thead><tr>
+      <th>ID</th><th>F.I.O.</th><th>${t('room')}</th><th>${t('roommate')}</th><th>${t('arrival')}</th>
+      <th style="width:96px">${t('grp')}</th><th style="width:70px">${t('leaderCol')}</th></tr></thead><tbody id="tb"></tbody></table></div>`;
+  document.getElementById('q').oninput=e=>{fSearch=e.target.value;fillRows();};
+  document.getElementById('fg').onchange=e=>{fGroup=e.target.value;fillRows();};
+  document.getElementById('fr').onchange=e=>{fRoom=e.target.value;fillRows();};
+  fillRows();
+}
+function filtered(){const q=fSearch.trim().toLowerCase();
+  return P().filter(p=>{
+    if(q&&!(p.fio.toLowerCase().includes(q)||p.id.toLowerCase().includes(q)))return false;
+    if(fGroup==='0'&&p.group)return false;
+    if(fGroup&&fGroup!=='0'&&String(p.group)!==fGroup)return false;
+    if(fRoom&&p.xona_turi!==fRoom)return false;return true;});}
+function fillRows(){const tb=document.getElementById('tb');if(!tb)return;
+  tb.innerHTML=filtered().map(p=>{
+    const fc=p.kelish==='Chet eldan alohida'
+      ?`<span class="chip" style="background:#FFE0E0;color:#B00000"><span class="dot" style="background:#B00000"></span>${t('foreign')}</span>`
+      :`<span class="muted" style="font-size:12px">Umumiy</span>`;
+    const roleChips=(p.roles||[]).map(rid=>{const r=roleById(rid);return r?`<span class="chip" style="background:${r.color}1f;color:${r.color};font-size:10px;padding:1px 7px">${escapeHtml(r.label)}</span>`:'';}).join(' ');
+    return `<tr><td><span class="id">${p.id}</span></td>
+      <td><b style="font-weight:600">${escapeHtml(p.fio)}</b> <a href="${pageUrl(p.id)}" target="_blank" title="${t('openPage')}" style="text-decoration:none;color:var(--muted);font-size:11px">↗</a>
+      <div style="margin-top:2px;display:flex;gap:4px;flex-wrap:wrap;align-items:center"><span class="muted" style="font-size:11px">${p.fuqarolik}</span>${roleChips}</div></td>
+      <td><span class="rg" style="background:${RTCOL[p.xona_turi]}">${p.xona_turi}</span></td>
+      <td><span class="muted tnum">${p.xona_guruhi}</span></td><td>${fc}</td>
+      <td><select class="gsel" onchange="setGroup('${p.id}',this.value)"><option value="">—</option>
+        ${[1,2,3,4,5].map(g=>`<option value="${g}" ${p.group==g?'selected':''}>${t('grp')} ${g}</option>`).join('')}</select></td>
+      <td>${p.group?`<button class="star ${p.leader?'on':'off'}" onclick="toggleLeader('${p.id}')">${p.leader?'★':'☆'}</button>`:'<span class="muted">—</span>'}</td></tr>`;
+  }).join('')||`<tr><td colspan="7" class="muted" style="padding:30px;text-align:center">${t('notFound')}</td></tr>`;
+}
+function setGroup(id,g){const p=find(id);p.group=g?+g:null;if(!p.group)p.leader=false;
+  api.patch(id,{group:p.group,leader:p.leader});toast(t('saved'));if(VIEW==='parts')fillRows();}
+function toggleLeader(id){const p=find(id);if(!p.group)return;
+  if(!p.leader)P().forEach(x=>{if(x.group===p.group)x.leader=false;});
+  p.leader=!p.leader;api.patch(id,{leader:p.leader,group:p.group});toast(t('saved'));
+  if(VIEW==='parts')fillRows();else if(VIEW==='groups')render();}
+
+/* ===== groups ===== */
+function renderGroups(){
+  const cards=[1,2,3,4,5].map(g=>{
+    const mem=P().filter(p=>p.group===g).sort((a,b)=>(b.leader-a.leader)||a.fio.localeCompare(b.fio));
+    const body=mem.length?mem.map(p=>`<div class="mrow">
+      <button class="setlead ${p.leader?'on':''}" onclick="toggleLeader('${p.id}')">${p.leader?'★':'☆'}</button>
+      <span class="nm">${escapeHtml(p.fio)}${p.leader?` <span class="leadtag">${t('leaderTag')}</span>`:''}</span>
+      <span class="muted tnum" style="font-size:11px">${p.xona_guruhi}</span></div>`).join(''):`<div class="empty">${t('noMembers')}</div>`;
+    return `<div class="card grp"><div class="hd" style="background:${GCOL[g]}"><div class="t">${t('grp')} ${g}</div><div class="c">${mem.length} ${t('member')}</div></div><div class="bd">${body}</div></div>`;
+  }).join('');
+  return `<div class="toolbar"><button class="btn acc" onclick="autoDist()">✦ ${t('autoDist')}</button>
+    <button class="btn" onclick="clearGroups()">${t('clearAll')}</button>
+    <span class="muted" style="font-size:12.5px">${t('vdesc_groups')}</span></div><div class="grp-grid">${cards}</div>`;
+}
+function autoDist(){
+  const byRoom={};P().forEach(p=>{(byRoom[p.xona_guruhi]=byRoom[p.xona_guruhi]||[]).push(p);});
+  const rooms=Object.values(byRoom).sort((a,b)=>b.length-a.length);const counts=[0,0,0,0,0];
+  rooms.forEach(room=>{let mi=0;for(let i=1;i<5;i++)if(counts[i]<counts[mi])mi=i;
+    room.forEach(p=>{p.group=mi+1;p.leader=false;});counts[mi]+=room.length;});
+  api.bulk(P().map(p=>({id:p.id,group:p.group,leader:p.leader})));toast(t('distDone'));render();
+}
+function clearGroups(){P().forEach(p=>{p.group=null;p.leader=false;});
+  api.bulk(P().map(p=>({id:p.id,group:null,leader:false})));toast(t('cleared'));render();}
+
+/* ===== roles / responsibilities ===== */
+const VW=()=>document.getElementById('view');
+function renderRoles(v){
+  const cards=(S.roles||[]).map(r=>{
+    const assigned=P().filter(p=>(p.roles||[]).includes(r.id));
+    const opts=P().filter(p=>!(p.roles||[]).includes(r.id)).map(p=>`<option value="${p.id}">${escapeHtml(p.fio)}</option>`).join('');
+    return `<div class="card pblock" style="border-top:4px solid ${r.color}">
+      <div class="frow" style="margin:0 0 4px"><input type="text" value="${escapeHtml(r.label)}" onchange="editRole('${r.id}','label',this.value)" style="flex:1;font-weight:700;font-size:14px">
+        <input type="color" value="${r.color}" oninput="editRole('${r.id}','color',this.value)">
+        <button class="btn sm" style="color:#C0392B;border-color:#F3C6C0" onclick="delRole('${r.id}')">🗑</button></div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 12px">
+        ${assigned.map(p=>`<span class="chip" style="background:${r.color}1f;color:${r.color}">${escapeHtml(p.fio)} <b onclick="unassign('${p.id}','${r.id}')" style="cursor:pointer;margin-left:2px">✕</b></span>`).join('')||`<span class="muted" style="font-size:12px">${t('noRole')}</span>`}
+      </div>
+      <select class="f" style="width:100%" onchange="assignRole(this.value,'${r.id}')"><option value="">${t('assign')}…</option>${opts}</select>
+    </div>`;
+  }).join('');
+  v.innerHTML=`<div class="toolbar"><button class="btn acc" onclick="addRole()">${t('addRole')}</button>
+    <span class="muted" style="font-size:12.5px">${t('vdesc_roles')}</span></div>
+    <div class="grp-grid">${cards}</div>`;
+}
+function addRole(){const label=prompt(t('roleLabel')+':');if(!label)return;
+  const id='r_'+Math.random().toString(36).slice(2,6);
+  S.roles.push({id,label:label.trim(),color:'#2E2C6E'});api.saveRoles();renderRoles(VW());}
+function editRole(id,k,val){const r=roleById(id);if(!r)return;r[k]=val;api.saveRoles();if(k==='color')renderRoles(VW());}
+function delRole(id){if(!confirm(t('cpDelQ')))return;
+  P().forEach(p=>{if((p.roles||[]).includes(id)){p.roles=p.roles.filter(x=>x!==id);api.patch(p.id,{roles:p.roles});}});
+  S.roles=S.roles.filter(r=>r.id!==id);api.saveRoles();renderRoles(VW());}
+function assignRole(pid,rid){if(!pid)return;const p=find(pid);p.roles=p.roles||[];
+  if(!p.roles.includes(rid))p.roles.push(rid);api.patch(pid,{roles:p.roles});renderRoles(VW());}
+function unassign(pid,rid){const p=find(pid);p.roles=(p.roles||[]).filter(x=>x!==rid);api.patch(pid,{roles:p.roles});renderRoles(VW());}
+
+/* ===== program editor ===== */
+function renderProgram(v){
+  const m=S.meta||{};
+  const inp=(lab,val,fn)=>`<div class="frow"><label>${lab}</label><input value="${escapeHtml(val||'')}" onchange="${fn}"></div>`;
+  const metaBlock=`<div class="card pblock"><h4>${t('eventMeta')}</h4>
+    ${inp(t('metaTitle'),m.title,"setMeta('title',this.value)")}
+    ${inp(t('metaSub'),m.subtitle,"setMeta('subtitle',this.value)")}
+    ${inp(t('metaDates'),m.dates,"setMeta('dates',this.value)")}
+    ${inp(t('metaLoc'),m.location,"setMeta('location',this.value)")}
+    <div class="frow"><label>${t('pageBase')}</label><input value="${escapeHtml(S.pageBase||'')}" placeholder="${location.origin}" onchange="setPageBase(this.value)"></div>
+    <div class="muted" style="font-size:11.5px;margin-top:4px">${t('qrHint')}</div></div>`;
+  const days=(S.program||[]).map((d,di)=>`<div class="card pblock">
+    <div class="frow" style="margin-bottom:8px">
+      <input value="${escapeHtml(d.date||'')}" onchange="setDay(${di},'date',this.value)" style="width:96px;font-weight:700">
+      <input value="${escapeHtml(d.dow||'')}" onchange="setDay(${di},'dow',this.value)" style="width:110px">
+      <input value="${escapeHtml(d.title||'')}" onchange="setDay(${di},'title',this.value)" style="flex:1;font-weight:700">
+      <button class="btn sm" style="color:#C0392B;border-color:#F3C6C0" onclick="delDay(${di})">🗑</button></div>
+    ${(d.blocks||[]).map((b,bi)=>`<div style="margin:8px 0;padding-left:12px;border-left:3px solid var(--line-2)">
+      <input value="${escapeHtml(b.label||'')}" placeholder="${t('progBlockLabel')}" onchange="setBlock(${di},${bi},this.value)" style="width:100%;font-weight:600;padding:5px 9px;border:1px solid var(--line-2);border-radius:8px;margin-bottom:6px">
+      ${(b.items||[]).map((it,ii)=>`<div class="frow" style="margin:4px 0">
+        <input value="${escapeHtml(it.time||'')}" placeholder="${t('progTime')}" onchange="setItem(${di},${bi},${ii},'time',this.value)" style="width:96px">
+        <input value="${escapeHtml(it.text||'')}" onchange="setItem(${di},${bi},${ii},'text',this.value)" style="flex:1">
+        <button class="btn sm" onclick="delItem(${di},${bi},${ii})">✕</button></div>`).join('')}
+      <button class="btn sm" onclick="addItem(${di},${bi})">${t('progAddItem')}</button></div>`).join('')}
+    <button class="btn sm" onclick="addBlock(${di})">${t('progAddBlock')}</button></div>`).join('');
+  v.innerHTML=`<div class="toolbar"><button class="btn acc" onclick="addDay()">+ ${t('progDay')}</button>
+    <span class="muted" style="font-size:12.5px">${t('vdesc_program')}</span></div>${metaBlock}${days}`;
+}
+function setMeta(k,val){S.meta[k]=val;api.saveMeta();}
+function setPageBase(val){S.pageBase=val.trim().replace(/\/+$/,'');api.savePageBase();}
+function setDay(di,k,val){S.program[di][k]=val;api.saveProgram();}
+function setBlock(di,bi,val){S.program[di].blocks[bi].label=val;api.saveProgram();}
+function setItem(di,bi,ii,k,val){S.program[di].blocks[bi].items[ii][k]=val;api.saveProgram();}
+function addDay(){S.program.push({date:"",dow:"",title:"Yangi kun",subtitle:"",blocks:[{label:"",items:[{time:"",text:""}]}]});api.saveProgram();renderProgram(VW());}
+function delDay(di){if(!confirm('?'))return;S.program.splice(di,1);api.saveProgram();renderProgram(VW());}
+function addBlock(di){S.program[di].blocks.push({label:"",items:[{time:"",text:""}]});api.saveProgram();renderProgram(VW());}
+function addItem(di,bi){S.program[di].blocks[bi].items.push({time:"",text:""});api.saveProgram();renderProgram(VW());}
+function delItem(di,bi,ii){S.program[di].blocks[bi].items.splice(ii,1);api.saveProgram();renderProgram(VW());}
+
+/* ===== checkin ===== */
+let ciSearch='';
+function renderCheckin(v){
+  if(!CPS().some(c=>c.key===activeCP))activeCP=(CPS()[0]||{}).key;
+  v.innerHTML=`<div class="toolbar" style="gap:8px">${CPS().map(c=>`
+    <button class="btn ${activeCP===c.key?'pri':''}" style="flex-direction:column;align-items:flex-start;min-width:140px;position:relative" onclick="setCP('${c.key}')">
+      <span style="font-weight:700">${c.icon||'•'} ${escapeHtml(c.label)}</span>
+      <span style="font-size:11.5px;opacity:.8"><span class="tnum">${cpCount(c.key)}</span>/${P().length} ${t('checkedIn')}</span>
+      <span onclick="event.stopPropagation();delCP('${c.key}')" title="${t('cpDel')}" style="position:absolute;top:4px;right:6px;font-size:12px;color:#C0392B;opacity:.6">✕</span></button>`).join('')}
+    <button class="btn" onclick="addCP()" style="min-width:auto">${t('cpAdd')}</button></div>
+    <div class="toolbar">
+      <input id="scan" placeholder="${t('scanPh')}" autocomplete="off" style="flex:1;min-width:200px;padding:11px 14px;border:1px solid var(--line-2);border-radius:10px;font-weight:600">
+      <div class="search"><span class="mag">⌕</span><input id="ciq" placeholder="${t('search')}" value="${ciSearch}"></div></div>
+    <div class="card"><div id="cil"></div></div>`;
+  const sc=document.getElementById('scan');if(!sc)return;
+  sc.onkeydown=e=>{if(e.key==='Enter'){const raw=sc.value.trim().toUpperCase().replace(/[^0-9]/g,'');
+    const p=P().find(x=>x.id.replace(/[^0-9]/g,'')===raw||x.id.toUpperCase()===sc.value.trim().toUpperCase());
+    if(p){doCheck(p.id,!(S.checkins[activeCP]||{})[p.id]);sc.value='';}else{toast(t('notFound'));sc.select();}}};
+  document.getElementById('ciq').oninput=e=>{ciSearch=e.target.value;fillCI();};
+  fillCI();sc.focus();
+}
+function setCP(k){activeCP=k;renderCheckin(document.getElementById('view'));}
+function fillCI(){const cil=document.getElementById('cil');if(!cil)return;
+  const q=ciSearch.trim().toLowerCase();const map=S.checkins[activeCP]||{};
+  const list=P().filter(p=>!q||p.fio.toLowerCase().includes(q)||p.id.toLowerCase().includes(q)).slice(0,80);
+  cil.innerHTML=list.map(p=>{const on=!!map[p.id];
+    const room=activeCP==='mehmonxona'?`<input class="cellinput" placeholder="${t('roomNo')}" value="${p.room||''}" onchange="setRoom('${p.id}',this.value)">`:'';
+    return `<div class="mrow" style="padding:10px 14px"><span class="id">${p.id}</span>
+      <span class="nm" style="flex:1"><b style="font-weight:600">${escapeHtml(p.fio)}</b>
+      <div class="muted" style="font-size:11.5px">${p.xona_turi} · ${p.xona_guruhi} · ${p.group?t('grp')+' '+p.group:t('noGroup')}</div></span>
+      ${room}${on?`<span style="font-size:11.5px;color:var(--ok);font-weight:700">✓ ${map[p.id]}</span>`:''}
+      <button class="btn sm ${on?'':'pri'}" onclick="doCheck('${p.id}',${!on})">${on?t('notYet'):'✓ '+t('checkedIn')}</button></div>`;
+  }).join('')||`<div class="empty" style="padding:26px;text-align:center">${t('notFound')}</div>`;
+}
+async function doCheck(id,on){const ts=await api.checkin(id,activeCP,on);const map=S.checkins[activeCP]=S.checkins[activeCP]||{};
+  if(on){map[id]=ts||nowHM();toast(find(id).fio+' — '+cpName(activeCP)+': '+t('pos'));}
+  else{delete map[id];toast(find(id).fio+' — '+t('neg'));}
+  renderCheckin(document.getElementById('view'));}
+function setRoom(id,val){find(id).room=val;api.patch(id,{room:val});toast(t('saved'));}
+function addCP(){const label=prompt(t('cpAddQ'));if(!label)return;
+  const icon=prompt(t('cpIconQ'),'📍')||'📍';
+  const key='cp_'+Math.random().toString(36).slice(2,7);
+  S.checkpoints.push({key,label:label.trim(),icon:icon.trim()});S.checkins[key]={};
+  activeCP=key;api.saveCheckpoints();renderCheckin(document.getElementById('view'));}
+function delCP(key){if(!confirm(t('cpDelQ')))return;
+  S.checkpoints=S.checkpoints.filter(c=>c.key!==key);delete S.checkins[key];
+  api.saveCheckpoints();renderCheckin(document.getElementById('view'));}
+
+/* ===== BADGE DESIGNER ===== */
+function getEl(id){return S.badge.elements.find(e=>e.id===id);}
+function sampleP(){return P()[sampleIdx]||P()[0];}
+function badgeInner(p){
+  const logo=S.seminarLogo||ACOUSTIC;
+  return S.badge.elements.map(e=>{
+    const pos=`left:${e.x}mm;top:${e.y}mm;`;
+    if(e.type==='band')return `<div class="be" data-eid="${e.id}" style="${pos}width:${e.w}mm;height:${e.h}mm;background:${e.color}"></div>`;
+    if(e.type==='logo')return `<div class="be" data-eid="${e.id}" style="${pos}width:${e.w}mm"><img src="${logo}" style="width:100%;display:block"></div>`;
+    if(e.type==='qr')return `<div class="be beqr" data-eid="${e.id}" style="${pos}width:${e.w}mm;height:${e.w}mm"><canvas data-qr="${p.id}" style="width:100%;height:100%"></canvas></div>`;
+    const txt=e.type==='field'?(e.field==='name'?p.fio:p.id):e.text;
+    const ls=e.letter?`letter-spacing:${e.letter}px;`:'';
+    return `<div class="be betext" data-eid="${e.id}" style="${pos}width:${e.w}mm;font-size:${e.size}mm;color:${e.color};font-weight:${e.weight};text-align:${e.align};${ls}line-height:1.05">${escapeHtml(txt)}</div>`;
+  }).join('');
+}
+function pageUrl(id){const base=(S.pageBase||location.origin||'').replace(/\/+$/,'');return (base||'')+'/p/'+id;}
+function fillQR(root){root.querySelectorAll('canvas[data-qr]').forEach(cv=>{
+  new QRious({element:cv,value:pageUrl(cv.dataset.qr),size:300,level:'M',foreground:'#211F52',background:'#ffffff'});});}
+
+function renderDesigner(v){
+  if(!S.badge)S.badge=defaultBadge();
+  const sc=editorScale(), stageW=bw()*PXMM*sc, stageH=bh()*PXMM*sc;
+  v.innerHTML=`<div class="toolbar">
+      <button class="btn pri" onclick="printAll()">⎙ ${t('printAll')}</button>
+      <button class="btn" onclick="resetTpl()">↺ ${t('resetTpl')}</button>
+      <span class="muted" style="font-size:12.5px">${t('vdesc_badges')} · ${(bw()/10).toFixed(0)}×${(bh()/10).toFixed(0)} sm</span></div>
+    <div class="des">
+      <div class="des-stage-wrap">
+        <div class="stage" style="width:${stageW}px;height:${stageH}px;transform:scale(${sc})">
+          <div class="badge-box editing" id="ebox" style="width:${bw()}mm;height:${bh()}mm;background:${S.badge.bg}">
+            <div class="punch"></div>${badgeInner(sampleP())}
+          </div></div></div>
+      <div class="props" id="props"></div>
+    </div>`;
+  fillQR(document.getElementById('ebox'));
+  bindDrag();renderProps();
+}
+function bindDrag(){
+  document.querySelectorAll('#ebox .be').forEach(el=>{
+    el.onpointerdown=ev=>{ev.preventDefault();selEid=el.dataset.eid;markSel();renderProps();
+      const e=getEl(selEid);const sx=e.x,sy=e.y,dx=ev.clientX,dy=ev.clientY;const sc=editorScale();
+      const move=m=>{e.x=Math.max(-2,Math.min(bw(),sx+(m.clientX-dx)/(PXMM*sc)));
+        e.y=Math.max(-2,Math.min(bh(),sy+(m.clientY-dy)/(PXMM*sc)));
+        el.style.left=e.x.toFixed(1)+'mm';el.style.top=e.y.toFixed(1)+'mm';syncNum('px',e.x);syncNum('py',e.y);};
+      const up=()=>{document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);api.saveBadge();};
+      document.addEventListener('pointermove',move);document.addEventListener('pointerup',up);};
+  });
+}
+function markSel(){document.querySelectorAll('#ebox .be').forEach(el=>el.classList.toggle('sel',el.dataset.eid===selEid));}
+function syncNum(id,val){const el=document.getElementById('pf_'+id);if(el)el.value=(+val).toFixed(1);}
+
+function renderProps(){
+  const box=document.getElementById('props');if(!box)return;
+  const opts=P().map((p,i)=>`<option value="${i}" ${i===sampleIdx?'selected':''}>${escapeHtml(p.fio)}</option>`).join('');
+  const logoPrev=(S.seminarLogo||ACOUSTIC);
+  let sel='';
+  const e=selEid?getEl(selEid):null;
+  if(e){sel=elementForm(e);}else{sel=`<div class="nofocus">${t('pickEl')}</div>`;}
+  box.innerHTML=`
+    <div class="card pblock"><h4>${t('elements')}</h4>
+      <div class="addrow">
+        <button class="btn" onclick="addEl('field','name')">${t('addField')}</button>
+        <button class="btn" onclick="addEl('text')">${t('addText')}</button>
+        <button class="btn" onclick="addEl('qr')">${t('addQR')}</button>
+        <button class="btn" onclick="addEl('logo')">${t('addLogo')}</button>
+        <button class="btn" onclick="addEl('band')">${t('addBand')}</button>
+      </div>
+    </div>
+    <div class="card pblock"><h4>${t('properties')}</h4>${sel}</div>
+    <div class="card pblock"><h4>${t('badgeSize')}</h4>
+      <div class="addrow" style="margin-bottom:10px">
+        ${SIZE_PRESETS.map(([w,h])=>`<button class="btn sm ${bw()==w&&bh()==h?'pri':''}" onclick="setSize(${w},${h})">${w/10}×${h/10}</button>`).join('')}
+      </div>
+      <div class="frow"><label>${t('bwCm')}</label><input type="number" step="0.5" value="${(bw()/10)}" oninput="setSize(Math.round(this.value*10), bh())"></div>
+      <div class="frow"><label>${t('bhCm')}</label><input type="number" step="0.5" value="${(bh()/10)}" oninput="setSize(bw(), Math.round(this.value*10))"></div>
+    </div>
+    <div class="card pblock"><h4>${t('front')}</h4>
+      <div class="frow"><label>${t('samplePerson')}</label><select onchange="sampleIdx=+this.value;refreshStage()">${opts}</select></div>
+      <div class="frow"><label>${t('badgeBg')}</label><input type="color" value="${S.badge.bg}" oninput="S.badge.bg=this.value;api.saveBadge();refreshStage()"></div>
+      <div class="frow" style="align-items:flex-start"><label>${t('seminarLogo')}</label>
+        <div class="logo-up"><div class="prev"><img src="${logoPrev}"></div>
+          <label class="btn sm" style="cursor:pointer">${t('uploadLogo')}<input type="file" accept="image/*" style="display:none" onchange="uploadLogo(this)"></label></div></div>
+    </div>`;
+}
+function elementForm(e){
+  const num=(id,lab,val,step)=>`<div class="frow"><label>${lab}</label><input id="pf_${id}" type="number" step="${step||1}" value="${val}" oninput="setProp('${e.id}','${id.replace(/^p[xy]$/,m=>m==='px'?'x':'y')}',this.value,true)"></div>`;
+  let f=`<div class="frow"><label>${t('posX')}</label><input id="pf_px" type="number" step="0.5" value="${(+e.x).toFixed(1)}" oninput="setProp('${e.id}','x',this.value,true)"></div>
+    <div class="frow"><label>${t('posY')}</label><input id="pf_py" type="number" step="0.5" value="${(+e.y).toFixed(1)}" oninput="setProp('${e.id}','y',this.value,true)"></div>`;
+  if(e.type==='field'||e.type==='text'){
+    if(e.type==='field')f+=`<div class="frow"><label>${t('field')}</label><select onchange="setProp('${e.id}','field',this.value)">
+      <option value="name" ${e.field==='name'?'selected':''}>${t('fieldName')}</option>
+      <option value="id" ${e.field==='id'?'selected':''}>${t('fieldId')}</option></select></div>`;
+    if(e.type==='text')f+=`<div class="frow"><label>${t('text')}</label><input type="text" value="${escapeHtml(e.text)}" oninput="setProp('${e.id}','text',this.value)"></div>`;
+    f+=`<div class="frow"><label>${t('width')}</label><input type="number" step="1" value="${e.w}" oninput="setProp('${e.id}','w',this.value)"></div>
+      <div class="frow"><label>${t('fsize')}</label><input type="number" step="0.2" value="${e.size}" oninput="setProp('${e.id}','size',this.value)"></div>
+      <div class="frow"><label>${t('color')}</label><input type="color" value="${e.color}" oninput="setProp('${e.id}','color',this.value)"></div>
+      <div class="frow"><label>${t('weight')}</label><select onchange="setProp('${e.id}','weight',this.value)">
+        <option value="400" ${e.weight==400?'selected':''}>${t('wNormal')}</option>
+        <option value="700" ${e.weight==700?'selected':''}>${t('wBold')}</option>
+        <option value="800" ${e.weight==800?'selected':''}>${t('wBlack')}</option></select></div>
+      <div class="frow"><label>${t('align')}</label><div class="seg">
+        ${['left','center','right'].map(a=>`<button class="${e.align===a?'on':''}" onclick="setProp('${e.id}','align','${a}')">${a==='left'?'⌷◄':a==='center'?'▬':'►⌷'}</button>`).join('')}</div></div>`;
+  }else if(e.type==='qr'){
+    f+=`<div class="frow"><label>${t('qrsize')}</label><input type="number" step="1" value="${e.w}" oninput="setProp('${e.id}','w',this.value)"></div>`;
+  }else if(e.type==='logo'){
+    f+=`<div class="frow"><label>${t('width')}</label><input type="number" step="1" value="${e.w}" oninput="setProp('${e.id}','w',this.value)"></div>`;
+  }else if(e.type==='band'){
+    f+=`<div class="frow"><label>${t('width')}</label><input type="number" step="1" value="${e.w}" oninput="setProp('${e.id}','w',this.value)"></div>
+      <div class="frow"><label>${t('height')}</label><input type="number" step="0.5" value="${e.h}" oninput="setProp('${e.id}','h',this.value)"></div>
+      <div class="frow"><label>${t('color')}</label><input type="color" value="${e.color}" oninput="setProp('${e.id}','color',this.value)"></div>`;
+  }
+  f+=`<button class="btn sm" style="margin-top:8px;color:#C0392B;border-color:#F3C6C0" onclick="delEl('${e.id}')">🗑 ${t('delEl')}</button>`;
+  return f;
+}
+function setProp(id,key,val,noRerender){const e=getEl(id);
+  if(['x','y','w','h','size','letter'].includes(key))val=parseFloat(val)||0;
+  e[key]=val;api.saveBadge();
+  if(noRerender){refreshStageOnly();}else{refreshStage();renderProps();}
+}
+function refreshStage(){const box=document.getElementById('ebox');if(!box)return;
+  box.style.background=S.badge.bg;
+  box.innerHTML=`<div class="punch"></div>`+badgeInner(sampleP());
+  fillQR(box);bindDrag();markSel();}
+function refreshStageOnly(){const box=document.getElementById('ebox');if(!box)return;
+  box.innerHTML=`<div class="punch"></div>`+badgeInner(sampleP());fillQR(box);bindDrag();markSel();}
+function addEl(type,field){
+  const id='e_'+Math.random().toString(36).slice(2,7);
+  const base={id,type,x:25,y:50};
+  if(type==='field')Object.assign(base,{field:field||'name',w:40,size:6,color:'#211F52',weight:700,align:'center'});
+  if(type==='text')Object.assign(base,{text:'MATN',w:40,size:5,color:'#2E2C6E',weight:700,align:'center',letter:0});
+  if(type==='qr')Object.assign(base,{w:22});
+  if(type==='logo')Object.assign(base,{w:24});
+  if(type==='band')Object.assign(base,{w:70,h:8,color:'#F07E1A',x:0});
+  S.badge.elements.push(base);selEid=id;api.saveBadge();refreshStage();renderProps();
+}
+function delEl(id){S.badge.elements=S.badge.elements.filter(e=>e.id!==id);selEid=null;api.saveBadge();refreshStage();renderProps();}
+function setSize(w,h){w=Math.max(40,Math.min(150,+w||70));h=Math.max(40,Math.min(200,+h||110));
+  S.badge.w=w;S.badge.h=h;api.saveBadge();renderDesigner(document.getElementById('view'));}
+function resetTpl(){S.badge=defaultBadge();selEid=null;api.saveBadge();renderDesigner(document.getElementById('view'));toast(t('resetDone'));}
+function uploadLogo(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{S.seminarLogo=r.result;api.saveLogo(r.result);refreshStage();renderProps();};r.readAsDataURL(f);}
+
+function printAll(){const wrap=document.getElementById('printwrap');
+  wrap.innerHTML=P().map(p=>`<div class="pbadge" style="width:${bw()}mm;height:${bh()}mm;background:${S.badge.bg}">${badgeInner(p)}</div>`).join('');
+  fillQR(wrap);setTimeout(()=>window.print(),150);}
+
+/* ===== boot ===== */
+(async function(){
+  const data=await api.boot();
+  if(data&&data.participants&&data.participants.length){
+    S.participants=data.participants.map(p=>({group:null,leader:false,room:'',branch:'',telegram:'',roles:[],...p}));
+    S.checkins=data.checkins||{};S.badge=data.badge||null;S.seminarLogo=data.seminarLogo||null;
+    S.checkpoints=data.checkpoints||[];S.program=data.program||[];S.roles=data.roles||[];
+    S.meta=data.meta||{};S.pageBase=data.pageBase||null;
+    if(data.lang)S.lang=data.lang;
+  }else{
+    S.participants=BASE.map(p=>({...p,group:null,leader:false,room:'',branch:'',telegram:'',roles:[]}));
+  }
+  if(!S.badge)S.badge=defaultBadge();
+  if(!S.checkpoints||!S.checkpoints.length)S.checkpoints=DEF_CPS.map(c=>({...c}));
+  if(!S.roles||!S.roles.length)S.roles=DEF_ROLES.map(r=>({...r}));
+  if(!S.program)S.program=[];
+  if(!S.meta||!S.meta.title)S.meta={...DEF_META};
+  if(!S.checkins)S.checkins={};
+  S.checkpoints.forEach(c=>{if(!S.checkins[c.key])S.checkins[c.key]={};});
+  activeCP=(S.checkpoints[0]||{}).key||'';
+  const mt=document.getElementById('modeTag');
+  const dot={server:'#12B886',local:'#F0A81A',memory:'#B0AFC4'}[api.mode];
+  mt.innerHTML=`<span class="dot" style="background:${dot}"></span>${api.mode==='server'?'Server':api.mode==='local'?'Lokal (brauzer)':'Vaqtinchalik'}`;
+  document.getElementById('lang-uz').classList.toggle('on',S.lang==='uz');
+  document.getElementById('lang-ru').classList.toggle('on',S.lang==='ru');
+  render();
+})();
+</script>
+</body>
+</html>

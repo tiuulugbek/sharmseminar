@@ -1,0 +1,1396 @@
+import asyncio
+import io
+import logging
+import os
+from datetime import date, datetime
+
+from aiogram import Bot, Dispatcher, F
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
+from aiogram.filters import Command, CommandStart
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import (
+    CallbackQuery,
+    BufferedInputFile,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    KeyboardButton,
+    Message,
+    ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
+)
+
+import broadcast
+import api_client
+import config
+import drive
+import seminar_store as sheets
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+bot = Bot(token=config.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+dp = Dispatcher()
+
+# Jadvalga yozishlarni ketma-ket bajarish uchun (parallel yozuvlar to'qnashmasin)
+sheet_lock = asyncio.Lock()
+
+
+async def send_personal_page(user_id: int, participant_id: str):
+    """Send the live participant page and a QR pointing to the same URL."""
+    url = f"{config.PUBLIC_URL}/p/{participant_id}"
+    details = {}
+    try:
+        details = await asyncio.to_thread(api_client.participant, participant_id)
+    except Exception:
+        logger.exception("Shaxsiy sahifa ma'lumotini olishda xato: %s", participant_id)
+    p = details.get("participant") or {}
+    roles = ", ".join(r.get("label", "") for r in details.get("roles", []) if r.get("label"))
+    lines = ["🎫 <b>Shaxsiy seminar sahifangiz</b>", f'<a href="{url}">{url}</a>']
+    if p.get("group"):
+        lines.append(f"👥 Guruhingiz: <b>{p['group']}</b>")
+    if details.get("groupLeader"):
+        lines.append(f"👤 Guruhboshingiz: <b>{details['groupLeader']}</b>")
+    if roles:
+        lines.append(f"📌 Mas’uliyatingiz: <b>{roles}</b>")
+    await bot.send_message(user_id, "\n".join(lines), disable_web_page_preview=True)
+    try:
+        import qrcode
+        qr = qrcode.make(url)
+        buf = io.BytesIO()
+        qr.save(buf, format="PNG")
+        await bot.send_photo(user_id, BufferedInputFile(buf.getvalue(), filename=f"{participant_id}-qr.png"),
+                             caption="QR-kod — shaxsiy seminar sahifangiz")
+    except Exception:
+        logger.exception("QR yaratish/yuborishda xato: %s", participant_id)
+
+
+async def _regroup_safe():
+    """Jadvalni sheriklar ketma-ket turadigan qilib qayta tartiblaydi (xato bo'lsa yutadi)."""
+    try:
+        await asyncio.to_thread(sheets.regroup_partners)
+    except Exception:
+        logger.exception("Avto qayta-tartiblashda xato")
+
+
+# ──────────────────────────── Holatlar ────────────────────────────
+class Reg(StatesGroup):
+    role = State()
+    name = State()
+    surname = State()
+    birthdate = State()
+    parent_confirm = State()  # 21 yoshgacha — ota/ona hamrohligi tasdiqi
+    phone = State()
+    passport = State()
+    passport_series = State()
+    passport_expiry = State()
+    room_size = State()
+    # Sherik (xodim / shifokor)
+    comp_type = State()
+    comp_registered = State()
+    comp_series = State()
+    # Oila a'zosi (start orqali) — avval kimning oila a'zosi ekani (sherigi) belgilanadi
+    fam_owner = State()
+    # Oila a'zosi (xodim sherik sifatida shu yerda to'ldiradi — inline)
+    fam_name = State()
+    fam_surname = State()
+    fam_birthdate = State()
+    fam_passport = State()
+    fam_series = State()
+    fam_expiry = State()
+    confirm = State()
+
+
+class Upd(StatesGroup):
+    """Mavjud ma'lumotni yangilash (tahrirlash) oqimi."""
+    find = State()   # pasport seriyasini so'rab, qatorni topish
+    menu = State()   # qaysi maydonni tahrirlash
+    value = State()  # yangi qiymatni kiritish
+
+
+class Admin(StatesGroup):
+    """Admin panel — ommaviy xabar yuborish oqimi."""
+    broadcast = State()  # e'lon matnini/rasmini kutish
+
+
+class Join(StatesGroup):
+    """Ro'yxat yopilgandan keyin: pasport seriyasini tekshirib, guruhga taklif."""
+    series = State()
+
+
+# ──────────────────────────── Yordamchilar ────────────────────────────
+def parse_date(text: str):
+    text = text.strip().replace("/", ".").replace("-", ".")
+    # Asosiy format: kun-oy-yil (dd-mm-yyyy). Eski yil-oy-kun ham qabul qilinadi.
+    for fmt in ("%d.%m.%Y", "%Y.%m.%d"):
+        try:
+            return datetime.strptime(text, fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+def fmt_date(d: date) -> str:
+    """Sanani dd-mm-yyyy ko'rinishida qaytaradi."""
+    return d.strftime("%d-%m-%Y")
+
+
+def calc_age(bd: date) -> int:
+    today = date.today()
+    return today.year - bd.year - ((today.month, today.day) < (bd.month, bd.day))
+
+
+def kb(rows, contact=False) -> ReplyKeyboardMarkup:
+    buttons = [[KeyboardButton(text=t, request_contact=contact and t == rows[0][0]) for t in row] for row in rows]
+    return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True, one_time_keyboard=True)
+
+
+ROLE_KB = kb([["🧑‍💼 Xodim", "🩺 Shifokor/Diller"], ["👨‍👩‍👧 Oila a'zosi"], ["✏️ Ma'lumotni yangilash"]])
+ROOM_KB = kb([config.ROOM_SIZES])
+COMP_TYPE_KB = kb([["👥 Xodim", "🩺 Shifokor/Diller"], ["👨‍👩‍👧 Oila a'zosi"]])
+COMP_REGISTERED_KB = kb([["✅ Kiritilgan", "🆕 Hali kiritilmagan"]])
+YESNO_KB = kb([["✅ Ha", "❌ Yo'q"]])
+PHONE_KB = ReplyKeyboardMarkup(
+    keyboard=[[KeyboardButton(text="📱 Raqamni yuborish", request_contact=True)]],
+    resize_keyboard=True,
+    one_time_keyboard=True,
+)
+
+# Update'da tahrirlanadigan maydonlar: (tugma matni, sheets ustun indeksi, tur)
+UPD_FIELDS = [
+    ("Ism", 4, "text"),
+    ("Familya", 5, "text"),
+    ("Tug'ilgan sana", 6, "date"),
+    ("Telefon", 8, "phone"),
+    ("Pasport seriya", 9, "series"),
+    ("Amal muddati", 10, "expiry"),
+    ("Xona", 11, "room"),
+    ("Pasport rasmi", 13, "photo"),
+]
+
+
+def upd_menu_kb() -> ReplyKeyboardMarkup:
+    labels = [f[0] for f in UPD_FIELDS]
+    rows = [labels[i : i + 2] for i in range(0, len(labels), 2)]
+    rows.append(["✅ Saqlash", "❌ Bekor"])
+    buttons = [[KeyboardButton(text=t) for t in r] for r in rows]
+    return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
+
+
+def upd_summary(row: list) -> str:
+    photo_state = "✅ bor" if row[13] else "❌ yo'q"
+    return (
+        "✏️ <b>Ma'lumotni tahrirlash</b>\n\n"
+        f"<b>Ism:</b> {row[4]}\n"
+        f"<b>Familya:</b> {row[5]}\n"
+        f"<b>Tug'ilgan sana:</b> {row[6]} ({row[7]} yosh)\n"
+        f"<b>Telefon:</b> {row[8]}\n"
+        f"<b>Pasport seriya:</b> {row[9]}\n"
+        f"<b>Amal muddati:</b> {row[10]}\n"
+        f"<b>Xona:</b> {row[11]}\n"
+        f"<b>Pasport rasmi:</b> {photo_state}\n\n"
+        "O'zgartirmoqchi bo'lgan maydon tugmasini tanlang yoki «✅ Saqlash»."
+    )
+
+
+EGYPT_WARNING = (
+    "⚠️ <b>Diqqat!</b> Misr davlati talabiga ko'ra, <b>21 yoshgacha</b> bo'lganlar faqat "
+    "ota-onasi yoki ulardan biri bilan birga borishi mumkin. Boshqa shaxslar bilan borishga ruxsat berilmaydi."
+)
+
+EXPIRY_HINT = (
+    "📆 <b>Pasport amal qilish muddatini</b> kiriting (masalan: <code>15-08-2027</code>).\n"
+    f"⚠️ Misr talabi: pasport kamida <b>{fmt_date(config.PASSPORT_MIN_EXPIRY)}</b> gacha amal qilishi shart "
+    "(safardan keyin 6 oy)."
+)
+
+
+def check_expiry(text: str):
+    """(date, xato_xabari) qaytaradi."""
+    d = parse_date(text)
+    if not d:
+        return None, "❌ Sana noto'g'ri. Namuna: <code>15-08-2027</code>"
+    if d < config.PASSPORT_MIN_EXPIRY:
+        return None, (
+            f"❌ Pasport muddati juda erta tugaydi. Kamida "
+            f"<b>{fmt_date(config.PASSPORT_MIN_EXPIRY)}</b> gacha amal qilishi kerak (Misr talabi: 6 oy)."
+        )
+    return d, None
+
+
+async def series_exists(series: str) -> bool:
+    """Pasport seriyasi jadvalda allaqachon bormi — Google Sheet orqali tekshiradi."""
+    s = (series or "").strip().upper()
+    if not s:
+        return False
+    try:
+        existing = await asyncio.to_thread(sheets.fetch_series)
+    except Exception:
+        logger.exception("Seriyalarni o'qishda xato")
+        return False
+    return s in existing
+
+
+async def extract_passport(message: Message):
+    if message.photo:
+        return {"type": "photo", "file_id": message.photo[-1].file_id, "mime": "image/jpeg", "ext": ".jpg"}
+    if message.document:
+        doc = message.document
+        ext = os.path.splitext(doc.file_name or "")[1] or ".bin"
+        return {"type": "document", "file_id": doc.file_id, "mime": doc.mime_type or "application/octet-stream", "ext": ext}
+    return None
+
+
+async def upload_passport_to_drive(passport: dict, person_label: str) -> str:
+    if not passport:
+        return ""
+    try:
+        tg_file = await bot.get_file(passport["file_id"])
+        buf = await bot.download_file(tg_file.file_path)
+        data = buf.read()
+        safe = person_label.replace(" ", "_").replace("/", "-")
+        filename = f"{safe}{passport['ext']}"
+        return await asyncio.to_thread(drive.upload_bytes, data, filename, passport["mime"])
+    except Exception:
+        logger.exception("Drive'ga yuklashda xato")
+        return ""
+
+
+# ──────────────────────────── /start ────────────────────────────
+@dp.message(CommandStart(), F.chat.type == "private")
+async def cmd_start(message: Message, state: FSMContext):
+    await state.clear()
+    await message.answer(
+        "👋 <b>Assalomu alaykum!</b>\n\n"
+        "📋 <b>Ro'yxatga olish yakunlandi.</b>\n\n"
+        "Agar siz ro'yxatdan o'tgan bo'lsangiz, quyidagilardan <b>birini</b> kiriting — "
+        "tekshirib, sizni safar guruhiga taklif qilamiz:\n"
+        "• <b>Pasport seriya raqami</b> (masalan: <code>AA1234567</code>), yoki\n"
+        "• <b>Tug'ilgan sana</b> (kun-oy-yil, masalan: <code>21-05-1990</code>)",
+        reply_markup=ReplyKeyboardRemove(),
+    )
+    await state.set_state(Join.series)
+
+
+@dp.message(Command("bekor"), F.chat.type == "private")
+async def cmd_cancel(message: Message, state: FSMContext):
+    await state.clear()
+    await message.answer("❌ Bekor qilindi. Qaytadan boshlash uchun /start", reply_markup=ReplyKeyboardRemove())
+
+
+@dp.message(Command("royxat"), F.chat.type == "private")
+async def cmd_register(message: Message, state: FSMContext):
+    """Open the full registration flow without changing the /start lookup flow."""
+    await state.clear()
+    await message.answer("📋 <b>Ro‘yxatdan o‘tish</b>\n\nToifangizni tanlang:", reply_markup=ROLE_KB)
+    await state.set_state(Reg.role)
+
+
+@dp.message(Command("yangilash"), F.chat.type == "private")
+async def cmd_update(message: Message, state: FSMContext):
+    await state.clear()
+    await message.answer("✏️ Pasport seriya raqamingizni kiriting:", reply_markup=ReplyKeyboardRemove())
+    await state.set_state(Upd.find)
+
+
+# ──────────────── Guruhga qo'shilish (ro'yxat yopilgandan keyingi asosiy oqim) ────────────────
+async def _do_join(user_id: int, full_name: str, idx: int, username: str = ""):
+    """Topilgan qatorga Telegram ID ni saqlab, foydalanuvchini guruhga taklif qiladi."""
+    try:
+        async with sheet_lock:
+            participant = await asyncio.to_thread(sheets.set_telegram_id, idx, user_id, username)
+    except api_client.ApiError as exc:
+        logger.warning("Telegram ID bog'lanmadi: %s", exc)
+        if exc.status == 409:
+            await bot.send_message(
+                user_id,
+                "⚠️ Bu Telegram akkaunt boshqa ishtirokchiga biriktirilgan. "
+                "Administrator bilan bog‘laning.")
+        else:
+            await bot.send_message(user_id, "⚠️ Ma’lumotni saqlashda xato. Keyinroq qayta urinib ko‘ring.")
+        return
+    except Exception:
+        logger.exception("Telegram ID saqlashda xato")
+        await bot.send_message(user_id, "⚠️ Ma’lumotni saqlashda xato. Keyinroq qayta urinib ko‘ring.")
+        return
+
+    await bot.send_message(user_id, f"✅ <b>Topildi:</b> {full_name}\nRo'yxatdan o'tganingiz tasdiqlandi.")
+    await send_personal_page(user_id, (participant or {}).get("id") or str(idx))
+
+    if not config.GROUP_CHAT_ID:
+        await bot.send_message(user_id, "ℹ️ Guruh havolasi hozircha mavjud emas. Administrator bilan bog'laning.")
+        return
+    if await broadcast.is_in_group(bot, user_id):
+        await bot.send_message(user_id, "👥 Siz allaqachon safar guruhidasiz. ✅")
+        return
+    ok = await broadcast.send_group_invite_to(bot, user_id, full_name)
+    if not ok:
+        await bot.send_message(user_id, "⚠️ Guruh havolasini yaratishda muammo bo'ldi. Administrator bilan bog'laning.")
+
+
+@dp.message(Join.series, F.text)
+async def join_check_series(message: Message, state: FSMContext):
+    text = message.text.strip()
+    bd = parse_date(text)
+
+    if bd:
+        # ── Tug'ilgan sana bo'yicha qidiruv ──
+        matches = await asyncio.to_thread(sheets.find_rows_by_birthdate, text)
+        if not matches:
+            await message.answer(
+                f"❌ Bu tug'ilgan sana (<code>{fmt_date(bd)}</code>) bo'yicha ro'yxatda hech kim topilmadi.\n"
+                "Tekshirib qayta kiriting yoki pasport seriyangizni yozing."
+            )
+            return
+        if len(matches) == 1:
+            idx, row = matches[0]
+            await state.clear()
+            await _do_join(message.from_user.id, f"{row[5]} {row[4]}".strip(), idx,
+                           f"@{message.from_user.username}" if message.from_user.username else "")
+            return
+        # Bir nechta odam shu sanada — o'zini tanlasin
+        names = {}
+        kb_rows = []
+        for idx, row in matches:
+            nm = f"{row[5]} {row[4]}".strip() or f"#{idx}"
+            names[str(idx)] = nm
+            kb_rows.append([InlineKeyboardButton(text=nm, callback_data=f"join:{idx}")])
+        kb_rows.append([InlineKeyboardButton(text="❌ Bekor", callback_data="join:cancel")])
+        await state.update_data(join_names=names)
+        await message.answer(
+            "👥 Shu tug'ilgan sanada <b>bir nechta</b> odam ro'yxatda bor.\n"
+            "Iltimos, ro'yxatdan <b>o'zingizni</b> tanlang:",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=kb_rows),
+        )
+        return
+
+    # ── Pasport seriyasi bo'yicha qidiruv ──
+    idx, row = await asyncio.to_thread(sheets.find_row_by_series, text)
+    if not idx:
+        await message.answer(
+            f"❌ Bunday pasport seriyasi (<code>{text}</code>) ro'yxatda topilmadi.\n"
+            "Pasport seriyangizni yoki tug'ilgan sanangizni (kun-oy-yil) kiriting."
+        )
+        return
+    await state.clear()
+    await _do_join(message.from_user.id, f"{row[5]} {row[4]}".strip(), idx,
+                   f"@{message.from_user.username}" if message.from_user.username else "")
+
+
+@dp.callback_query(F.data.startswith("join:"))
+async def join_pick(call: CallbackQuery, state: FSMContext):
+    val = call.data.split(":", 1)[1]
+    if val == "cancel":
+        await state.clear()
+        await call.message.edit_text("❌ Bekor qilindi. Qaytadan boshlash uchun /start")
+        return await call.answer()
+    try:
+        idx = int(val)
+    except ValueError:
+        return await call.answer()
+    data = await state.get_data()
+    full_name = (data.get("join_names") or {}).get(val, "")
+    await state.clear()
+    await call.message.edit_text(f"✅ Tanlandi: <b>{full_name or ('#' + val)}</b>")
+    await call.answer()
+    await _do_join(call.from_user.id, full_name, idx,
+                   f"@{call.from_user.username}" if call.from_user.username else "")
+
+
+@dp.message(Join.series)
+async def join_series_invalid(message: Message):
+    await message.answer(
+        "Iltimos, <b>pasport seriya raqamini</b> (masalan: <code>AA1234567</code>) yoki "
+        "<b>tug'ilgan sanangizni</b> (masalan: <code>21-05-1990</code>) <b>matn</b> ko'rinishida kiriting."
+    )
+
+
+@dp.message(Command("joyla"), F.chat.type == "private")
+async def cmd_regroup(message: Message):
+    """Faqat admin: jadvaldagi sheriklarni ketma-ket joylashtirib qayta tartiblaydi."""
+    if message.from_user.id not in config.ADMIN_IDS:
+        return
+    await message.answer("⏳ Jadval qayta tartiblanmoqda (sheriklar ketma-ket)...")
+    try:
+        async with sheet_lock:
+            moved = await asyncio.to_thread(sheets.regroup_partners)
+        await message.answer(f"✅ Tayyor. Joyi o'zgargan qatorlar: <b>{moved}</b>.")
+    except Exception:
+        logger.exception("Regroup xatosi")
+        await message.answer("⚠️ Qayta tartiblashda xato bo'ldi, log'ni tekshiring.")
+
+
+@dp.message(Command("id"))
+async def cmd_chat_id(message: Message):
+    """Sozlash uchun: guruhda yuborilsa, guruh ID sini qaytaradi."""
+    await message.answer(
+        f"<b>Chat turi:</b> {message.chat.type}\n<b>Chat ID:</b> <code>{message.chat.id}</code>"
+    )
+
+
+# ──────────────────────────── Admin panel ────────────────────────────
+def admin_menu_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📢 E'lon yuborish", callback_data="adm:bc")],
+        [InlineKeyboardButton(text="🛏 Xona sheriklarini xabardor qilish", callback_data="adm:rooms")],
+        [InlineKeyboardButton(text="➕ Guruhga taklif (qo'shilmaganlarga)", callback_data="adm:invite")],
+        [InlineKeyboardButton(text="📊 Statistika", callback_data="adm:stats")],
+    ])
+
+
+@dp.message(Command("admin"), F.chat.type == "private")
+async def cmd_admin(message: Message, state: FSMContext):
+    """Admin panel (faqat ADMIN_IDS)."""
+    if message.from_user.id not in config.ADMIN_IDS:
+        return
+    await state.clear()
+    await message.answer(
+        "🛠 <b>Admin panel</b>\n\nKerakli amalni tanlang:",
+        reply_markup=admin_menu_kb(),
+    )
+
+
+async def send_group_invite(message: Message, full_name: str):
+    """Ro'yxatdan o'tgan kishiga guruhga qo'shilish uchun shaxsiy (bir martalik) havola yuboradi."""
+    if not config.GROUP_CHAT_ID:
+        return
+    url = ""
+    try:
+        link = await bot.create_chat_invite_link(
+            chat_id=config.GROUP_CHAT_ID,
+            name=(full_name or "Ro'yxat")[:32],
+            member_limit=1,
+        )
+        url = link.invite_link
+    except Exception:
+        logger.exception("Guruh taklif havolasini yaratishda xato")
+        url = config.GROUP_INVITE_LINK  # zaxira havola (agar sozlangan bo'lsa)
+    if not url:
+        return
+    markup = InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text="➕ Guruhga qo'shilish", url=url)]]
+    )
+    await message.answer(
+        "👥 Quyidagi tugma orqali safar guruhiga qo'shiling.\n"
+        "<i>Havola faqat siz uchun amal qiladi.</i>",
+        reply_markup=markup,
+    )
+
+
+# ──────────────────────────── Rol ────────────────────────────
+@dp.message(Reg.role, F.text.in_(["🧑‍💼 Xodim", "🩺 Shifokor/Diller"]))
+async def set_role(message: Message, state: FSMContext):
+    role = "Xodim" if "Xodim" in message.text else "Shifokor/Diller"
+    await state.update_data(role=role, partner=None)
+    await message.answer(f"Tanlandi: <b>{role}</b>\n\n📝 <b>Ismingizni</b> kiriting:", reply_markup=ReplyKeyboardRemove())
+    await state.set_state(Reg.name)
+
+
+@dp.message(Reg.role, F.text.contains("Oila"))
+async def role_family(message: Message, state: FSMContext):
+    await state.update_data(role="Oila a'zosi", partner=None)
+    await message.answer(
+        "👨‍👩‍👧 <b>Oila a'zosi</b> sifatida ro'yxatdan o'tyapsiz.\n"
+        "⚠️ Oila a'zosi uchun <b>100% to'lov</b> amalga oshiriladi.\n\n"
+        "Avval <b>kimning oila a'zosi</b> ekaningizni belgilaymiz. Sizni olib boradigan "
+        "<b>xodim/shifokorning pasport seriyasini</b> kiriting "
+        "(u avval ro'yxatdan o'tgan bo'lishi shart, masalan: <code>AA1234567</code>):",
+        reply_markup=ReplyKeyboardRemove(),
+    )
+    await state.set_state(Reg.fam_owner)
+
+
+@dp.message(Reg.fam_owner, F.text)
+async def fam_set_owner(message: Message, state: FSMContext):
+    series = message.text.strip()
+    idx, row = await asyncio.to_thread(sheets.find_row_by_series, series)
+    if not idx:
+        await message.answer(
+            f"❌ Bunday seriya (<code>{series}</code>) ro'yxatda topilmadi.\n"
+            "Sizni olib boradigan xodim/shifokor avval ro'yxatdan o'tgan bo'lishi kerak. "
+            "Seriyani tekshirib qayta kiriting yoki /bekor."
+        )
+        return
+    owner_name = f"{row[5]} {row[4]}".strip()
+    await state.update_data(
+        _owner_series=series.upper(), _owner_name=owner_name, _owner_phone=row[8]
+    )
+    await message.answer(
+        f"✅ Topildi: <b>{owner_name}</b> ({series.upper()}).\n"
+        "Siz shu insonning oila a'zosi sifatida belgilanasiz.\n\n"
+        "Endi o'zingiz haqingizdagi ma'lumotni kiriting.\n📝 <b>Ismingizni</b> kiriting:"
+    )
+    await state.set_state(Reg.name)
+
+
+@dp.message(Reg.role, F.text.contains("yangilash"))
+async def start_update(message: Message, state: FSMContext):
+    await message.answer(
+        "✏️ <b>Ma'lumotni yangilash.</b>\n\n"
+        "Ro'yxatdan o'tgan <b>pasport seriya raqamingizni</b> kiriting "
+        "(masalan: <code>AA1234567</code>):",
+        reply_markup=ReplyKeyboardRemove(),
+    )
+    await state.set_state(Upd.find)
+
+
+@dp.message(Reg.role)
+async def role_invalid(message: Message):
+    await message.answer("Iltimos, tugmalardan birini tanlang.", reply_markup=ROLE_KB)
+
+
+# ──────────────────────────── Asosiy shaxs ────────────────────────────
+@dp.message(Reg.name, F.text)
+async def set_name(message: Message, state: FSMContext):
+    await state.update_data(name=message.text.strip())
+    await message.answer("📝 <b>Familyangizni</b> kiriting:")
+    await state.set_state(Reg.surname)
+
+
+@dp.message(Reg.surname, F.text)
+async def set_surname(message: Message, state: FSMContext):
+    await state.update_data(surname=message.text.strip())
+    await message.answer("📅 <b>Tug'ilgan sanangizni</b> kiriting (masalan: <code>21-05-1990</code>):")
+    await state.set_state(Reg.birthdate)
+
+
+@dp.message(Reg.birthdate, F.text)
+async def set_birthdate(message: Message, state: FSMContext):
+    bd = parse_date(message.text)
+    if not bd:
+        await message.answer("❌ Sana noto'g'ri. Namuna: <code>21-05-1990</code>")
+        return
+    age = calc_age(bd)
+    await state.update_data(birthdate=fmt_date(bd), age=age)
+    data = await state.get_data()
+    # Oila a'zosi xodim bilan birga boradi — ota/ona tasdiqi so'ralmaydi
+    if data.get("role") != "Oila a'zosi" and age < config.MIN_AGE_ALONE:
+        await message.answer(EGYPT_WARNING)
+        await message.answer(
+            "👨‍👩‍👧 Siz 21 yoshga to'lmagansiz. <b>Ota yoki onangiz</b> shu safarda siz bilan "
+            "<b>birga boradimi</b>?",
+            reply_markup=YESNO_KB,
+        )
+        await state.set_state(Reg.parent_confirm)
+        return
+    await message.answer("📱 <b>Telefon raqamingizni</b> yuboring:", reply_markup=PHONE_KB)
+    await state.set_state(Reg.phone)
+
+
+@dp.message(Reg.parent_confirm, F.text.contains("Ha"))
+async def parent_confirm_yes(message: Message, state: FSMContext):
+    await state.update_data(parent_accompany=True)
+    await message.answer(
+        "✅ Tasdiqlandi: ota yoki onangiz siz bilan birga boradi.\n\n"
+        "📱 <b>Telefon raqamingizni</b> yuboring:",
+        reply_markup=PHONE_KB,
+    )
+    await state.set_state(Reg.phone)
+
+
+@dp.message(Reg.parent_confirm, F.text.contains("Yo'q"))
+async def parent_confirm_no(message: Message, state: FSMContext):
+    await state.clear()
+    await message.answer(
+        "❌ Afsus, Misr davlati talabiga ko'ra <b>21 yoshgacha</b> bo'lganlar faqat "
+        "<b>ota yoki onasi bilan birga</b> ro'yxatdan o'ta oladi.\n\n"
+        "Ota yoki onangiz bilan birga bo'lsangiz, qaytadan /start bosing.",
+        reply_markup=ReplyKeyboardRemove(),
+    )
+
+
+@dp.message(Reg.parent_confirm)
+async def parent_confirm_invalid(message: Message):
+    await message.answer("Iltimos, «✅ Ha» yoki «❌ Yo'q» ni tanlang.", reply_markup=YESNO_KB)
+
+
+@dp.message(Reg.phone, F.contact)
+async def set_phone_contact(message: Message, state: FSMContext):
+    await state.update_data(phone=message.contact.phone_number)
+    await ask_passport(message, state)
+
+
+@dp.message(Reg.phone, F.text)
+async def set_phone_text(message: Message, state: FSMContext):
+    await state.update_data(phone=message.text.strip())
+    await ask_passport(message, state)
+
+
+async def ask_passport(message: Message, state: FSMContext):
+    await message.answer("📷 <b>Pasportingiz skanerini</b> (rasm yoki fayl) yuboring:", reply_markup=ReplyKeyboardRemove())
+    await state.set_state(Reg.passport)
+
+
+@dp.message(Reg.passport, F.photo | F.document)
+async def set_passport(message: Message, state: FSMContext):
+    await state.update_data(passport=await extract_passport(message))
+    await message.answer("📇 <b>Pasport seriya raqamini</b> kiriting (masalan: <code>AA1234567</code>):")
+    await state.set_state(Reg.passport_series)
+
+
+@dp.message(Reg.passport)
+async def passport_invalid(message: Message):
+    await message.answer("Iltimos, pasport <b>rasmini</b> yoki <b>faylini</b> yuboring.")
+
+
+@dp.message(Reg.passport_series, F.text)
+async def set_passport_series(message: Message, state: FSMContext):
+    series = message.text.strip()
+    if await series_exists(series):
+        await message.answer(
+            "⚠️ <b>Siz avval ro'yxatga kiritilgansiz.</b>\n"
+            f"Bu pasport seriyasi (<code>{series}</code>) allaqachon mavjud. Qaytadan kiritish shart emas.",
+            reply_markup=ReplyKeyboardRemove(),
+        )
+        await state.clear()
+        return
+    await state.update_data(passport_series=series)
+    await message.answer(EXPIRY_HINT)
+    await state.set_state(Reg.passport_expiry)
+
+
+@dp.message(Reg.passport_expiry, F.text)
+async def set_passport_expiry(message: Message, state: FSMContext):
+    d, err = check_expiry(message.text)
+    if err:
+        await message.answer(err)
+        return
+    await state.update_data(passport_expiry=fmt_date(d))
+    data = await state.get_data()
+    if data.get("role") == "Oila a'zosi":
+        # Oila a'zosi xodim bilan bog'lanadi — xona avtomatik 2 kishilik, sherik so'ralmaydi
+        await state.update_data(room="2 kishilik")
+        await show_confirm(message, state)
+        return
+    await message.answer("🏨 <b>Necha kishilik xona</b> kerak?", reply_markup=ROOM_KB)
+    await state.set_state(Reg.room_size)
+
+
+# ──────────────────────────── Xona ────────────────────────────
+@dp.message(Reg.room_size, F.text.in_(config.ROOM_SIZES))
+async def set_room(message: Message, state: FSMContext):
+    await state.update_data(room=message.text)
+    await ask_comp_type(message, state, first=True)
+
+
+@dp.message(Reg.room_size)
+async def room_invalid(message: Message):
+    await message.answer("Iltimos, tugmalardan birini tanlang.", reply_markup=ROOM_KB)
+
+
+# ──────────────────────────── Sherik turi ────────────────────────────
+async def ask_comp_type(message: Message, state: FSMContext, first: bool):
+    txt = "👥 <b>Xona sherigingiz</b> kim?" if first else "👥 <b>Keyingi sherigingiz</b> kim?"
+    await message.answer(txt, reply_markup=COMP_TYPE_KB)
+    await state.set_state(Reg.comp_type)
+
+
+@dp.message(Reg.comp_type, F.text.func(lambda t: t and ("Xodim" in t or "Shifokor" in t or "Oila" in t)))
+async def set_comp_type(message: Message, state: FSMContext):
+    if "Oila" in message.text:
+        ctype, pay100 = "Oila a'zosi", True
+    elif "Shifokor" in message.text:
+        ctype, pay100 = "Shifokor/Diller", False
+    else:
+        ctype, pay100 = "Xodim", False
+    await state.update_data(_c_type=ctype, _c_pay100=pay100)
+
+    if ctype == "Oila a'zosi":
+        # Oila a'zosini xodim shu yerda to'liq to'ldiradi — ikkalasi birga yakunlanadi
+        await message.answer(
+            "⚠️ <b>Diqqat!</b> Sherigingiz xodim emas, oila a'zosi bo'lgani uchun u uchun "
+            "<b>100% to'lov</b> amalga oshiriladi."
+        )
+        await message.answer(
+            "👨‍👩‍👧 Endi <b>oila a'zosi</b> ma'lumotini kiritamiz.\n\n"
+            "📝 Oila a'zosining <b>ismini</b> kiriting:",
+            reply_markup=ReplyKeyboardRemove(),
+        )
+        await state.set_state(Reg.fam_name)
+        return
+
+    await message.answer(
+        f"👥 Sherigingiz (<b>{ctype}</b>) ro'yxatga <b>kiritilganmi</b>?\n\n"
+        "Agar u allaqachon ushbu bot orqali ro'yxatdan o'tgan bo'lsa — «✅ Kiritilgan», "
+        "aks holda «🆕 Hali kiritilmagan» ni tanlang. Hali kiritilmagan sherik o'zini keyinroq "
+        "alohida kiritadi — uning ma'lumotini siz to'ldirmaysiz.",
+        reply_markup=COMP_REGISTERED_KB,
+    )
+    await state.set_state(Reg.comp_registered)
+
+
+@dp.message(Reg.comp_type)
+async def comp_type_invalid(message: Message):
+    await message.answer("Iltimos, tugmalardan birini tanlang.", reply_markup=COMP_TYPE_KB)
+
+
+# ──────────────────────────── Sherik kiritilganmi? ────────────────────────────
+@dp.message(Reg.comp_registered, F.text.contains("Hali kiritilmagan"))
+async def comp_not_registered(message: Message, state: FSMContext):
+    await state.update_data(partner=None)
+    await message.answer(
+        "✅ Tushunarli. Sherigingiz o'zini keyinroq alohida (/start orqali) kiritadi.",
+        reply_markup=ReplyKeyboardRemove(),
+    )
+    await show_confirm(message, state)
+
+
+@dp.message(Reg.comp_registered, F.text.contains("Kiritilgan"))
+async def comp_already_registered(message: Message, state: FSMContext):
+    await message.answer(
+        "📇 Sherigingizning <b>pasport seriya raqamini</b> kiriting (masalan: <code>AA1234567</code>):",
+        reply_markup=ReplyKeyboardRemove(),
+    )
+    await state.set_state(Reg.comp_series)
+
+
+@dp.message(Reg.comp_registered)
+async def comp_registered_invalid(message: Message):
+    await message.answer("Iltimos, tugmalardan birini tanlang.", reply_markup=COMP_REGISTERED_KB)
+
+
+@dp.message(Reg.comp_series, F.text)
+async def set_comp_series(message: Message, state: FSMContext):
+    series = message.text.strip()
+    if not await series_exists(series):
+        await message.answer(
+            f"❌ Bunday seriya (<code>{series}</code>) ro'yxatda topilmadi.\n"
+            "Sherigingiz hali kiritilmagan bo'lishi mumkin. Seriyani tekshirib qayta kiriting "
+            "yoki u o'zini avval kiritsin."
+        )
+        return
+    data = await state.get_data()
+    await state.update_data(
+        room=data.get("room", "2 kishilik"),
+        partner={
+            "type": data["_c_type"],
+            "pay100": data["_c_pay100"],
+            "series": series,
+        },
+    )
+    await show_confirm(message, state)
+
+
+# ──────────────────── Oila a'zosi (xodim sherigi sifatida inline) ────────────────────
+@dp.message(Reg.fam_name, F.text)
+async def fam_set_name(message: Message, state: FSMContext):
+    await state.update_data(_f_name=message.text.strip())
+    await message.answer("📝 Oila a'zosining <b>familyasini</b> kiriting:")
+    await state.set_state(Reg.fam_surname)
+
+
+@dp.message(Reg.fam_surname, F.text)
+async def fam_set_surname(message: Message, state: FSMContext):
+    await state.update_data(_f_surname=message.text.strip())
+    await message.answer(
+        "📅 Oila a'zosining <b>tug'ilgan sanasini</b> kiriting (masalan: <code>21-05-2012</code>):"
+    )
+    await state.set_state(Reg.fam_birthdate)
+
+
+@dp.message(Reg.fam_birthdate, F.text)
+async def fam_set_birthdate(message: Message, state: FSMContext):
+    bd = parse_date(message.text)
+    if not bd:
+        await message.answer("❌ Sana noto'g'ri. Namuna: <code>21-05-2012</code>")
+        return
+    await state.update_data(_f_birthdate=fmt_date(bd), _f_age=calc_age(bd))
+    await message.answer("📷 Oila a'zosining <b>pasport skanerini</b> (rasm yoki fayl) yuboring:")
+    await state.set_state(Reg.fam_passport)
+
+
+@dp.message(Reg.fam_passport, F.photo | F.document)
+async def fam_set_passport(message: Message, state: FSMContext):
+    await state.update_data(_f_passport=await extract_passport(message))
+    await message.answer(
+        "📇 Oila a'zosining <b>pasport seriya raqamini</b> kiriting (masalan: <code>AA1234567</code>):"
+    )
+    await state.set_state(Reg.fam_series)
+
+
+@dp.message(Reg.fam_passport)
+async def fam_passport_invalid(message: Message):
+    await message.answer("Iltimos, oila a'zosining pasport <b>rasmini</b> yoki <b>faylini</b> yuboring.")
+
+
+@dp.message(Reg.fam_series, F.text)
+async def fam_set_series(message: Message, state: FSMContext):
+    series = message.text.strip()
+    data = await state.get_data()
+    if series.upper() == (data.get("passport_series") or "").upper():
+        await message.answer("❌ Bu sizning seriyangiz. Oila a'zosining <b>boshqa</b> seriyasini kiriting.")
+        return
+    if await series_exists(series):
+        await message.answer(
+            f"⚠️ Bu pasport seriyasi (<code>{series}</code>) allaqachon ro'yxatda mavjud.\n"
+            "Tekshirib boshqa seriya kiriting."
+        )
+        return
+    await state.update_data(_f_series=series)
+    await message.answer(EXPIRY_HINT)
+    await state.set_state(Reg.fam_expiry)
+
+
+@dp.message(Reg.fam_expiry, F.text)
+async def fam_set_expiry(message: Message, state: FSMContext):
+    d, err = check_expiry(message.text)
+    if err:
+        await message.answer(err)
+        return
+    data = await state.get_data()
+    await state.update_data(
+        room="2 kishilik",  # oila a'zosi bog'langani uchun ikkalasi ham 2 kishilik
+        partner={
+            "type": data["_c_type"],
+            "pay100": data["_c_pay100"],
+            "inline": True,
+            "name": data["_f_name"],
+            "surname": data["_f_surname"],
+            "birthdate": data["_f_birthdate"],
+            "age": data["_f_age"],
+            "series": data["_f_series"],
+            "expiry": fmt_date(d),
+            "passport": data["_f_passport"],
+        },
+    )
+    await show_confirm(message, state)
+
+
+# ──────────────────────────── Tasdiqlash ────────────────────────────
+def summary_text(data: dict) -> str:
+    age_note = " 👨‍👩‍👧 ota/ona bilan" if data.get("parent_accompany") else ""
+    lines = [
+        "📋 <b>Ma'lumotlarni tekshiring:</b>\n",
+        f"<b>Rol:</b> {data['role']}",
+        f"<b>F.I.O:</b> {data['surname']} {data['name']}",
+        f"<b>Tug'ilgan sana:</b> {data['birthdate']} ({data['age']} yosh){age_note}",
+        f"<b>Telefon:</b> {data['phone']}",
+        f"<b>Pasport seriya:</b> {data['passport_series']} | <b>Amal muddati:</b> {data['passport_expiry']}",
+        f"<b>Xona:</b> {data['room']}",
+    ]
+    if data.get("role") == "Oila a'zosi" and data.get("_owner_name"):
+        lines.append(
+            f"\n👨‍👩‍👧 <b>{data['_owner_name']}</b> ning oila a'zosi"
+            f" ({data.get('_owner_series', '')}) — 💰100% to'lov"
+        )
+    p = data.get("partner")
+    if p:
+        pay = " — 💰100% to'lov" if p["pay100"] else ""
+        if p.get("inline"):
+            lines.append(
+                f"\n👨‍👩‍👧 <b>Oila a'zosi{pay}:</b>\n"
+                f"   F.I.O: {p['surname']} {p['name']}\n"
+                f"   Tug'ilgan sana: {p['birthdate']} ({p['age']} yosh)\n"
+                f"   Pasport seriya: {p['series']} | Amal muddati: {p['expiry']}\n"
+                f"   ({data['surname']} {data['name']} ning oila a'zosi)"
+            )
+        else:
+            lines.append(
+                f"\n👥 <b>Sherik ({p['type']}){pay}:</b>\n"
+                f"   Pasport seriya: {p['series']} (ro'yxatda mavjud ✅)"
+            )
+    return "\n".join(lines)
+
+
+async def show_confirm(message: Message, state: FSMContext):
+    data = await state.get_data()
+    await message.answer(summary_text(data), reply_markup=kb([["✅ Tasdiqlash", "🔄 Qaytadan"]]))
+    await state.set_state(Reg.confirm)
+
+
+@dp.message(Reg.confirm, F.text.contains("Qaytadan"))
+async def confirm_restart(message: Message, state: FSMContext):
+    await cmd_start(message, state)
+
+
+@dp.message(Reg.confirm, F.text.contains("Tasdiqlash"))
+async def confirm_save(message: Message, state: FSMContext):
+    data = await state.get_data()
+    user = message.from_user
+    who = f"@{user.username}" if user.username else f"{user.full_name} ({user.id})"
+    now = datetime.now().strftime("%d-%m-%Y %H:%M")
+
+    await message.answer("⏳ Ma'lumotlar saqlanmoqda, pasport Drive'ga yuklanmoqda...")
+
+    is_family = data["role"] == "Oila a'zosi"
+    label = "Oila" if is_family else "Asosiy"
+    main_link = await upload_passport_to_drive(data["passport"], f"{data['surname']}_{data['name']}_{label}")
+
+    p = data.get("partner")
+    # 100% to'lov: start orqali kirgan oila a'zosida — o'zining qatorida; inline holatda — oila a'zosi qatorida
+    main_pay = "Ha" if (is_family or (p and p["pay100"] and not p.get("inline"))) else ""
+    main_row = [
+        now, who, data["role"], ("Sherik (oila a'zosi)" if is_family else "Asosiy"),
+        data["name"], data["surname"], data["birthdate"], data["age"], data["phone"],
+        data["passport_series"], data["passport_expiry"], data["room"],
+        main_pay, main_link,
+        (data["_owner_series"] if is_family else (p["series"] if p else "")),
+        str(user.id),  # Telegram ID — xabar yuborish uchun
+    ]
+
+    try:
+        saved_person = None
+        async with sheet_lock:
+            if is_family:
+                # Oila a'zosi (start orqali) — uni olib boradigan xodim (sherigi) bilan bog'laymiz
+                saved_person = await asyncio.to_thread(sheets.append_linked, main_row, data["_owner_series"])
+            elif p and p.get("inline"):
+                # Oila a'zosi shu yerda to'ldirilgan — uning qatorini yasab, xodim bilan ketma-ket qo'shamiz
+                fam_link = await upload_passport_to_drive(p["passport"], f"{p['surname']}_{p['name']}_Oila")
+                fam_row = [
+                    now, who, p["type"], "Sherik (oila a'zosi)",
+                    p["name"], p["surname"], p["birthdate"], p["age"], data["phone"],
+                    p["series"], p["expiry"], "2 kishilik",
+                    ("Ha" if p["pay100"] else ""), fam_link,
+                    data["passport_series"],  # kimning oila a'zosi ekani — xodim seriyasi
+                    str(user.id),  # oila a'zosini kiritgan xodimning Telegram ID si
+                ]
+                saved_person, _ = await asyncio.to_thread(sheets.append_pair, main_row, fam_row)
+            elif p:
+                # Sherik bog'langan — A va sherigini jadvalda ketma-ket joylaymiz
+                saved_person = await asyncio.to_thread(sheets.append_linked, main_row, p["series"])
+            else:
+                saved_person = (await asyncio.to_thread(sheets.append_rows, [main_row]))[0]
+            # Yangi yozuvdan keyin butun jadvalni sheriklar ketma-ket turadigan qilib tekshiramiz
+            await _regroup_safe()
+        saved = True
+    except Exception:
+        logger.exception("Seminar API ga yozishda xato")
+        saved = False
+        saved_person = None
+
+    await message.answer(
+        "✅ <b>Ro'yxatdan o'tdingiz!</b> Ma'lumotlaringiz qabul qilindi."
+        + ("" if saved else "\n\n⚠️ (Jadvalga yozishda muammo bo'ldi, admin tekshiradi.)"),
+        reply_markup=ReplyKeyboardRemove(),
+    )
+    await notify_admins(data, who)
+    if saved:
+        await send_personal_page(user.id, saved_person["id"])
+        await send_group_invite(message, f"{data['surname']} {data['name']}")
+    await state.clear()
+
+
+@dp.message(Reg.confirm)
+async def confirm_invalid(message: Message):
+    await message.answer("Iltimos, «Tasdiqlash» yoki «Qaytadan» ni tanlang.")
+
+
+# ──────────────────────────── Admin xabarnomasi ────────────────────────────
+async def notify_admins(data: dict, who: str):
+    body = summary_text(data).replace("📋 <b>Ma'lumotlarni tekshiring:</b>\n\n", "")
+    text = f"🆕 <b>Yangi ro'yxat</b>\n<b>Kim kiritdi:</b> {who}\n\n{body}"
+    passports = [("Asosiy", data["passport"])]
+    p = data.get("partner")
+    if p and p.get("inline"):
+        passports.append(("Oila a'zosi", p["passport"]))
+
+    for admin_id in config.ADMIN_IDS:
+        try:
+            await bot.send_message(admin_id, text)
+            for label, p in passports:
+                if not p:
+                    continue
+                if p["type"] == "photo":
+                    await bot.send_photo(admin_id, p["file_id"], caption=f"📷 Pasport — {label}")
+                else:
+                    await bot.send_document(admin_id, p["file_id"], caption=f"📷 Pasport — {label}")
+        except Exception:
+            logger.exception("Admin %s ga yuborishda xato", admin_id)
+
+
+# ──────────────────────────── Yangilash (update) oqimi ────────────────────────────
+@dp.message(Upd.find, F.text)
+async def upd_find(message: Message, state: FSMContext):
+    series = message.text.strip()
+    idx, row = await asyncio.to_thread(sheets.find_row_by_series, series)
+    if not idx:
+        await message.answer(
+            f"❌ Bunday seriya (<code>{series}</code>) ro'yxatda topilmadi.\n"
+            "Seriyani tekshirib qayta kiriting yoki /bekor bosing."
+        )
+        return
+    await state.update_data(_idx=idx, _row=row)
+    await message.answer(upd_summary(row), reply_markup=upd_menu_kb())
+    await state.set_state(Upd.menu)
+
+
+@dp.message(Upd.menu, F.text.contains("Bekor"))
+async def upd_cancel(message: Message, state: FSMContext):
+    await state.clear()
+    await message.answer("❌ Yangilash bekor qilindi. Boshlash uchun /start", reply_markup=ReplyKeyboardRemove())
+
+
+@dp.message(Upd.menu, F.text.contains("Saqlash"))
+async def upd_save(message: Message, state: FSMContext):
+    data = await state.get_data()
+    idx, row = data["_idx"], data["_row"]
+    # Telegram ID ustunini (16-ustun) tahrirlovchining ID si bilan to'ldiramiz/yangilaymiz
+    tg_col = sheets.HEADER.index("Telegram ID")
+    while len(row) <= tg_col:
+        row.append("")
+    row[tg_col] = str(message.from_user.id)
+    await message.answer("⏳ Yangilangan ma'lumotlar saqlanmoqda...")
+    try:
+        async with sheet_lock:
+            await asyncio.to_thread(sheets.update_row, idx, row)
+            # Tahrirda sherik seriyasi o'zgargan bo'lishi mumkin — qaytadan tartiblaymiz
+            await _regroup_safe()
+        ok = True
+    except Exception:
+        logger.exception("Update yozishda xato")
+        ok = False
+    await message.answer(
+        "✅ <b>Ma'lumotlaringiz yangilandi!</b>" if ok
+        else "⚠️ Saqlashda muammo bo'ldi, admin tekshiradi.",
+        reply_markup=ReplyKeyboardRemove(),
+    )
+    if ok:
+        await notify_admins_update(message.from_user, row)
+    await state.clear()
+
+
+@dp.message(Upd.menu, F.text)
+async def upd_pick_field(message: Message, state: FSMContext):
+    field = next((f for f in UPD_FIELDS if f[0] == message.text.strip()), None)
+    if not field:
+        await message.answer("Iltimos, tugmalardan birini tanlang.", reply_markup=upd_menu_kb())
+        return
+    name, _col, kind = field
+    await state.update_data(_field=name)
+    if kind == "room":
+        await message.answer(f"🏨 Yangi <b>{name}</b> ni tanlang:", reply_markup=ROOM_KB)
+    elif kind == "photo":
+        await message.answer(
+            "📷 Yangi <b>pasport rasmini</b> (rasm yoki fayl) yuboring:",
+            reply_markup=ReplyKeyboardRemove(),
+        )
+    elif kind == "phone":
+        await message.answer("📱 Yangi <b>telefon raqamini</b> yuboring yoki yozing:", reply_markup=PHONE_KB)
+    else:
+        hint = {
+            "date": " (masalan: <code>21-05-1990</code>)",
+            "expiry": " (masalan: <code>15-08-2027</code>)",
+            "series": " (masalan: <code>AA1234567</code>)",
+        }.get(kind, "")
+        await message.answer(f"✏️ Yangi <b>{name}</b> ni kiriting{hint}:", reply_markup=ReplyKeyboardRemove())
+    await state.set_state(Upd.value)
+
+
+@dp.message(Upd.value, F.photo | F.document)
+async def upd_value_photo(message: Message, state: FSMContext):
+    data = await state.get_data()
+    if data.get("_field") != "Pasport rasmi":
+        await message.answer("Iltimos, so'ralgan ma'lumotni matn ko'rinishida kiriting.")
+        return
+    row = data["_row"]
+    await message.answer("⏳ Rasm Drive'ga yuklanmoqda...")
+    link = await upload_passport_to_drive(await extract_passport(message), f"{row[5]}_{row[4]}_Yangilangan")
+    if not link:
+        await message.answer("⚠️ Rasmni yuklashda xato. Qayta urinib ko'ring.")
+        return
+    row[13] = link
+    await state.update_data(_row=row)
+    await message.answer("✅ Pasport rasmi yangilandi.")
+    await message.answer(upd_summary(row), reply_markup=upd_menu_kb())
+    await state.set_state(Upd.menu)
+
+
+@dp.message(Upd.value, F.contact)
+async def upd_value_contact(message: Message, state: FSMContext):
+    await _apply_value(message, state, message.contact.phone_number)
+
+
+@dp.message(Upd.value, F.text)
+async def upd_value_text(message: Message, state: FSMContext):
+    await _apply_value(message, state, message.text.strip())
+
+
+async def _apply_value(message: Message, state: FSMContext, raw: str):
+    data = await state.get_data()
+    row = data["_row"]
+    field = next((f for f in UPD_FIELDS if f[0] == data.get("_field")), None)
+    if not field:
+        await message.answer(upd_summary(row), reply_markup=upd_menu_kb())
+        await state.set_state(Upd.menu)
+        return
+    name, col, kind = field
+
+    if kind == "photo":
+        await message.answer("Iltimos, pasport <b>rasmini</b> yoki <b>faylini</b> yuboring.")
+        return
+    if kind == "date":
+        d = parse_date(raw)
+        if not d:
+            await message.answer("❌ Sana noto'g'ri. Namuna: <code>21-05-1990</code>")
+            return
+        row[col] = fmt_date(d)
+        row[7] = str(calc_age(d))  # Yosh ustunini yangilaymiz
+    elif kind == "expiry":
+        d, err = check_expiry(raw)
+        if err:
+            await message.answer(err)
+            return
+        row[col] = fmt_date(d)
+    elif kind == "series":
+        s = raw.strip().upper()
+        if not s:
+            await message.answer("❌ Seriya bo'sh bo'lmasligi kerak.")
+            return
+        if s != (row[col] or "").strip().upper() and await series_exists(s):
+            await message.answer(
+                f"⚠️ Bu seriya (<code>{s}</code>) allaqachon boshqa ro'yxatda mavjud. Boshqa seriya kiriting."
+            )
+            return
+        row[col] = s
+    elif kind == "room":
+        if raw not in config.ROOM_SIZES:
+            await message.answer("Iltimos, tugmalardan birini tanlang.", reply_markup=ROOM_KB)
+            return
+        row[col] = raw
+    elif kind == "phone":
+        row[col] = raw
+    else:  # text
+        if not raw:
+            await message.answer("❌ Bo'sh bo'lmasligi kerak.")
+            return
+        row[col] = raw
+
+    await state.update_data(_row=row)
+    await message.answer(f"✅ <b>{name}</b> yangilandi.")
+    await message.answer(upd_summary(row), reply_markup=upd_menu_kb())
+    await state.set_state(Upd.menu)
+
+
+async def notify_admins_update(user, row: list):
+    who = f"@{user.username}" if user.username else f"{user.full_name} ({user.id})"
+    text = (
+        "✏️ <b>Ma'lumot yangilandi</b>\n"
+        f"<b>Kim:</b> {who}\n\n"
+        f"<b>Toifa:</b> {row[2]}\n"
+        f"<b>F.I.O:</b> {row[5]} {row[4]}\n"
+        f"<b>Tug'ilgan sana:</b> {row[6]} ({row[7]} yosh)\n"
+        f"<b>Telefon:</b> {row[8]}\n"
+        f"<b>Pasport seriya:</b> {row[9]} | <b>Amal muddati:</b> {row[10]}\n"
+        f"<b>Xona:</b> {row[11]}"
+    )
+    for admin_id in config.ADMIN_IDS:
+        try:
+            await bot.send_message(admin_id, text)
+        except Exception:
+            logger.exception("Admin %s ga (update) yuborishda xato", admin_id)
+
+
+# ──────────────────────────── Admin amallari ────────────────────────────
+def _is_admin(uid: int) -> bool:
+    return uid in config.ADMIN_IDS
+
+
+def _bc_confirm_kb(n: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"✅ Hammaga yuborish ({n})", callback_data="admbc:all")],
+        [InlineKeyboardButton(text="🧪 Faqat menga (test)", callback_data="admbc:test")],
+        [InlineKeyboardButton(text="❌ Bekor", callback_data="admbc:cancel")],
+    ])
+
+
+def _confirm_kb(go_data: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Ha, yuborish", callback_data=go_data)],
+        [InlineKeyboardButton(text="❌ Bekor", callback_data="adm:cancel")],
+    ])
+
+
+@dp.callback_query(F.data == "adm:cancel")
+async def adm_cancel(call: CallbackQuery, state: FSMContext):
+    if not _is_admin(call.from_user.id):
+        return await call.answer("Ruxsat yo'q", show_alert=True)
+    await state.clear()
+    await call.message.edit_text("❌ Bekor qilindi. /admin")
+    await call.answer()
+
+
+# ── E'lon yuborish ──
+@dp.callback_query(F.data == "adm:bc")
+async def adm_bc_start(call: CallbackQuery, state: FSMContext):
+    if not _is_admin(call.from_user.id):
+        return await call.answer("Ruxsat yo'q", show_alert=True)
+    await state.set_state(Admin.broadcast)
+    await call.message.edit_text(
+        "📢 <b>E'lon yuborish.</b>\n\n"
+        "Yubormoqchi bo'lgan xabarni (matn, rasm, fayl — istalgan) shu yerga yuboring.\n"
+        "Bekor qilish: /bekor"
+    )
+    await call.answer()
+
+
+@dp.message(Admin.broadcast)
+async def adm_bc_capture(message: Message, state: FSMContext):
+    if not _is_admin(message.from_user.id):
+        return
+    regs = await broadcast.fetch_registrants()
+    recips = broadcast.distinct_recipients(regs)
+    n = len(recips)
+    await state.update_data(bc_chat=message.chat.id, bc_msg=message.message_id)
+    if n == 0:
+        await message.answer(
+            "⚠️ Hozircha xabar yuborib bo'ladigan foydalanuvchi yo'q "
+            "(Telegram ID saqlangan yozuvlar yo'q). «🧪 Faqat menga» bilan testlashingiz mumkin.",
+            reply_markup=_bc_confirm_kb(0),
+        )
+        return
+    await message.answer(
+        f"👆 Yuqoridagi xabar <b>{n}</b> ta foydalanuvchiga yuboriladi.\n\nTasdiqlaysizmi?",
+        reply_markup=_bc_confirm_kb(n),
+    )
+
+
+@dp.callback_query(F.data.in_(["admbc:all", "admbc:test", "admbc:cancel"]))
+async def adm_bc_confirm(call: CallbackQuery, state: FSMContext):
+    if not _is_admin(call.from_user.id):
+        return await call.answer("Ruxsat yo'q", show_alert=True)
+    data = await state.get_data()
+    bc_chat, bc_msg = data.get("bc_chat"), data.get("bc_msg")
+    await state.clear()
+
+    if call.data == "admbc:cancel" or not bc_chat:
+        await call.message.edit_text("❌ E'lon bekor qilindi. /admin")
+        return await call.answer()
+
+    if call.data == "admbc:test":
+        try:
+            await bot.copy_message(call.from_user.id, bc_chat, bc_msg)
+            await call.message.edit_text("🧪 Test: xabar faqat sizga yuborildi. /admin")
+        except Exception:
+            logger.exception("Test e'lon yuborishda xato")
+            await call.message.edit_text("⚠️ Test yuborishda xato. /admin")
+        return await call.answer()
+
+    # Hammaga
+    await call.answer("Yuborilmoqda...")
+    await call.message.edit_text("⏳ E'lon yuborilmoqda...")
+    regs = await broadcast.fetch_registrants()
+    recips = broadcast.distinct_recipients(regs)
+    rep = await broadcast.broadcast_copy(bot, bc_chat, bc_msg, recips)
+    await call.message.edit_text(
+        "📢 <b>E'lon yuborildi.</b>\n\n"
+        f"✅ Yetkazildi: <b>{rep['sent']}</b>\n"
+        f"⚠️ Yuborilmadi: <b>{rep['failed']}</b>\n"
+        f"👥 Jami: <b>{rep['total']}</b>\n\n/admin"
+    )
+
+
+# ── Xona sheriklari ──
+@dp.callback_query(F.data == "adm:rooms")
+async def adm_rooms_preview(call: CallbackQuery):
+    if not _is_admin(call.from_user.id):
+        return await call.answer("Ruxsat yo'q", show_alert=True)
+    await call.answer("Hisoblanmoqda...")
+    groups = await broadcast.fetch_groups()
+    pv = broadcast.roommate_preview(groups)
+    if pv["reachable"] == 0:
+        await call.message.edit_text(
+            "🛏 Xabar yuboriladigan xona a'zosi topilmadi "
+            f"(to'liq xonalar: {pv['rooms']}, ID siz: {pv['unreachable']}).\n\n/admin"
+        )
+        return
+    await call.message.edit_text(
+        "🛏 <b>Xona sheriklarini xabardor qilish</b>\n\n"
+        f"To'liq biriktirilgan xonalar: <b>{pv['rooms']}</b>\n"
+        f"Xabar yetadi (ID bor): <b>{pv['reachable']}</b> kishiga\n"
+        f"ID siz (yetmaydi): <b>{pv['unreachable']}</b> kishi\n\n"
+        "Har bir kishiga o'z xonasidagi sheriklar ro'yxati yuboriladi. Davom etamizmi?",
+        reply_markup=_confirm_kb("admrooms:go"),
+    )
+
+
+@dp.callback_query(F.data == "admrooms:go")
+async def adm_rooms_go(call: CallbackQuery):
+    if not _is_admin(call.from_user.id):
+        return await call.answer("Ruxsat yo'q", show_alert=True)
+    await call.answer("Yuborilmoqda...")
+    await call.message.edit_text("⏳ Xona xabarlari yuborilmoqda...")
+    groups = await broadcast.fetch_groups()
+    rep = await broadcast.notify_roommates(bot, groups)
+    await call.message.edit_text(
+        "🛏 <b>Xona xabarlari yuborildi.</b>\n\n"
+        f"✅ Yetkazildi: <b>{rep['sent']}</b>\n"
+        f"⚠️ Yuborilmadi: <b>{rep['failed']}</b>\n"
+        f"❔ ID siz (yetmadi): <b>{rep['unreachable']}</b>\n\n/admin"
+    )
+
+
+# ── Guruhga taklif ──
+@dp.callback_query(F.data == "adm:invite")
+async def adm_invite_preview(call: CallbackQuery):
+    if not _is_admin(call.from_user.id):
+        return await call.answer("Ruxsat yo'q", show_alert=True)
+    if not config.GROUP_CHAT_ID:
+        await call.message.edit_text(
+            "⚠️ Guruh sozlanmagan (GROUP_CHAT_ID yo'q). Avval .env da sozlang.\n\n/admin"
+        )
+        return await call.answer()
+    await call.answer("Hisoblanmoqda...")
+    regs = await broadcast.fetch_registrants()
+    recips = broadcast.distinct_recipients(regs)
+    await call.message.edit_text(
+        "➕ <b>Guruhga taklif</b>\n\n"
+        f"ID si bor <b>{len(recips)}</b> foydalanuvchi tekshiriladi. "
+        "Guruhga qo'shilmaganlarga shaxsiy taklif havolasi yuboriladi.\n\nDavom etamizmi?",
+        reply_markup=_confirm_kb("adminvite:go"),
+    )
+
+
+@dp.callback_query(F.data == "adminvite:go")
+async def adm_invite_go(call: CallbackQuery):
+    if not _is_admin(call.from_user.id):
+        return await call.answer("Ruxsat yo'q", show_alert=True)
+    await call.answer("Yuborilmoqda...")
+    await call.message.edit_text("⏳ Tekshirilmoqda va takliflar yuborilmoqda...")
+    regs = await broadcast.fetch_registrants()
+    recips = broadcast.distinct_recipients(regs)
+    rep = await broadcast.invite_non_members(bot, recips)
+    await call.message.edit_text(
+        "➕ <b>Guruh takliflari yakunlandi.</b>\n\n"
+        f"📨 Taklif yuborildi: <b>{rep['invited']}</b>\n"
+        f"✅ Allaqachon guruhda: <b>{rep['already']}</b>\n"
+        f"⚠️ Yuborilmadi: <b>{rep['failed']}</b>\n"
+        f"👥 Tekshirildi: <b>{rep['total']}</b>\n\n/admin"
+    )
+
+
+# ── Statistika ──
+@dp.callback_query(F.data == "adm:stats")
+async def adm_stats(call: CallbackQuery):
+    if not _is_admin(call.from_user.id):
+        return await call.answer("Ruxsat yo'q", show_alert=True)
+    await call.answer("Hisoblanmoqda...")
+    s = await asyncio.to_thread(api_client.stats)
+    text = (
+        "📊 <b>Statistika</b>\n\n"
+        f"👤 Jami ro‘yxatda: <b>{s['total']}</b>\n"
+        f"✉️ Telegram ID bor: <b>{s['telegram']}</b>\n"
+        f"❔ Telegram ID yo‘q: <b>{s['no_telegram']}</b>\n\n"
+        f"🛏 DBL: <b>{s['dbl']}</b> ta yozuv\n"
+        f"🛏 TRPL: <b>{s['trpl']}</b> ta yozuv\n"
+        f"✅ To‘liq xonalar: <b>{s['rooms_ready']}</b>\n"
+        f"⏳ Sherigi belgilanmaganlar: <b>{s['without_roommate']}</b>"
+    )
+    await call.message.edit_text(text + "\n\n/admin")
+
+
+# ──────────────────────────── Fallback ────────────────────────────
+# Faqat shaxsiy chatga javob beramiz — guruhda bot jim turadi (admin bo'lsa ham).
+@dp.message(F.chat.type == "private")
+async def fallback(message: Message):
+    await message.answer("Boshlash uchun /start buyrug'ini bosing.")
+
+
+async def main():
+    logger.info("Bot ishga tushdi")
+    await dp.start_polling(bot)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

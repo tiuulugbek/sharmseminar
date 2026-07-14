@@ -1,0 +1,14 @@
+.env
+.claude/
+.agents/
+.codex/
+.verifier
+*.log
+__pycache__/
+*.py[cod]
+venv/
+sharm-seminar/data/sharm.db*
+sharm-seminar.zip
+acoustic-marketing.json
+client_secret.json
+token.json

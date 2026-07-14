@@ -120,7 +120,8 @@ tbody tr:hover{background:#FAFAFE}
 .badge-box.editing .be:hover{outline:1.5px solid rgba(46,44,110,.35)}
 .badge-box.editing .be.sel{outline:2px dashed var(--orange);outline-offset:1px}
 .be{position:absolute}
-.betext{overflow:hidden}
+.betext{overflow:hidden;white-space:pre-wrap;word-break:break-word}
+.badge-box.editing .betext[contenteditable=true]{cursor:text;outline:2px solid #5B7CFA!important;background:rgba(255,255,255,.92);padding:1mm;z-index:20}
 .beqr canvas{display:block}
 .punch{position:absolute;top:2.5mm;left:50%;transform:translateX(-50%);width:14mm;height:3mm;border-radius:2mm;
   background:rgba(0,0,0,.12);border:.4mm solid rgba(0,0,0,.18)}
@@ -132,7 +133,9 @@ tbody tr:hover{background:#FAFAFE}
 .addrow .btn{padding:7px 10px;font-size:12px}
 .frow{display:flex;align-items:center;gap:10px;margin:9px 0}
 .frow label{width:70px;font-size:12px;font-weight:600;color:var(--muted)}
-.frow input[type=number],.frow input[type=text],.frow select{flex:1;padding:6px 9px;border:1px solid var(--line-2);border-radius:8px}
+.frow input[type=number],.frow input[type=text],.frow select,.frow textarea{flex:1;min-width:0;padding:6px 9px;border:1px solid var(--line-2);border-radius:8px;background:#fff}
+.frow textarea{min-height:72px;resize:vertical;font:inherit;line-height:1.35}
+.hint{font-size:11px;color:var(--muted);line-height:1.4;margin-top:7px}
 .frow input[type=color]{width:38px;height:30px;border:1px solid var(--line-2);border-radius:8px;padding:2px;background:#fff}
 .seg{display:flex;border:1px solid var(--line-2);border-radius:8px;overflow:hidden;flex:1}
 .seg button{flex:1;padding:6px;font-size:12px;font-weight:600;color:var(--muted)}
@@ -230,7 +233,8 @@ const T = {
   elements:"Elementlar",fieldName:"Ism familya",fieldId:"ID raqam",properties:"Element sozlamalari",
   pickEl:"Element tanlang yoki suring",delEl:"Elementni o'chirish",samplePerson:"Namuna ishtirokchi",
   badgeBg:"Beyjik foni",seminarLogo:"Seminar logotipi",uploadLogo:"Logo yuklash",resetTpl:"Standart shablon",
-  posX:"Chap (mm)",posY:"Yuqori (mm)",width:"Kenglik (mm)",height:"Balandlik (mm)",fsize:"Shrift (mm)",
+  posX:"Chap (mm)",posY:"Yuqori (mm)",width:"Kenglik (mm)",height:"Balandlik (mm)",fsize:"Shrift (mm)",fontFamily:"Shrift turi",italic:"Kursiv",lineHeight:"Qator",letterSpace:"Oraliq",
+  editHint:"Matnni bevosita tahrirlash uchun beyjikdagi yozuvni ikki marta bosing",logoImage:"Logo rasmi",uploadThisLogo:"Rasm tanlash",useDefaultLogo:"Asosiy logo",
   color:"Rang",weight:"Qalinlik",align:"Tekislash",text:"Matn",qrsize:"QR o'lchami (mm)",field:"Maydon",
   wNormal:"Oddiy",wBold:"Qalin",wBlack:"Juda qalin",front:"Old tomon",resetDone:"Standart shablon tiklandi",
   badgeSize:"Beyjik o'lchami",bwCm:"Kenglik (sm)",bhCm:"Balandlik (sm)",sizeCustom:"Ixtiyoriy",
@@ -258,7 +262,8 @@ const T = {
   elements:"Элементы",fieldName:"Имя фамилия",fieldId:"ID номер",properties:"Свойства элемента",
   pickEl:"Выберите или перетащите элемент",delEl:"Удалить элемент",samplePerson:"Пример участника",
   badgeBg:"Фон бейджа",seminarLogo:"Логотип семинара",uploadLogo:"Загрузить лого",resetTpl:"Шаблон по умолчанию",
-  posX:"Слева (мм)",posY:"Сверху (мм)",width:"Ширина (мм)",height:"Высота (мм)",fsize:"Шрифт (мм)",
+  posX:"Слева (мм)",posY:"Сверху (мм)",width:"Ширина (мм)",height:"Высота (мм)",fsize:"Шрифт (мм)",fontFamily:"Шрифт",italic:"Курсив",lineHeight:"Интервал",letterSpace:"Буквы",
+  editHint:"Дважды нажмите на текст на бейдже для быстрого редактирования",logoImage:"Изображение",uploadThisLogo:"Выбрать",useDefaultLogo:"Основной логотип",
   color:"Цвет",weight:"Насыщенность",align:"Выравнивание",text:"Текст",qrsize:"Размер QR (мм)",field:"Поле",
   wNormal:"Обычный",wBold:"Жирный",wBlack:"Очень жирный",front:"Лицевая сторона",resetDone:"Шаблон сброшен",
   badgeSize:"Размер бейджа",bwCm:"Ширина (см)",bhCm:"Высота (см)",sizeCustom:"Свой",
@@ -279,6 +284,11 @@ const roleById=id=>(S.roles||[]).find(r=>r.id===id);
 const GCOL=['','var(--g1)','var(--g2)','var(--g3)','var(--g4)','var(--g5)'];
 const GHEX=['','#5B7CFA','#F07E1A','#12B886','#E4508B','#8A63D2'];
 const RTCOL={'1 kishilik':'var(--rt-single)','2 kishilik':'var(--rt-double)','3 kishilik':'var(--rt-triple)','Posh club':'var(--rt-posh)'};
+const BADGE_FONTS=[
+  ['Inter,Arial,sans-serif','Inter'],['Arial,sans-serif','Arial'],['Verdana,sans-serif','Verdana'],
+  ['Georgia,serif','Georgia'],['Times New Roman,serif','Times New Roman'],
+  ['Trebuchet MS,sans-serif','Trebuchet'],['Courier New,monospace','Courier New']
+];
 
 /* ===== default badge template (7x11cm front side) ===== */
 function defaultBadge(){return{
@@ -286,11 +296,11 @@ function defaultBadge(){return{
  elements:[
   {id:"b_top", type:"band",  x:0,  y:0,   w:70, h:6,  color:"#F07E1A"},
   {id:"e_logo",type:"logo",  x:22, y:11,  w:26},
-  {id:"e_name",type:"field", field:"name", x:4, y:52, w:62, size:7,  color:"#211F52", weight:800, align:"center"},
-  {id:"e_id",  type:"field", field:"id",   x:4, y:64, w:62, size:5,  color:"#E06A0A", weight:800, align:"center"},
+  {id:"e_name",type:"field", field:"name", x:4, y:52, w:62, size:7,  color:"#211F52", weight:800, align:"center",font:"Inter,Arial,sans-serif",lineHeight:1.05},
+  {id:"e_id",  type:"field", field:"id",   x:4, y:64, w:62, size:5,  color:"#E06A0A", weight:800, align:"center",font:"Inter,Arial,sans-serif",lineHeight:1.05},
   {id:"e_qr",  type:"qr",    x:23, y:73, w:24},
   {id:"b_bot", type:"band",  x:0,  y:100, w:70, h:10, color:"#2E2C6E"},
-  {id:"e_ftr", type:"text",  text:"SHARM SEMINAR", x:4, y:102.6, w:62, size:3.6, color:"#FFFFFF", weight:800, align:"center", letter:2}
+  {id:"e_ftr", type:"text",  text:"SHARM SEMINAR", x:4, y:102.6, w:62, size:3.6, color:"#FFFFFF", weight:800, align:"center", letter:2,font:"Inter,Arial,sans-serif",lineHeight:1.05}
  ]};}
 
 /* ===== defaults ===== */
@@ -579,11 +589,12 @@ function badgeInner(p){
   return S.badge.elements.map(e=>{
     const pos=`left:${e.x}mm;top:${e.y}mm;`;
     if(e.type==='band')return `<div class="be" data-eid="${e.id}" style="${pos}width:${e.w}mm;height:${e.h}mm;background:${e.color}"></div>`;
-    if(e.type==='logo')return `<div class="be" data-eid="${e.id}" style="${pos}width:${e.w}mm"><img src="${logo}" style="width:100%;display:block"></div>`;
+    if(e.type==='logo'){const src=e.src||logo;return `<div class="be" data-eid="${e.id}" style="${pos}width:${e.w}mm"><img src="${src}" style="width:100%;display:block;max-height:${e.h||40}mm;object-fit:contain"></div>`;}
     if(e.type==='qr')return `<div class="be beqr" data-eid="${e.id}" style="${pos}width:${e.w}mm;height:${e.w}mm"><canvas data-qr="${p.id}" style="width:100%;height:100%"></canvas></div>`;
     const txt=e.type==='field'?(e.field==='name'?p.fio:p.id):e.text;
     const ls=e.letter?`letter-spacing:${e.letter}px;`:'';
-    return `<div class="be betext" data-eid="${e.id}" style="${pos}width:${e.w}mm;font-size:${e.size}mm;color:${e.color};font-weight:${e.weight};text-align:${e.align};${ls}line-height:1.05">${escapeHtml(txt)}</div>`;
+    const font=e.font||'Inter,Arial,sans-serif',lh=e.lineHeight||1.05,italic=e.italic?'italic':'normal';
+    return `<div class="be betext" data-eid="${e.id}" data-etype="${e.type}" style="${pos}width:${e.w}mm;font-size:${e.size}mm;color:${e.color};font-family:${font};font-style:${italic};font-weight:${e.weight};text-align:${e.align};${ls}line-height:${lh}">${escapeHtml(txt)}</div>`;
   }).join('');
 }
 function pageUrl(id){const base=(S.pageBase||location.origin||'').replace(/\/+$/,'');return (base||'')+'/p/'+id;}
@@ -610,6 +621,8 @@ function renderDesigner(v){
 }
 function bindDrag(){
   document.querySelectorAll('#ebox .be').forEach(el=>{
+    const model=getEl(el.dataset.eid);
+    if(model&&model.type==='text')el.ondblclick=ev=>startInlineTextEdit(el,model,ev);
     el.onpointerdown=ev=>{ev.preventDefault();selEid=el.dataset.eid;markSel();renderProps();
       const e=getEl(selEid);const sx=e.x,sy=e.y,dx=ev.clientX,dy=ev.clientY;const sc=editorScale();
       const move=m=>{e.x=Math.max(-2,Math.min(bw(),sx+(m.clientX-dx)/(PXMM*sc)));
@@ -618,6 +631,14 @@ function bindDrag(){
       const up=()=>{document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);api.saveBadge();};
       document.addEventListener('pointermove',move);document.addEventListener('pointerup',up);};
   });
+}
+function startInlineTextEdit(el,e,ev){
+  ev.preventDefault();ev.stopPropagation();
+  el.onpointerdown=null;el.contentEditable='true';el.spellcheck=true;el.focus();
+  const range=document.createRange();range.selectNodeContents(el);const sel=window.getSelection();sel.removeAllRanges();sel.addRange(range);
+  const save=()=>{e.text=el.innerText.replace(/\n+$/,'');el.contentEditable='false';api.saveBadge();refreshStage();renderProps();};
+  el.onblur=save;el.onkeydown=k=>{if(k.key==='Escape'){k.preventDefault();el.innerText=e.text;el.blur();}
+    if(k.key==='Enter'&&!k.shiftKey){k.preventDefault();el.blur();}};
 }
 function markSel(){document.querySelectorAll('#ebox .be').forEach(el=>el.classList.toggle('sel',el.dataset.eid===selEid));}
 function syncNum(id,val){const el=document.getElementById('pf_'+id);if(el)el.value=(+val).toFixed(1);}
@@ -663,30 +684,36 @@ function elementForm(e){
     if(e.type==='field')f+=`<div class="frow"><label>${t('field')}</label><select onchange="setProp('${e.id}','field',this.value)">
       <option value="name" ${e.field==='name'?'selected':''}>${t('fieldName')}</option>
       <option value="id" ${e.field==='id'?'selected':''}>${t('fieldId')}</option></select></div>`;
-    if(e.type==='text')f+=`<div class="frow"><label>${t('text')}</label><input type="text" value="${escapeHtml(e.text)}" oninput="setProp('${e.id}','text',this.value)"></div>`;
-    f+=`<div class="frow"><label>${t('width')}</label><input type="number" step="1" value="${e.w}" oninput="setProp('${e.id}','w',this.value)"></div>
-      <div class="frow"><label>${t('fsize')}</label><input type="number" step="0.2" value="${e.size}" oninput="setProp('${e.id}','size',this.value)"></div>
-      <div class="frow"><label>${t('color')}</label><input type="color" value="${e.color}" oninput="setProp('${e.id}','color',this.value)"></div>
+    if(e.type==='text')f+=`<div class="frow" style="align-items:flex-start"><label>${t('text')}</label><textarea oninput="setProp('${e.id}','text',this.value,true)">${escapeHtml(e.text)}</textarea></div><div class="hint">${t('editHint')}</div>`;
+    f+=`<div class="frow"><label>${t('width')}</label><input type="number" step="1" value="${e.w}" oninput="setProp('${e.id}','w',this.value,true)"></div>
+      <div class="frow"><label>${t('fsize')}</label><input type="number" step="0.2" value="${e.size}" oninput="setProp('${e.id}','size',this.value,true)"></div>
+      <div class="frow"><label>${t('fontFamily')}</label><select onchange="setProp('${e.id}','font',this.value)">${BADGE_FONTS.map(([v,n])=>`<option value="${v}" ${(e.font||'Inter,Arial,sans-serif')===v?'selected':''}>${n}</option>`).join('')}</select></div>
+      <div class="frow"><label>${t('color')}</label><input type="color" value="${e.color}" oninput="setProp('${e.id}','color',this.value,true)"></div>
       <div class="frow"><label>${t('weight')}</label><select onchange="setProp('${e.id}','weight',this.value)">
-        <option value="400" ${e.weight==400?'selected':''}>${t('wNormal')}</option>
-        <option value="700" ${e.weight==700?'selected':''}>${t('wBold')}</option>
-        <option value="800" ${e.weight==800?'selected':''}>${t('wBlack')}</option></select></div>
+        ${[[300,'300'],[400,t('wNormal')],[500,'500'],[600,'600'],[700,t('wBold')],[800,t('wBlack')],[900,'900']].map(([v,n])=>`<option value="${v}" ${e.weight==v?'selected':''}>${n}</option>`).join('')}</select></div>
+      <div class="frow"><label>${t('italic')}</label><select onchange="setProp('${e.id}','italic',this.value==='true')"><option value="false" ${!e.italic?'selected':''}>—</option><option value="true" ${e.italic?'selected':''}>✓</option></select></div>
+      <div class="frow"><label>${t('lineHeight')}</label><input type="number" min="0.7" max="3" step="0.05" value="${e.lineHeight||1.05}" oninput="setProp('${e.id}','lineHeight',this.value,true)"></div>
+      <div class="frow"><label>${t('letterSpace')}</label><input type="number" step="0.2" value="${e.letter||0}" oninput="setProp('${e.id}','letter',this.value,true)"></div>
       <div class="frow"><label>${t('align')}</label><div class="seg">
         ${['left','center','right'].map(a=>`<button class="${e.align===a?'on':''}" onclick="setProp('${e.id}','align','${a}')">${a==='left'?'⌷◄':a==='center'?'▬':'►⌷'}</button>`).join('')}</div></div>`;
   }else if(e.type==='qr'){
-    f+=`<div class="frow"><label>${t('qrsize')}</label><input type="number" step="1" value="${e.w}" oninput="setProp('${e.id}','w',this.value)"></div>`;
+    f+=`<div class="frow"><label>${t('qrsize')}</label><input type="number" step="1" value="${e.w}" oninput="setProp('${e.id}','w',this.value,true)"></div>`;
   }else if(e.type==='logo'){
-    f+=`<div class="frow"><label>${t('width')}</label><input type="number" step="1" value="${e.w}" oninput="setProp('${e.id}','w',this.value)"></div>`;
+    const logoSrc=e.src||(S.seminarLogo||ACOUSTIC);
+    f+=`<div class="frow" style="align-items:flex-start"><label>${t('logoImage')}</label><div class="logo-up"><div class="prev"><img src="${logoSrc}"></div><label class="btn sm" style="cursor:pointer">${t('uploadThisLogo')}<input type="file" accept="image/*" style="display:none" onchange="uploadElementLogo(this,'${e.id}')"></label></div></div>
+      <div class="frow"><label>${t('width')}</label><input type="number" step="1" value="${e.w}" oninput="setProp('${e.id}','w',this.value,true)"></div>
+      <div class="frow"><label>${t('height')}</label><input type="number" step="1" value="${e.h||40}" oninput="setProp('${e.id}','h',this.value,true)"></div>
+      ${e.src?`<button class="btn sm" onclick="setProp('${e.id}','src','')">↺ ${t('useDefaultLogo')}</button>`:''}`;
   }else if(e.type==='band'){
-    f+=`<div class="frow"><label>${t('width')}</label><input type="number" step="1" value="${e.w}" oninput="setProp('${e.id}','w',this.value)"></div>
-      <div class="frow"><label>${t('height')}</label><input type="number" step="0.5" value="${e.h}" oninput="setProp('${e.id}','h',this.value)"></div>
-      <div class="frow"><label>${t('color')}</label><input type="color" value="${e.color}" oninput="setProp('${e.id}','color',this.value)"></div>`;
+    f+=`<div class="frow"><label>${t('width')}</label><input type="number" step="1" value="${e.w}" oninput="setProp('${e.id}','w',this.value,true)"></div>
+      <div class="frow"><label>${t('height')}</label><input type="number" step="0.5" value="${e.h}" oninput="setProp('${e.id}','h',this.value,true)"></div>
+      <div class="frow"><label>${t('color')}</label><input type="color" value="${e.color}" oninput="setProp('${e.id}','color',this.value,true)"></div>`;
   }
   f+=`<button class="btn sm" style="margin-top:8px;color:#C0392B;border-color:#F3C6C0" onclick="delEl('${e.id}')">🗑 ${t('delEl')}</button>`;
   return f;
 }
 function setProp(id,key,val,noRerender){const e=getEl(id);
-  if(['x','y','w','h','size','letter'].includes(key))val=parseFloat(val)||0;
+  if(['x','y','w','h','size','letter','lineHeight'].includes(key))val=parseFloat(val)||0;
   e[key]=val;api.saveBadge();
   if(noRerender){refreshStageOnly();}else{refreshStage();renderProps();}
 }
@@ -699,10 +726,10 @@ function refreshStageOnly(){const box=document.getElementById('ebox');if(!box)re
 function addEl(type,field){
   const id='e_'+Math.random().toString(36).slice(2,7);
   const base={id,type,x:25,y:50};
-  if(type==='field')Object.assign(base,{field:field||'name',w:40,size:6,color:'#211F52',weight:700,align:'center'});
-  if(type==='text')Object.assign(base,{text:'MATN',w:40,size:5,color:'#2E2C6E',weight:700,align:'center',letter:0});
+  if(type==='field')Object.assign(base,{field:field||'name',w:40,size:6,color:'#211F52',weight:700,align:'center',font:'Inter,Arial,sans-serif',lineHeight:1.05,italic:false});
+  if(type==='text')Object.assign(base,{text:'MATN',w:40,size:5,color:'#2E2C6E',weight:700,align:'center',letter:0,font:'Inter,Arial,sans-serif',lineHeight:1.05,italic:false});
   if(type==='qr')Object.assign(base,{w:22});
-  if(type==='logo')Object.assign(base,{w:24});
+  if(type==='logo')Object.assign(base,{w:24,h:40,src:''});
   if(type==='band')Object.assign(base,{w:70,h:8,color:'#F07E1A',x:0});
   S.badge.elements.push(base);selEid=id;api.saveBadge();refreshStage();renderProps();
 }
@@ -712,6 +739,8 @@ function setSize(w,h){w=Math.max(40,Math.min(150,+w||70));h=Math.max(40,Math.min
 function resetTpl(){S.badge=defaultBadge();selEid=null;api.saveBadge();renderDesigner(document.getElementById('view'));toast(t('resetDone'));}
 function uploadLogo(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();
   r.onload=()=>{S.seminarLogo=r.result;api.saveLogo(r.result);refreshStage();renderProps();};r.readAsDataURL(f);}
+function uploadElementLogo(inp,id){const f=inp.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{const e=getEl(id);if(!e)return;e.src=r.result;api.saveBadge();refreshStage();renderProps();};r.readAsDataURL(f);}
 
 function printAll(){const wrap=document.getElementById('printwrap');
   wrap.innerHTML=P().map(p=>`<div class="pbadge" style="width:${bw()}mm;height:${bh()}mm;background:${S.badge.bg}">${badgeInner(p)}</div>`).join('');

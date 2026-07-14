@@ -89,6 +89,18 @@ class BotApiTest(unittest.TestCase):
         self.assertEqual(stats["total"], 2)
         self.assertEqual(stats["rooms_ready"], 1)
 
+    def test_badge_template_keeps_multiple_logo_and_font_settings(self):
+        badge = {"w": 70, "h": 110, "bg": "#fff", "elements": [
+            {"id": "logo1", "type": "logo", "src": "data:image/png;base64,AAA", "x": 1, "y": 1, "w": 20},
+            {"id": "logo2", "type": "logo", "src": "data:image/png;base64,BBB", "x": 30, "y": 1, "w": 20},
+            {"id": "text1", "type": "text", "text": "Seminar", "font": "Georgia,serif",
+             "italic": True, "lineHeight": 1.2, "letter": 0.4},
+        ]}
+        self.assertEqual(self.client.post("/api/badge", json=badge).status_code, 200)
+        saved = self.client.get("/api/bootstrap").get_json()["badge"]
+        self.assertEqual(saved["elements"][1]["src"], "data:image/png;base64,BBB")
+        self.assertEqual(saved["elements"][2]["font"], "Georgia,serif")
+
 
 if __name__ == "__main__":
     unittest.main()

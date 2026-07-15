@@ -213,7 +213,7 @@ const PXMM = 96/25.4;      // px per mm @96dpi
 const bw=()=>(S.badge&&S.badge.w)||70;   // badge width mm
 const bh=()=>(S.badge&&S.badge.h)||110;  // badge height mm
 const editorScale=()=>Math.max(1.1,Math.min(2.2,620/(bh()*PXMM)));  // fit editor
-const SIZE_PRESETS=[[70,100],[70,110],[80,120],[90,130]];  // cm: 7x10, 7x11, 8x12, 9x13
+const SIZE_PRESETS=[[70,100],[70,110],[80,120],[90,130],[100,140]];  // cm: 7x10, 7x11, 8x12, 9x13, 10x14
 
 /* ===== i18n ===== */
 const T = {
@@ -290,17 +290,21 @@ const BADGE_FONTS=[
   ['Trebuchet MS,sans-serif','Trebuchet'],['Courier New,monospace','Courier New']
 ];
 
-/* ===== default badge template (7x11cm front side) ===== */
+/* ===== default badge template (8x12cm front side) ===== */
 function defaultBadge(){return{
- bg:"#FFFFFF", w:70, h:110,
+ bg:"linear-gradient(180deg, #FFFFFF 0%, #F8FBFF 100%)", w:80, h:120,
  elements:[
-  {id:"b_top", type:"band",  x:0,  y:0,   w:70, h:6,  color:"#F07E1A"},
-  {id:"e_logo",type:"logo",  x:22, y:11,  w:26},
-  {id:"e_name",type:"field", field:"name", x:4, y:52, w:62, size:7,  color:"#211F52", weight:800, align:"center",font:"Inter,Arial,sans-serif",lineHeight:1.05},
-  {id:"e_id",  type:"field", field:"id",   x:4, y:64, w:62, size:5,  color:"#E06A0A", weight:800, align:"center",font:"Inter,Arial,sans-serif",lineHeight:1.05},
-  {id:"e_qr",  type:"qr",    x:23, y:73, w:24},
-  {id:"b_bot", type:"band",  x:0,  y:100, w:70, h:10, color:"#2E2C6E"},
-  {id:"e_ftr", type:"text",  text:"SHARM SEMINAR", x:4, y:102.6, w:62, size:3.6, color:"#FFFFFF", weight:800, align:"center", letter:2,font:"Inter,Arial,sans-serif",lineHeight:1.05}
+  {id:"b_grad_top", type:"band",  x:0,  y:0,   w:80, h:8,  color:"linear-gradient(135deg, #F07E1A 0%, #FFB366 100%)"},
+  {id:"deco_palm1",type:"logo",  x:2, y:2,  w:8, h:12, src:"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 48'%3E%3Cpath d='M12 8c-2 0-3 2-4 4s-2 3-4 3c0-3 1-5 3-7s4-3 5-3c-1 1-1 2 0 3zm0 0c2 0 3 2 4 4s2 3 4 3c0-3-1-5-3-7s-4-3-5-3c1 1 1 2 0 3zm-1 4c0-2-2-3-4-4s-3-2-3-4c3 0 5 1 7 3s3 4 3 5c-1-1-2-1-3 0zm2 0c0-2 2-3 4-4s3-2 3-4c-3 0-5 1-7 3s-3 4-3 5c1-1 2-1 3 0zM11 14v30c0 2 1 4 1 4s1-2 1-4V14c-1 0-1 0-2 0z' fill='%232E2C6E' opacity='0.15'/%3E%3C/svg%3E"},
+  {id:"deco_palm2",type:"logo",  x:70, y:3,  w:8, h:12, src:"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 48'%3E%3Cpath d='M12 8c-2 0-3 2-4 4s-2 3-4 3c0-3 1-5 3-7s4-3 5-3c-1 1-1 2 0 3zm0 0c2 0 3 2 4 4s2 3 4 3c0-3-1-5-3-7s-4-3-5-3c1 1 1 2 0 3zm-1 4c0-2-2-3-4-4s-3-2-3-4c3 0 5 1 7 3s3 4 3 5c-1-1-2-1-3 0zm2 0c0-2 2-3 4-4s3-2 3-4c-3 0-5 1-7 3s-3 4-3 5c1-1 2-1 3 0zM11 14v30c0 2 1 4 1 4s1-2 1-4V14c-1 0-1 0-2 0z' fill='%232E2C6E' opacity='0.15'/%3E%3C/svg%3E"},
+  {id:"deco_sun", type:"logo",  x:58, y:12,  w:16, h:16, src:"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='12' fill='%23FFB366'/%3E%3Cpath d='M32 4v8M32 52v8M4 32h8M52 32h8M12 12l6 6M46 46l6 6M12 52l6-6M46 18l6-6' stroke='%23F07E1A' stroke-width='3' stroke-linecap='round' opacity='0.6'/%3E%3C/svg%3E"},
+  {id:"e_logo",type:"logo",  x:27, y:32,  w:26, h:18},
+  {id:"e_name",type:"field", field:"name", x:6, y:54, w:68, size:7.5,  color:"#211F52", weight:800, align:"center",font:"Inter,Arial,sans-serif",lineHeight:1.1},
+  {id:"e_id",  type:"field", field:"id",   x:6, y:68, w:68, size:5.5,  color:"#E06A0A", weight:800, align:"center",font:"Inter,Arial,sans-serif",lineHeight:1.05},
+  {id:"e_qr",  type:"qr",    x:28, y:77, w:24},
+  {id:"deco_wave", type:"logo",  x:0, y:102,  w:80, h:8, src:"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 20'%3E%3Cpath d='M0 10c10 0 10-8 20-8s10 8 20 8 10-8 20-8 10 8 20 8 10-8 20-8 10 8 20 8 10-8 20-8 10 8 20 8 10-8 20-8 10 8 20 8 10-8 20-8 10 8 20 8' stroke='%231B9AAA' stroke-width='1.5' fill='none' opacity='0.3'/%3E%3C/svg%3E"},
+  {id:"b_bot", type:"band",  x:0,  y:110, w:80, h:10, color:"#2E2C6E"},
+  {id:"e_ftr", type:"text",  text:"SHARM SEMINAR 2026", x:6, y:113, w:68, size:3.8, color:"#FFFFFF", weight:800, align:"center", letter:1.8,font:"Inter,Arial,sans-serif",lineHeight:1.05}
  ]};}
 
 /* ===== defaults ===== */
@@ -730,7 +734,7 @@ function addEl(type,field){
   if(type==='text')Object.assign(base,{text:'MATN',w:40,size:5,color:'#2E2C6E',weight:700,align:'center',letter:0,font:'Inter,Arial,sans-serif',lineHeight:1.05,italic:false});
   if(type==='qr')Object.assign(base,{w:22});
   if(type==='logo')Object.assign(base,{w:24,h:40,src:''});
-  if(type==='band')Object.assign(base,{w:70,h:8,color:'#F07E1A',x:0});
+  if(type==='band')Object.assign(base,{w:80,h:8,color:'#F07E1A',x:0});
   S.badge.elements.push(base);selEid=id;api.saveBadge();refreshStage();renderProps();
 }
 function delEl(id){S.badge.elements=S.badge.elements.filter(e=>e.id!==id);selEid=null;api.saveBadge();refreshStage();renderProps();}

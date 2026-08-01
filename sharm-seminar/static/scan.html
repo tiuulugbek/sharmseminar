@@ -49,8 +49,9 @@ video{width:100%;border-radius:12px;background:#000;display:block;aspect-ratio:1
   </div>
   <div class="pad">
     <div id="denied" class="card hidden">
-      <div class="lab">Ruxsat yo'q</div>
+      <div class="lab" id="deniedTitle">Ruxsat yo'q</div>
       <div id="deniedText">Check-in qilish faqat guruh rahbari va adminlarga ruxsat etilgan.</div>
+      <div class="hint" id="diag"></div>
     </div>
 
     <div id="app" class="hidden">
@@ -201,29 +202,42 @@ $('stop').onclick = stopCamera;
 $('go').onclick = () => { submit($('manual').value.trim()); $('manual').value = ''; };
 $('manual').onkeydown = e => { if (e.key === 'Enter') $('go').click(); };
 
+/* Nima yetishmayotganini aniq ko'rsatamiz — "ruxsat yo'q" bilan "Telegram
+   ichida ochilmagan" butunlay boshqa muammolar. */
+function deny(title, text) {
+  $('deniedTitle').textContent = title;
+  $('deniedText').textContent = text;
+  const u = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) || null;
+  $('diag').textContent = 'Tashxis: SDK=' + (tg ? 'bor' : 'yo\'q') +
+    ' · platform=' + ((tg && tg.platform) || '—') +
+    ' · versiya=' + ((tg && tg.version) || '—') +
+    ' · initData=' + (initData ? initData.length + ' belgi' : 'bo\'sh') +
+    ' · user=' + (u ? u.id : '—');
+  $('denied').classList.remove('hidden');
+}
+
 (async function boot() {
   if (!initData) {
     $('who').textContent = 'Telegram orqali oching';
-    $('denied').classList.remove('hidden');
-    $('deniedText').textContent =
-      'Bu sahifa @sharmseminarbot ichidagi "📷 QR skanlash" tugmasi orqali ochilishi kerak.';
+    deny('Telegram ichida ochilmagan',
+      'Bu sahifa brauzerda emas, @sharmseminarbot ichidagi "📷 QR skanlash" tugmasi ' +
+      'orqali ochilishi kerak. Botda /skaner buyrug\'ini yuboring va chiqqan tugmani bosing.');
     return;
   }
   const {status, data} = await api('/api/webapp/whoami', {});
   if (status !== 200) {
     $('who').textContent = 'Tasdiqlanmadi';
-    $('denied').classList.remove('hidden');
-    $('deniedText').textContent = 'Telegram imzosi tekshiruvdan o\'tmadi. Botni qaytadan oching.';
+    deny('Imzo tekshirilmadi',
+      'Telegram imzosi serverda tasdiqlanmadi. Mini-appni yopib, botdan qaytadan oching.');
     return;
   }
   const roles = {admin: 'Administrator', leader: 'Guruh rahbari', member: 'Ishtirokchi', guest: 'Mehmon'};
   $('who').textContent = [data.fio || 'Admin', roles[data.role] || data.role,
                           data.group_name || ''].filter(Boolean).join(' · ');
   if (data.role !== 'admin' && data.role !== 'leader') {
-    $('denied').classList.remove('hidden');
-    $('deniedText').textContent = data.role === 'member'
+    deny('Ruxsat yo\'q', data.role === 'member'
       ? 'Check-in qilish faqat guruh rahbari va adminlarga ruxsat etilgan.'
-      : 'Siz ro\'yxatda topilmadingiz. Avval botda /start orqali ro\'yxatdan o\'ting.';
+      : 'Siz ro\'yxatda topilmadingiz. Avval botda /start orqali ro\'yxatdan o\'ting.');
     return;
   }
   if (data.role === 'leader' && data.leader_scope === 'group') {

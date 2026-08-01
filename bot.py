@@ -19,6 +19,7 @@ from aiogram.types import (
     Message,
     ReplyKeyboardMarkup,
     ReplyKeyboardRemove,
+    WebAppInfo,
 )
 
 import broadcast
@@ -1443,6 +1444,24 @@ async def show_menu(user_id: int, me: dict | None = None, note: str = "") -> dic
 async def cmd_menu(message: Message, state: FSMContext):
     await state.clear()
     await show_menu(message.from_user.id)
+
+
+@dp.message(Command("skaner"), F.chat.type == "private")
+async def cmd_scanner(message: Message, state: FSMContext):
+    """Mini-appni inline tugma orqali ochadi.
+
+    Ba'zi mijozlarda klaviatura tugmasi mini-appni `initData` siz ochadi —
+    inline tugma esa har doim imzolangan ma'lumot bilan keladi.
+    """
+    await state.clear()
+    me = await whoami(message.from_user.id)
+    if me.get("role") not in {"admin", "leader"}:
+        return await show_menu(message.from_user.id, me,
+                               "⛔ QR skaner faqat admin va guruh rahbarlari uchun.")
+    await message.answer(
+        "📷 <b>QR skaner</b>\n\nQuyidagi tugmani bosing — skaner Telegram ichida ochiladi.",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(
+            text="📷 QR skanlash", web_app=WebAppInfo(url=f"{config.WEBAPP_URL}/scan"))]]))
 
 
 async def _ask_text(message: Message, state: FSMContext, scope: str, value=None, prompt: str = ""):

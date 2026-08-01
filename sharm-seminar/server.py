@@ -51,7 +51,13 @@ BOT_COLUMNS = {
     "token": "TEXT", "passport_issued": "TEXT", "passport_issuer": "TEXT",
     "doc_type": "TEXT", "seminar": "TEXT", "international": "INTEGER DEFAULT 0",
     "izoh": "TEXT",
+    # Panelga kirish roli: bo'sh bo'lsa leader/member avtomatik aniqlanadi.
+    "panel_role": "TEXT",
 }
+
+# Panel rollari, kuchsizdan kuchligiga qarab.
+PANEL_ROLES = ["member", "leader", "manager", "admin"]
+ROLE_RANK = {name: index for index, name in enumerate(PANEL_ROLES)}
 
 DEFAULT_GROUPS = [{"id": 1, "name": "Sazanchik"}, {"id": 2, "name": "Meduza"},
                   {"id": 3, "name": "Akula"}, {"id": 4, "name": "Delfin"},
@@ -372,6 +378,186 @@ def _label(con, row, names=None):
     return f"{row['id']} · {row['fio']}{suffix}"
 
 
+# ══════════════════════ Panelga kirish (maxfiy kod = pasport) ══════════════════
+SESSION_COOKIE = "sharm_session"
+SESSION_MAX_AGE = 30 * 24 * 3600          # 30 kun
+LOGIN_WINDOW = 600                        # 10 daqiqa
+LOGIN_MAX_FAILURES = 12                   # shu oynada bir IP dan
+_login_failures = {}                      # {ip: [timestamp, ...]} — jarayon ichida
+
+
+def _code_variants(series, number):
+    """Bir ishtirokchini topish mumkin bo'lgan kod ko'rinishlari.
+
+    Odam beyjigidagi pasportni turlicha ko'chiradi: to'liq (``FA1177095``),
+    faqat raqam (``1177095``) yoki boshidagi nollarsiz.  Hammasini qabul
+    qilamiz, lekin faqat bitta odamga to'g'ri kelsa.
+    """
+    series = re.sub(r"[^A-Z0-9]", "", str(series or "").upper())
+    number = re.sub(r"[^0-9]", "", str(number or ""))
+    short = number.lstrip("0")
+    out = {series + number, number}
+    if short:
+        out |= {series + short, short}
+    return {v for v in out if v}
+
+
+def _find_by_code(con, code):
+    """Maxfiy kod bo'yicha ishtirokchi. ``(row, error)`` qaytaradi."""
+    code = re.sub(r"[^A-Z0-9]", "", str(code or "").upper())
+    if len(code) < 5:
+        return None, "too_short"
+    matches = [r for r in con.execute("SELECT * FROM participants")
+               if code in _code_variants(r["passport_series"], r["passport_number"])]
+    if not matches:
+        return None, "not_found"
+    if len(matches) > 1:
+        # Faqat raqam bir nechta odamga to'g'ri keldi — seriyasi bilan yozsin.
+        exact = [r for r in matches
+                 if code == re.sub(r"[^A-Z0-9]", "", (r["passport_series"] or "").upper())
+                 + re.sub(r"[^0-9]", "", r["passport_number"] or "")]
+        if len(exact) != 1:
+            return None, "ambiguous"
+        matches = exact
+    return matches[0], None
+
+
+def _panel_admin_ids():
+    raw = os.environ.get("PANEL_ADMIN_IDS", "")
+    return {x.strip().upper() for x in raw.split(",") if x.strip()}
+
+
+def panel_role(con, row):
+    """Panel roli.
+
+    Ustuvorlik: `PANEL_ADMIN_IDS` → botning `ADMIN_IDS` idagi Telegram hisobi →
+    `panel_role` ustuni → guruh mas'uli → oddiy ishtirokchi.  Botda admin bo'lgan
+    odam panelda ham admin bo'ladi, alohida ro'yxat yuritish shart emas.
+    """
+    if row["id"].upper() in _panel_admin_ids():
+        return "admin"
+    if row["telegram_id"] and str(row["telegram_id"]) in _admin_ids():
+        return "admin"
+    explicit = str(row["panel_role"] or "").strip().lower()
+    if explicit in ROLE_RANK:
+        return explicit
+    return "leader" if row["leader"] else "member"
+
+
+def _sign_session(pid, role):
+    issued = int(datetime.datetime.now(datetime.timezone.utc).timestamp())
+    payload = f"{pid}|{role}|{issued}"
+    signature = hmac.new(_token_secret().encode(), payload.encode(), hashlib.sha256).hexdigest()[:32]
+    return f"{payload}|{signature}"
+
+
+def _read_session(raw):
+    """Imzolangan cookie'ni ochadi; soxta yoki eskirgan bo'lsa ``None``."""
+    try:
+        pid, role, issued, signature = str(raw or "").split("|")
+    except ValueError:
+        return None
+    payload = f"{pid}|{role}|{issued}"
+    expected = hmac.new(_token_secret().encode(), payload.encode(), hashlib.sha256).hexdigest()[:32]
+    if not hmac.compare_digest(expected, signature):
+        return None
+    try:
+        age = datetime.datetime.now(datetime.timezone.utc).timestamp() - int(issued)
+    except ValueError:
+        return None
+    if age > SESSION_MAX_AGE:
+        return None
+    return {"id": pid, "role": role}
+
+
+def current_session(con=None):
+    """Joriy foydalanuvchi ``{id, role, fio, group, group_name}`` yoki ``None``.
+
+    Rol har so'rovda bazadan qayta o'qiladi — rol o'zgarsa cookie'ni kutib
+    o'tirmaydi.
+    """
+    session = _read_session(request.cookies.get(SESSION_COOKIE))
+    if not session:
+        return None
+    close_after = con is None
+    con = con or db()
+    try:
+        row = con.execute("SELECT * FROM participants WHERE id=?", (session["id"],)).fetchone()
+        if not row:
+            return None
+        role = panel_role(con, row)
+        return {"id": row["id"], "role": role, "fio": row["fio"], "group": row["grp"],
+                "group_name": _group_names(con).get(str(row["grp"])) if row["grp"] else None,
+                "token": row["token"], "rank": ROLE_RANK[role]}
+    finally:
+        if close_after:
+            con.close()
+
+
+def panel_auth(minimum="member"):
+    """Panel endpointlarini rol bo'yicha yopadi."""
+    def wrapper(fn):
+        @wraps(fn)
+        def guarded(*args, **kwargs):
+            user = current_session()
+            if not user:
+                return jsonify(error="auth_required"), 401
+            if user["rank"] < ROLE_RANK[minimum]:
+                return jsonify(error="forbidden", role=user["role"]), 403
+            request.panel_user = user
+            return fn(*args, **kwargs)
+        return guarded
+    return wrapper
+
+
+def _throttled(ip):
+    now = datetime.datetime.now(datetime.timezone.utc).timestamp()
+    attempts = [t for t in _login_failures.get(ip, []) if now - t < LOGIN_WINDOW]
+    _login_failures[ip] = attempts
+    return len(attempts) >= LOGIN_MAX_FAILURES
+
+
+def _note_failure(ip):
+    _login_failures.setdefault(ip, []).append(
+        datetime.datetime.now(datetime.timezone.utc).timestamp())
+
+
+@app.post("/api/auth/login")
+def auth_login():
+    ip = request.headers.get("X-Real-IP") or request.remote_addr or "?"
+    if _throttled(ip):
+        return jsonify(error="too_many_attempts"), 429
+    code = (request.get_json(silent=True) or {}).get("code")
+    con = db()
+    row, error = _find_by_code(con, code)
+    if error:
+        con.close()
+        _note_failure(ip)
+        return jsonify(error=error), 401 if error != "ambiguous" else 409
+    role = panel_role(con, row)
+    con.close()
+    response = jsonify(ok=True, user={"id": row["id"], "fio": row["fio"], "role": role})
+    response.set_cookie(SESSION_COOKIE, _sign_session(row["id"], role),
+                        max_age=SESSION_MAX_AGE, httponly=True, samesite="Lax",
+                        secure=request.headers.get("X-Forwarded-Proto") == "https")
+    return response
+
+
+@app.post("/api/auth/logout")
+def auth_logout():
+    response = jsonify(ok=True)
+    response.delete_cookie(SESSION_COOKIE)
+    return response
+
+
+@app.get("/api/auth/me")
+def auth_me():
+    user = current_session()
+    if not user:
+        return jsonify(error="auth_required"), 401
+    return jsonify(user=user)
+
+
 def _find_by_passport(con, value):
     series, number = _passport(value)
     key = number.lstrip("0") or "0"
@@ -381,15 +567,44 @@ def _find_by_passport(con, value):
 
 
 # ---------------------------------------------------------------- admin API
+# Pasport ma'lumoti — faqat rahbar/adminlarga va odamning o'ziga.
+PASSPORT_FIELDS = ("passport_series", "passport_number", "passport_expiry",
+                   "passport_issued", "passport_issuer", "doc_type",
+                   "passport_file_url", "dob", "phone", "telegram_id",
+                   "telegram_username", "main_series", "roommate_series")
+
+
+def _visible(participant, user):
+    """Bir ishtirokchi yozuvidan foydalanuvchi ko'rishi mumkin bo'lgan qismi."""
+    if user["rank"] >= ROLE_RANK["manager"] or participant["id"] == user["id"]:
+        return participant
+    return {k: v for k, v in participant.items() if k not in PASSPORT_FIELDS}
+
+
+def _scope_rows(con, user):
+    """Rol qamrovidagi ishtirokchilar: admin/rahbar — hammasi, guruh mas'uli —
+    o'z guruhi, oddiy ishtirokchi — faqat o'zi."""
+    if user["rank"] >= ROLE_RANK["manager"]:
+        return con.execute("SELECT * FROM participants").fetchall()
+    if user["role"] == "leader" and user["group"]:
+        return con.execute("SELECT * FROM participants WHERE grp=?", (user["group"],)).fetchall()
+    return con.execute("SELECT * FROM participants WHERE id=?", (user["id"],)).fetchall()
+
+
 @app.get("/api/bootstrap")
+@panel_auth("member")
 def bootstrap():
+    user = request.panel_user
     con = db()
-    parts = [part_dict(r) for r in con.execute("SELECT * FROM participants").fetchall()]
+    rows = _scope_rows(con, user)
+    visible_ids = {r["id"] for r in rows}
+    parts = [_visible(part_dict(r), user) for r in rows]
     cps = sget(con, "checkpoints", DEFAULT_CHECKPOINTS)
     checkins = {c["key"]: {} for c in cps}
     for r in con.execute("SELECT * FROM checkins").fetchall():
-        checkins.setdefault(r["checkpoint"], {})[r["pid"]] = r["ts"]
-    out = {"participants": parts, "checkins": checkins,
+        if r["pid"] in visible_ids:
+            checkins.setdefault(r["checkpoint"], {})[r["pid"]] = r["ts"]
+    out = {"user": user, "participants": parts, "checkins": checkins,
            "checkpoints": cps, "program": sget(con, "program", []),
            "groups": sget(con, "groups", DEFAULT_GROUPS),
            "roles": sget(con, "roles", DEFAULT_ROLES), "meta": sget(con, "meta", DEFAULT_META),
@@ -400,6 +615,7 @@ def bootstrap():
 
 
 @app.post("/api/participant")
+@panel_auth("manager")
 def upd_participant():
     d = request.get_json(force=True)
     pid, patch = d["id"], d.get("patch", {})
@@ -423,6 +639,7 @@ def upd_participant():
 
 
 @app.post("/api/participants/bulk")
+@panel_auth("manager")
 def bulk_participants():
     for it in request.get_json(force=True).get("items", []):
         con = db()
@@ -433,10 +650,18 @@ def bulk_participants():
 
 
 @app.post("/api/checkin")
+@panel_auth("leader")
 def checkin():
     d = request.get_json(force=True)
     pid, cp, on = d["id"], d["checkpoint"], d.get("on", True)
     con = db()
+    user = request.panel_user
+    if user["rank"] < ROLE_RANK["manager"]:
+        # Guruh mas'uli faqat o'z guruhini belgilaydi.
+        target = con.execute("SELECT grp FROM participants WHERE id=?", (pid,)).fetchone()
+        if not target or not user["group"] or target["grp"] != user["group"]:
+            con.close()
+            return jsonify(error="forbidden"), 403
     if on:
         ts = datetime.datetime.now().strftime("%H:%M")
         con.execute("INSERT INTO checkins(pid,checkpoint,ts) VALUES(?,?,?) "
@@ -449,6 +674,7 @@ def checkin():
 
 
 @app.post("/api/checkpoints")
+@panel_auth("admin")
 def save_checkpoints():
     cps = request.get_json(force=True).get("checkpoints", [])
     keys = {c["key"] for c in cps}
@@ -467,15 +693,19 @@ def _save(key):
     return jsonify(ok=True)
 
 @app.post("/api/program")
+@panel_auth("admin")
 def save_program(): return _save("program")
 
 @app.post("/api/roles")
+@panel_auth("admin")
 def save_roles(): return _save("roles")
 
 @app.post("/api/meta")
+@panel_auth("admin")
 def save_meta(): return _save("meta")
 
 @app.post("/api/groups")
+@panel_auth("admin")
 def save_groups():
     """Group names (and optionally their leaders) from the admin panel."""
     payload = request.get_json(force=True)
@@ -491,14 +721,17 @@ def save_groups():
     return jsonify(ok=True)
 
 @app.post("/api/badge")
+@panel_auth("admin")
 def save_badge(): return _save("badge")
 
 @app.post("/api/pagebase")
+@panel_auth("admin")
 def save_pagebase():
     con = db(); sset(con, "pageBase", request.get_json(force=True).get("base")); con.commit(); con.close()
     return jsonify(ok=True)
 
 @app.post("/api/seminar-logo")
+@panel_auth("admin")
 def save_logo():
     con = db(); sset(con, "seminarLogo", request.get_json(force=True).get("dataUrl")); con.commit(); con.close()
     return jsonify(ok=True)

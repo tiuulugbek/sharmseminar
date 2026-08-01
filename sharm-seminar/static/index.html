@@ -170,9 +170,46 @@ tbody tr:hover{background:#FAFAFE}
   .pbadge{position:relative;overflow:hidden;page-break-after:always;outline:.2mm solid #ccc}
   @page{margin:8mm;size:auto}
 }
+
+/* ===== kirish (maxfiy kod) ===== */
+.gate{position:fixed;inset:0;z-index:900;display:none;align-items:center;justify-content:center;
+  padding:22px;background:radial-gradient(120% 90% at 80% -10%,#5B4BC4 0%,#2E2C6E 42%,#1A1848 100%)}
+.gate.show{display:flex}
+.gate .box{width:100%;max-width:360px;background:#fff;border-radius:18px;padding:28px 24px;
+  box-shadow:0 26px 60px rgba(0,0,0,.35);text-align:center}
+.gate .box h2{font-size:19px;font-weight:800;color:#211F52;margin-bottom:6px}
+.gate .box p{font-size:13px;color:#7A7990;margin-bottom:18px}
+.gate input{width:100%;padding:14px;border:1px solid #E7E8F0;border-radius:12px;font-size:17px;
+  font-weight:700;text-align:center;letter-spacing:.08em}
+.gate input:focus{outline:none;border-color:#2E2C6E}
+.gate button{width:100%;margin-top:12px;padding:14px;border:0;border-radius:12px;background:#2E2C6E;
+  color:#fff;font-size:15px;font-weight:800;cursor:pointer}
+.gate button:disabled{opacity:.6;cursor:default}
+.gate .err{margin-top:12px;font-size:13px;font-weight:700;color:#E03131;min-height:18px}
+.whoami{display:flex;align-items:center;gap:8px;font-size:12.5px;color:#7A7990}
+.whoami b{color:#211F52;font-weight:700}
+.whoami .out{border:1px solid #E7E8F0;background:#fff;border-radius:8px;padding:6px 10px;
+  font-weight:700;cursor:pointer;color:#7A7990}
+/* ===== QR gridi ===== */
+.qrgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:14px}
+.qrcard{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;text-align:center}
+.qrcard canvas{width:100%;max-width:150px;height:auto;image-rendering:pixelated}
+.qrname{font-weight:700;font-size:13.5px;margin-top:8px;line-height:1.25}
+.qrmeta{font-size:11.5px;color:var(--muted);margin:3px 0 9px}
+.chk{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--muted)}
 </style>
 </head>
 <body>
+<div class="gate" id="gate">
+  <div class="box">
+    <h2>Maxfiy kodni kiriting</h2>
+    <p>Kirish uchun shaxsiy kodingizni yozing.</p>
+    <input id="gateCode" type="password" inputmode="text" autocomplete="off"
+           autocapitalize="characters" placeholder="••••••••">
+    <button id="gateGo">Kirish</button>
+    <div class="err" id="gateErr"></div>
+  </div>
+</div>
 <div class="scrim" id="scrim" onclick="toggleNav(false)"></div>
 <div class="app">
   <aside class="side" id="side">
@@ -192,6 +229,7 @@ tbody tr:hover{background:#FAFAFE}
       <button class="burger" onclick="toggleNav(true)">☰</button>
       <div><h1 id="vtitle">Boshqaruv paneli</h1><div class="desc" id="vdesc"></div></div>
       <div class="sp"></div>
+      <div class="whoami" id="whoami"></div>
       <div class="lang">
         <button id="lang-uz" class="on" onclick="setLang('uz')">UZ</button>
         <button id="lang-ru" onclick="setLang('ru')">RU</button>
@@ -205,29 +243,25 @@ tbody tr:hover{background:#FAFAFE}
 
 <script>
 /* ===== base data + assets ===== */
-const BASE = [{"id": "ACO-001", "fio": "Fedyuk Yury", "jinsi": "MR", "fuqarolik": "RUSSIA", "xona_turi": "1 kishilik", "xona_guruhi": "S01", "kelish": "Umumiy"}, {"id": "ACO-002", "fio": "Dolzhenko Vladimir", "jinsi": "MR", "fuqarolik": "RUSSIA", "xona_turi": "1 kishilik", "xona_guruhi": "S02", "kelish": "Umumiy"}, {"id": "ACO-003", "fio": "Fedorov Aleksei", "jinsi": "MR", "fuqarolik": "RUSSIA", "xona_turi": "1 kishilik", "xona_guruhi": "S03", "kelish": "Umumiy"}, {"id": "ACO-004", "fio": "Musaev Sardorjon", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "1 kishilik", "xona_guruhi": "S04", "kelish": "Umumiy"}, {"id": "ACO-005", "fio": "Denis Malenkikh", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "1 kishilik", "xona_guruhi": "S05", "kelish": "Umumiy"}, {"id": "ACO-006", "fio": "Lilja Nilsson Eva Maria", "jinsi": "MRS", "fuqarolik": "SWEDEN", "xona_turi": "1 kishilik", "xona_guruhi": "S06", "kelish": "Chet eldan alohida"}, {"id": "ACO-007", "fio": "Rakhimzhanova Gulmira", "jinsi": "MRS", "fuqarolik": "KAZAKHSTAN", "xona_turi": "1 kishilik", "xona_guruhi": "S07", "kelish": "Chet eldan alohida"}, {"id": "ACO-008", "fio": "Vakhobjonov Jakhonmirza", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D01", "kelish": "Umumiy"}, {"id": "ACO-009", "fio": "Mirzaev Ravshan", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D01", "kelish": "Umumiy"}, {"id": "ACO-010", "fio": "Pirmatov Yuldosh", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D02", "kelish": "Umumiy"}, {"id": "ACO-011", "fio": "Abdullaev Mamanazar", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D02", "kelish": "Umumiy"}, {"id": "ACO-012", "fio": "Abdukhamidov Tursunali", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D03", "kelish": "Umumiy"}, {"id": "ACO-013", "fio": "Siddikov Odiljon", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D03", "kelish": "Umumiy"}, {"id": "ACO-014", "fio": "Yunusova Yulduzkhon", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D04", "kelish": "Umumiy"}, {"id": "ACO-015", "fio": "Khamdamov Azizbek", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D04", "kelish": "Umumiy"}, {"id": "ACO-016", "fio": "Alibaeva Gulshat", "jinsi": "MRS", "fuqarolik": "KAZAKHSTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D05", "kelish": "Umumiy"}, {"id": "ACO-017", "fio": "Karshieva Sojida", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D05", "kelish": "Umumiy"}, {"id": "ACO-018", "fio": "Siddikova Madina", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D06", "kelish": "Umumiy"}, {"id": "ACO-019", "fio": "Siddikov Erkinjon", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D06", "kelish": "Umumiy"}, {"id": "ACO-020", "fio": "Karlibaeva Bekzada", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D07", "kelish": "Umumiy"}, {"id": "ACO-021", "fio": "Sharapov Alliyar", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D07", "kelish": "Umumiy"}, {"id": "ACO-022", "fio": "Saydullaev Umid", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D08", "kelish": "Umumiy"}, {"id": "ACO-023", "fio": "Egamberdiev Umidbek", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D08", "kelish": "Umumiy"}, {"id": "ACO-024", "fio": "Pulatov Jurabek", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D09", "kelish": "Umumiy"}, {"id": "ACO-025", "fio": "Rakhimov Khojiakbar", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D09", "kelish": "Umumiy"}, {"id": "ACO-026", "fio": "Nasriddinov Mukhsin", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D10", "kelish": "Umumiy"}, {"id": "ACO-027", "fio": "Khusanov Davron", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D10", "kelish": "Umumiy"}, {"id": "ACO-028", "fio": "Numonov Adhamjon", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D11", "kelish": "Umumiy"}, {"id": "ACO-029", "fio": "Chorshanbiev Fakhriyor", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D11", "kelish": "Umumiy"}, {"id": "ACO-030", "fio": "Abdullaeva Sarvinoz", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D12", "kelish": "Umumiy"}, {"id": "ACO-031", "fio": "Jumaev Aziz", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D12", "kelish": "Umumiy"}, {"id": "ACO-032", "fio": "Kamolov Miraziz", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D13", "kelish": "Umumiy"}, {"id": "ACO-033", "fio": "Orynbaev Rasul", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D13", "kelish": "Umumiy"}, {"id": "ACO-034", "fio": "Saidov Abdulvoris", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D14", "kelish": "Umumiy"}, {"id": "ACO-035", "fio": "Saidov Shokhjakhon", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D14", "kelish": "Umumiy"}, {"id": "ACO-036", "fio": "Khasanova Gulrukh", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D15", "kelish": "Umumiy"}, {"id": "ACO-037", "fio": "Mirzaev Shavkat", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D15", "kelish": "Umumiy"}, {"id": "ACO-038", "fio": "Akramova Mashkhura", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D16", "kelish": "Umumiy"}, {"id": "ACO-039", "fio": "Akramova Safiya", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D16", "kelish": "Umumiy"}, {"id": "ACO-040", "fio": "Sayfutdinova Nozima", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D17", "kelish": "Umumiy"}, {"id": "ACO-041", "fio": "Mumindjanova Nargiza", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D17", "kelish": "Umumiy"}, {"id": "ACO-042", "fio": "Ziyoev Khudoyberdy", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D18", "kelish": "Umumiy"}, {"id": "ACO-043", "fio": "Abdulazizov Farrukh", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D18", "kelish": "Umumiy"}, {"id": "ACO-044", "fio": "Pakhritdinov Shakhobitdin", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D19", "kelish": "Umumiy"}, {"id": "ACO-045", "fio": "Sobirjonov Otabek", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D19", "kelish": "Umumiy"}, {"id": "ACO-046", "fio": "Salimova Muyassar", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D20", "kelish": "Umumiy"}, {"id": "ACO-047", "fio": "Salimov Doniyor", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D20", "kelish": "Umumiy"}, {"id": "ACO-048", "fio": "Ziyaeva Khakimakhon", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D21", "kelish": "Umumiy"}, {"id": "ACO-049", "fio": "Madaminova Nigora", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D21", "kelish": "Umumiy"}, {"id": "ACO-050", "fio": "Davronova Rakhshona", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D22", "kelish": "Umumiy"}, {"id": "ACO-051", "fio": "Normatov Ismoil", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D22", "kelish": "Umumiy"}, {"id": "ACO-052", "fio": "Tukhtasinov Nurbek", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D23", "kelish": "Umumiy"}, {"id": "ACO-053", "fio": "Azamjonov Iskandar", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D23", "kelish": "Umumiy"}, {"id": "ACO-054", "fio": "Kurganbaev Dilmurod", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D24", "kelish": "Umumiy"}, {"id": "ACO-055", "fio": "Ismoilov Shakhzodbek", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D24", "kelish": "Umumiy"}, {"id": "ACO-056", "fio": "Ziyaev Bakhriddin", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D25", "kelish": "Umumiy"}, {"id": "ACO-057", "fio": "Nishanov Tokhir", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D25", "kelish": "Umumiy"}, {"id": "ACO-058", "fio": "Arslonova Hilola", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D26", "kelish": "Umumiy"}, {"id": "ACO-059", "fio": "Arslanov Ravshan", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D26", "kelish": "Umumiy"}, {"id": "ACO-060", "fio": "Arslanova Sanobar", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D27", "kelish": "Umumiy"}, {"id": "ACO-061", "fio": "Arslonov Abdurakhmon", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D27", "kelish": "Umumiy"}, {"id": "ACO-062", "fio": "Digai Valeriia", "jinsi": "MRS", "fuqarolik": "RUSSIA", "xona_turi": "2 kishilik", "xona_guruhi": "D28", "kelish": "Umumiy"}, {"id": "ACO-063", "fio": "Karimova Gulnoza", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D28", "kelish": "Umumiy"}, {"id": "ACO-064", "fio": "Kobilova Shahodat", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D29", "kelish": "Umumiy"}, {"id": "ACO-065", "fio": "Lutfullaeva Gulnoza", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D29", "kelish": "Umumiy"}, {"id": "ACO-066", "fio": "Fayzullayev Ali", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D30", "kelish": "Umumiy"}, {"id": "ACO-067", "fio": "Nuriddinov Khusniddin", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D30", "kelish": "Umumiy"}, {"id": "ACO-068", "fio": "Kumashova Aidai", "jinsi": "MRS", "fuqarolik": "KYRGYZ REPUBLIC", "xona_turi": "2 kishilik", "xona_guruhi": "D31", "kelish": "Umumiy"}, {"id": "ACO-069", "fio": "Gainazarova Akmaral", "jinsi": "MRS", "fuqarolik": "KYRGYZ REPUBLIC", "xona_turi": "2 kishilik", "xona_guruhi": "D31", "kelish": "Umumiy"}, {"id": "ACO-070", "fio": "Imanalieva Gulmairam", "jinsi": "MRS", "fuqarolik": "KYRGYZ REPUBLIC", "xona_turi": "2 kishilik", "xona_guruhi": "D32", "kelish": "Umumiy"}, {"id": "ACO-071", "fio": "Djuraeva Dono", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D32", "kelish": "Umumiy"}, {"id": "ACO-072", "fio": "Tagaev Bekbolot", "jinsi": "MR", "fuqarolik": "KYRGYZ REPUBLIC", "xona_turi": "2 kishilik", "xona_guruhi": "D33", "kelish": "Umumiy"}, {"id": "ACO-073", "fio": "Lapasov Nurali", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D33", "kelish": "Umumiy"}, {"id": "ACO-074", "fio": "Tojiboev Akmal", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D34", "kelish": "Umumiy"}, {"id": "ACO-075", "fio": "Mirzajonov Qodirjon", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D34", "kelish": "Umumiy"}, {"id": "ACO-076", "fio": "Buronov Jasurbek", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D35", "kelish": "Umumiy"}, {"id": "ACO-077", "fio": "Nurullaev Akhtamjon", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D35", "kelish": "Umumiy"}, {"id": "ACO-078", "fio": "Djaparov Inomjan", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D36", "kelish": "Umumiy"}, {"id": "ACO-079", "fio": "Djaparova Komila", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D36", "kelish": "Umumiy"}, {"id": "ACO-080", "fio": "Abdurakhimov Usmonbek", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D37", "kelish": "Umumiy"}, {"id": "ACO-081", "fio": "Abdurakhimova Khilolakhon", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D37", "kelish": "Umumiy"}, {"id": "ACO-082", "fio": "Farajov Nijat", "jinsi": "MR", "fuqarolik": "Azerbaycan", "xona_turi": "2 kishilik", "xona_guruhi": "D38", "kelish": "Umumiy"}, {"id": "ACO-083", "fio": "Boymurzaev Bektemir", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "2 kishilik", "xona_guruhi": "D38", "kelish": "Umumiy"}, {"id": "ACO-084", "fio": "Ibragimova Dina", "jinsi": "MRS", "fuqarolik": "KAZAKHSTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T01", "kelish": "Umumiy"}, {"id": "ACO-085", "fio": "Syzdykova Assiya", "jinsi": "MRS", "fuqarolik": "KAZAKHSTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T01", "kelish": "Umumiy"}, {"id": "ACO-086", "fio": "Ibragimova Sara", "jinsi": "MRS", "fuqarolik": "KAZAKHSTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T01", "kelish": "Umumiy"}, {"id": "ACO-087", "fio": "Nasriddinova Laziza", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T02", "kelish": "Umumiy"}, {"id": "ACO-088", "fio": "Isakova Yulduz", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T02", "kelish": "Umumiy"}, {"id": "ACO-089", "fio": "Azzamova Zumrad", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T02", "kelish": "Umumiy"}, {"id": "ACO-090", "fio": "Mirzaabdullaev Tilavoldi", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T03", "kelish": "Umumiy"}, {"id": "ACO-091", "fio": "Yusupov Rustamjon", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T03", "kelish": "Umumiy"}, {"id": "ACO-092", "fio": "Mamurov Shokhrukhmirzo", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T03", "kelish": "Umumiy"}, {"id": "ACO-093", "fio": "Karimova Ziynatkhon", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T04", "kelish": "Umumiy"}, {"id": "ACO-094", "fio": "Karimov Kudratbek", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T04", "kelish": "Umumiy"}, {"id": "ACO-095", "fio": "Karimova Zebiniso", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T04", "kelish": "Umumiy"}, {"id": "ACO-096", "fio": "Rasulov Abdulaziz", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T05", "kelish": "Umumiy"}, {"id": "ACO-097", "fio": "Rasulov Umarbek", "jinsi": "MR", "fuqarolik": "UZBEKISTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T05", "kelish": "Umumiy"}, {"id": "ACO-098", "fio": "Karimova Nargiza", "jinsi": "MRS", "fuqarolik": "UZBEKISTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T05", "kelish": "Umumiy"}, {"id": "ACO-099", "fio": "Mahmudov Sulton", "jinsi": "MR", "fuqarolik": "TAJIKISTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T06", "kelish": "Umumiy"}, {"id": "ACO-100", "fio": "Mahmudov Bakhtiyorkhon", "jinsi": "MR", "fuqarolik": "TAJIKISTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T06", "kelish": "Umumiy"}, {"id": "ACO-101", "fio": "Mirsaburov Mirsharaf", "jinsi": "MR", "fuqarolik": "TAJIKISTAN", "xona_turi": "3 kishilik", "xona_guruhi": "T06", "kelish": "Umumiy"}, {"id": "ACO-102", "fio": "Niyazova Shakhlo", "jinsi": "MRS", "fuqarolik": "Oʻzbekiston", "xona_turi": "Posh club", "xona_guruhi": "P01", "kelish": "Umumiy"}, {"id": "ACO-103", "fio": "Abdurakhmonov Rauf", "jinsi": "MR", "fuqarolik": "Oʻzbekiston", "xona_turi": "Posh club", "xona_guruhi": "P01", "kelish": "Umumiy"}, {"id": "ACO-104", "fio": "Niyazov Bobir", "jinsi": "MR", "fuqarolik": "Oʻzbekiston", "xona_turi": "Posh club", "xona_guruhi": "P01", "kelish": "Umumiy"}];
 const ACOUSTIC = "data:image/png;base64,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";
 const BOT = "https://t.me/AcousticSharmBot?start=";
 const H = {'Content-Type':'application/json'};
 const PXMM = 96/25.4;      // px per mm @96dpi
-const bw=()=>(S.badge&&S.badge.w)||70;   // badge width mm
-const bh=()=>(S.badge&&S.badge.h)||110;  // badge height mm
-const editorScale=()=>Math.max(1.1,Math.min(2.2,620/(bh()*PXMM)));  // fit editor
 const SIZE_PRESETS=[[70,100],[70,110],[80,120],[90,130]];  // cm: 7x10, 7x11, 8x12, 9x13
 
 /* ===== i18n ===== */
 const T = {
- uz:{dash:"Boshqaruv paneli",parts:"Ishtirokchilar",groups:"Guruhlar",badges:"Beyjik dizayneri",checkin:"Check-in",
+ uz:{dash:"Boshqaruv paneli",parts:"Ishtirokchilar",groups:"Guruhlar",qr:"QR kodlar",checkin:"Check-in",
   total:"Jami ishtirokchi",assigned:"Guruhga biriktirilgan",leaders:"Guruhboshilar",foreign:"Chet eldan alohida",
   byGroup:"Guruhlar bo'yicha taqsimot",cpProgress:"Check-in holati",search:"Ism yoki ID bo'yicha qidirish…",
   allGroups:"Barcha guruhlar",allRooms:"Barcha xonalar",noGroup:"Guruhsiz",grp:"Guruh",room:"Xona turi",
   roommate:"Sherik",leaderCol:"Guruhboshi",arrival:"Kelish",autoDist:"Avtomatik taqsimlash",clearAll:"Tozalash",
-  member:"a'zo",noMembers:"Hali a'zo yo'q",leaderTag:"Guruhboshi",printAll:"Barcha beyjiklarni chop etish",
+  member:"a'zo",noMembers:"Hali a'zo yo'q",leaderTag:"Guruhboshi",noRight:"Buning uchun ruxsatingiz yo'q",qrAll:"Hammasini ZIP qilib yuklash",qrWithName:"Ism-familya bilan",
   roomNo:"Xona №",scanPh:"QR / ID kiriting (ACO-001) va Enter",checkedIn:"belgilangan",notYet:"belgilanmagan",
   cpAero:"Aeroport",cpHotel:"Mehmonxona",cpSem:"Seminar",cpFood:"Ovqatlanish",saved:"Saqlandi",
   distDone:"Guruhlarga taqsimlandi",cleared:"Guruhlar tozalandi",notFound:"Topilmadi",pos:"belgilandi",neg:"bekor qilindi",
   vdesc_dash:"Umumiy holat va check-in monitoringi",vdesc_parts:"Guruh va guruhboshini shu yerda belgilang",
-  vdesc_groups:"5 guruh · sheriklar birga saqlanadi",vdesc_badges:"7×11 sm · yozuv va QR joyini o'zingiz suring",
+  vdesc_groups:"5 guruh · sheriklar birga saqlanadi",vdesc_qr:"Har bir ishtirokchining QR kodi · PNG yoki ZIP",
   vdesc_checkin:"Nuqta tanlang va ishtirokchini belgilang",
   addField:"+ Maydon",addText:"+ Matn",addQR:"+ QR",addLogo:"+ Logo",addBand:"+ Rang chizig'i",
   elements:"Elementlar",fieldName:"Ism familya",fieldId:"ID raqam",properties:"Element sozlamalari",
@@ -245,18 +279,18 @@ const T = {
   noRole:"Mas'ul yo'q",assignedTo:"Biriktirilgan",pickRole:"Mas'uliyatni tanlang",
   progDay:"Kun",progAddItem:"+ Band",progAddBlock:"+ Bo'lim",progTime:"Vaqt",progText:"Matn",progBlockLabel:"Bo'lim nomi",
   eventMeta:"Tadbir ma'lumoti",metaTitle:"Sarlavha",metaSub:"Kichik sarlavha",metaDates:"Sanalar",metaLoc:"Manzil",
-  pageBase:"Sahifa manzili (domen)",qrHint:"QR skan qilinganda ishtirokchi sahifasi ochiladi",roleTag:"Mas'ul",openPage:"Sahifani ochish"},
- ru:{dash:"Панель управления",parts:"Участники",groups:"Группы",badges:"Дизайнер бейджей",checkin:"Check-in",
+  pageBase:"Sahifa manzili (domen)",qrHint:"QR skanlanganda ishtirokchining shaxsiy sahifasi ochiladi. Kod ichida pasportdan olingan maxfiy token turadi \u2014 pasport raqami ko'rinmaydi.",roleTag:"Mas'ul",openPage:"Sahifani ochish"},
+ ru:{dash:"Панель управления",parts:"Участники",groups:"Группы",qr:"QR коды",checkin:"Check-in",
   total:"Всего участников",assigned:"Распределены в группы",leaders:"Старосты групп",foreign:"Прилетают отдельно",
   byGroup:"Распределение по группам",cpProgress:"Статус check-in",search:"Поиск по имени или ID…",
   allGroups:"Все группы",allRooms:"Все номера",noGroup:"Без группы",grp:"Группа",room:"Тип номера",
   roommate:"Сосед",leaderCol:"Староста",arrival:"Прибытие",autoDist:"Авто-распределение",clearAll:"Очистить",
-  member:"чел.",noMembers:"Пока нет участников",leaderTag:"Староста",printAll:"Печать всех бейджей",
+  member:"чел.",noMembers:"Пока нет участников",leaderTag:"Староста",noRight:"Недостаточно прав",qrAll:"Скачать все в ZIP",qrWithName:"С именем и фамилией",
   roomNo:"Номер",scanPh:"Введите QR / ID (ACO-001) и Enter",checkedIn:"отмечено",notYet:"не отмечено",
   cpAero:"Аэропорт",cpHotel:"Отель",cpSem:"Семинар",cpFood:"Питание",saved:"Сохранено",
   distDone:"Распределено по группам",cleared:"Группы очищены",notFound:"Не найдено",pos:"отмечен",neg:"снят",
   vdesc_dash:"Общий статус и мониторинг check-in",vdesc_parts:"Назначьте группу и старосту здесь",
-  vdesc_groups:"5 групп · соседи вместе",vdesc_badges:"7×11 см · разместите текст и QR сами",
+  vdesc_groups:"5 групп · соседи вместе",vdesc_qr:"QR-код каждого участника · PNG или ZIP",
   vdesc_checkin:"Выберите точку и отметьте участника",
   addField:"+ Поле",addText:"+ Текст",addQR:"+ QR",addLogo:"+ Лого",addBand:"+ Полоса",
   elements:"Элементы",fieldName:"Имя фамилия",fieldId:"ID номер",properties:"Свойства элемента",
@@ -274,7 +308,7 @@ const T = {
   noRole:"Нет ответственных",assignedTo:"Назначены",pickRole:"Выберите роль",
   progDay:"День",progAddItem:"+ Пункт",progAddBlock:"+ Блок",progTime:"Время",progText:"Текст",progBlockLabel:"Название блока",
   eventMeta:"О мероприятии",metaTitle:"Заголовок",metaSub:"Подзаголовок",metaDates:"Даты",metaLoc:"Место",
-  pageBase:"Адрес страницы (домен)",qrHint:"При сканировании QR открывается страница участника",roleTag:"Ответ.",openPage:"Открыть страницу"}
+  pageBase:"Адрес страницы (домен)",qrHint:"При сканировании QR открывается личная страница участника. Внутри кода \u2014 секретный токен, номер паспорта не виден.",roleTag:"Ответ.",openPage:"Открыть страницу"}
 };
 function t(k){return (T[S.lang]&&T[S.lang][k])||T.uz[k]||k;}
 const CPS=()=>S.checkpoints||[];
@@ -291,17 +325,6 @@ const BADGE_FONTS=[
 ];
 
 /* ===== default badge template (7x11cm front side) ===== */
-function defaultBadge(){return{
- bg:"#FFFFFF", w:70, h:110,
- elements:[
-  {id:"b_top", type:"band",  x:0,  y:0,   w:70, h:6,  color:"#F07E1A"},
-  {id:"e_logo",type:"logo",  x:22, y:11,  w:26},
-  {id:"e_name",type:"field", field:"name", x:4, y:52, w:62, size:7,  color:"#211F52", weight:800, align:"center",font:"Inter,Arial,sans-serif",lineHeight:1.05},
-  {id:"e_id",  type:"field", field:"id",   x:4, y:64, w:62, size:5,  color:"#E06A0A", weight:800, align:"center",font:"Inter,Arial,sans-serif",lineHeight:1.05},
-  {id:"e_qr",  type:"qr",    x:23, y:73, w:24},
-  {id:"b_bot", type:"band",  x:0,  y:100, w:70, h:10, color:"#2E2C6E"},
-  {id:"e_ftr", type:"text",  text:"SHARM SEMINAR", x:4, y:102.6, w:62, size:3.6, color:"#FFFFFF", weight:800, align:"center", letter:2,font:"Inter,Arial,sans-serif",lineHeight:1.05}
- ]};}
 
 /* ===== defaults ===== */
 const DEF_CPS=[{key:"aeroport",label:"Aeroport",icon:"✈️"},{key:"mehmonxona",label:"Mehmonxona",icon:"🏨"},
@@ -312,34 +335,39 @@ const DEF_ROLES=[{id:"coord",label:"Koordinator",color:"#2E2C6E"},{id:"prep",lab
 const DEF_META={title:"ACOUSTIC 2026",subtitle:"Xalqaro seminar-trening",dates:"8–15 avgust 2026",location:"Sharm El Sheikh, Misr"};
 
 /* ===== state ===== */
-let S={participants:[],checkins:{},checkpoints:[],program:[],roles:[],meta:{},badge:null,seminarLogo:null,pageBase:null,lang:'uz'};
+let S={user:null,participants:[],checkins:{},checkpoints:[],program:[],roles:[],meta:{},seminarLogo:null,pageBase:null,lang:'uz'};
 let VIEW='dash', activeCP='aeroport', selEid=null, sampleIdx=0;
 
 /* ===== api layer (server -> localStorage -> memory) ===== */
 const api={
- mode:'memory',
+ mode:'server',
+ // Panel endi doim serverdan o'qiydi: ma'lumot maxfiy kod bilan himoyalangan,
+ // shuning uchun brauzer xotirasidagi zaxira nusxa saqlanmaydi.
  async boot(){
    try{const r=await fetch('/api/bootstrap',{cache:'no-store'});
-     if(r.ok){this.mode='server';return await r.json();}}catch(e){}
-   try{const raw=localStorage.getItem('sharm');this.mode='local';
-     if(raw)return JSON.parse(raw);}catch(e){this.mode='memory';}
+     if(r.status===401)return {unauthorized:true};
+     if(r.ok)return await r.json();}catch(e){}
    return null;
  },
- saveLocal(){ if(this.mode!=='local')return;
-   try{localStorage.setItem('sharm',JSON.stringify(
-     {participants:S.participants,checkins:S.checkins,checkpoints:S.checkpoints,program:S.program,
-      roles:S.roles,meta:S.meta,badge:S.badge,seminarLogo:S.seminarLogo,pageBase:S.pageBase}));}catch(e){} },
- async _post(url,body){ if(this.mode==='server'){try{await fetch(url,{method:'POST',headers:H,body:JSON.stringify(body)});}catch(e){}} else this.saveLocal(); },
+ saveLocal(){ /* server-only: brauzerda nusxa qoldirmaymiz */ },
+ async _post(url,body){
+   try{const r=await fetch(url,{method:'POST',headers:H,body:JSON.stringify(body)});
+     if(r.status===401){showGate();return false;}
+     if(r.status===403){toast(t('noRight'));return false;}
+     return r.ok;}catch(e){return false;} },
  async patch(id,patch){ return this._post('/api/participant',{id,patch}); },
  async bulk(items){ return this._post('/api/participants/bulk',{items}); },
- async checkin(id,cp,on){ if(this.mode==='server'){try{const r=await fetch('/api/checkin',{method:'POST',headers:H,body:JSON.stringify({id,checkpoint:cp,on})});const j=await r.json();return j.ts;}catch(e){}} else this.saveLocal(); return on?nowHM():null; },
- async saveBadge(){ return this._post('/api/badge',S.badge); },
+ async checkin(id,cp,on){
+   try{const r=await fetch('/api/checkin',{method:'POST',headers:H,body:JSON.stringify({id,checkpoint:cp,on})});
+     if(r.status===401){showGate();return null;}
+     if(r.status===403){toast(t('noRight'));return null;}
+     const j=await r.json();return j.ts;}catch(e){return on?nowHM():null;} },
  async saveCheckpoints(){ return this._post('/api/checkpoints',{checkpoints:S.checkpoints}); },
  async saveProgram(){ return this._post('/api/program',S.program); },
  async saveRoles(){ return this._post('/api/roles',S.roles); },
  async saveMeta(){ return this._post('/api/meta',S.meta); },
  async savePageBase(){ return this._post('/api/pagebase',{base:S.pageBase}); },
- async saveLogo(u){ if(this.mode==='server'){try{await fetch('/api/seminar-logo',{method:'POST',headers:H,body:JSON.stringify({dataUrl:u})});}catch(e){}} else this.saveLocal(); }
+ async saveLogo(u){ return this._post('/api/seminar-logo',{dataUrl:u}); }
 };
 const nowHM=()=>{const d=new Date();const p=n=>String(n).padStart(2,'0');return p(d.getHours())+':'+p(d.getMinutes());};
 
@@ -352,15 +380,25 @@ function escapeHtml(s){return String(s==null?'':s).replace(/[&<>"]/g,m=>({'&':'&
 function toast(m){const el=document.getElementById('toast');el.textContent=m;el.classList.add('show');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),1600);}
 
 /* ===== nav / shell ===== */
-const NAV=[['dash','▦'],['parts','☰'],['groups','◍'],['roles','◆'],['program','▤'],['badges','❏'],['checkin','✓']];
-function renderNav(){document.getElementById('nav').innerHTML=NAV.map(([id,ic])=>
+// Har bir bo'lim uchun eng past rol. member — faqat o'zi haqidagi ma'lumot,
+// leader — o'z guruhi, manager — barcha guruhlar, admin — sozlamalar ham.
+const NAV=[['dash','▦','member'],['parts','☰','member'],['groups','◍','leader'],
+           ['roles','◆','manager'],['program','▤','member'],['qr','▩','leader'],
+           ['checkin','✓','leader']];
+const RANK={member:0,leader:1,manager:2,admin:3};
+const myRank=()=>RANK[(S.user&&S.user.role)||'member']||0;
+const can=need=>myRank()>=RANK[need];
+const visibleNav=()=>NAV.filter(([,,need])=>can(need));
+function renderNav(){document.getElementById('nav').innerHTML=visibleNav().map(([id,ic])=>
   `<button class="${VIEW===id?'on':''}" onclick="go('${id}')"><span class="ic">${ic}</span>${t(id)}</button>`).join('');}
 function go(v){VIEW=v;selEid=null;toggleNav(false);render();}
 function toggleNav(open){document.getElementById('side').classList.toggle('open',open);document.getElementById('scrim').classList.toggle('show',open);}
 function setLang(l){S.lang=l;document.getElementById('lang-uz').classList.toggle('on',l==='uz');document.getElementById('lang-ru').classList.toggle('on',l==='ru');api.saveLocal();render();}
 
 function render(){
+  if(!visibleNav().some(([id])=>id===VIEW))VIEW=(visibleNav()[0]||['dash'])[0];
   renderNav();
+  renderWhoami();
   document.getElementById('vtitle').textContent=t(VIEW);
   document.getElementById('vdesc').textContent=t('vdesc_'+VIEW);
   const v=document.getElementById('view');
@@ -369,7 +407,7 @@ function render(){
   else if(VIEW==='groups')v.innerHTML=renderGroups();
   else if(VIEW==='roles')renderRoles(v);
   else if(VIEW==='program')renderProgram(v);
-  else if(VIEW==='badges')renderDesigner(v);
+  else if(VIEW==='qr')renderQR(v);
   else if(VIEW==='checkin')renderCheckin(v);
 }
 
@@ -591,24 +629,9 @@ function delCP(key){if(!confirm(t('cpDelQ')))return;
   S.checkpoints=S.checkpoints.filter(c=>c.key!==key);delete S.checkins[key];
   api.saveCheckpoints();renderCheckin(document.getElementById('view'));}
 
-/* ===== BADGE DESIGNER ===== */
-function getEl(id){return S.badge.elements.find(e=>e.id===id);}
-function sampleP(){return P()[sampleIdx]||P()[0];}
-function badgeInner(p){
-  const logo=S.seminarLogo||ACOUSTIC;
-  return S.badge.elements.map(e=>{
-    const pos=`left:${e.x}mm;top:${e.y}mm;`;
-    if(e.type==='band')return `<div class="be" data-eid="${e.id}" style="${pos}width:${e.w}mm;height:${e.h}mm;background:${e.color}"></div>`;
-    if(e.type==='logo'){const src=e.src||logo;return `<div class="be" data-eid="${e.id}" style="${pos}width:${e.w}mm"><img src="${src}" style="width:100%;display:block;max-height:${e.h||40}mm;object-fit:contain"></div>`;}
-    if(e.type==='qr')return `<div class="be beqr" data-eid="${e.id}" style="${pos}width:${e.w}mm;height:${e.w}mm"><canvas data-qr="${p.id}" style="width:100%;height:100%"></canvas></div>`;
-    const txt=e.type==='field'?(e.field==='name'?p.fio:p.id):e.text;
-    const ls=e.letter?`letter-spacing:${e.letter}px;`:'';
-    const font=e.font||'Inter,Arial,sans-serif',lh=e.lineHeight||1.05,italic=e.italic?'italic':'normal';
-    return `<div class="be betext" data-eid="${e.id}" data-etype="${e.type}" style="${pos}width:${e.w}mm;font-size:${e.size}mm;color:${e.color};font-family:${font};font-style:${italic};font-weight:${e.weight};text-align:${e.align};${ls}line-height:${lh}">${escapeHtml(txt)}</div>`;
-  }).join('');
-}
-// Badge QR encodes the passport-derived token, never the plain ACO id.
-// The id still works as a URL, so older printed badges keep opening.
+/* ===== QR KODLAR ===== */
+// QR ichida pasportdan olingan token turadi, ochiq ACO id emas.
+// Eski ID li havolalar ham ochiladi, ya'ni chop etilgan beyjiklar ishlashda davom etadi.
 function pageUrl(id){
   const base=(S.pageBase||location.origin||'').replace(/\/+$/,'');
   const p=(S.participants||[]).find(x=>x.id===id);
@@ -617,174 +640,200 @@ function pageUrl(id){
 function fillQR(root){root.querySelectorAll('canvas[data-qr]').forEach(cv=>{
   new QRious({element:cv,value:pageUrl(cv.dataset.qr),size:300,level:'M',foreground:'#211F52',background:'#ffffff'});});}
 
-function renderDesigner(v){
-  if(!S.badge)S.badge=defaultBadge();
-  const sc=editorScale(), stageW=bw()*PXMM*sc, stageH=bh()*PXMM*sc;
-  v.innerHTML=`<div class="toolbar">
-      <button class="btn pri" onclick="printAll()">⎙ ${t('printAll')}</button>
-      <button class="btn" onclick="resetTpl()">↺ ${t('resetTpl')}</button>
-      <span class="muted" style="font-size:12.5px">${t('vdesc_badges')} · ${(bw()/10).toFixed(0)}×${(bh()/10).toFixed(0)} sm</span></div>
-    <div class="des">
-      <div class="des-stage-wrap">
-        <div class="stage" style="width:${stageW}px;height:${stageH}px;transform:scale(${sc})">
-          <div class="badge-box editing" id="ebox" style="width:${bw()}mm;height:${bh()}mm;background:${S.badge.bg}">
-            <div class="punch"></div>${badgeInner(sampleP())}
-          </div></div></div>
-      <div class="props" id="props"></div>
-    </div>`;
-  fillQR(document.getElementById('ebox'));
-  bindDrag();renderProps();
-}
-function bindDrag(){
-  document.querySelectorAll('#ebox .be').forEach(el=>{
-    const model=getEl(el.dataset.eid);
-    if(model&&model.type==='text')el.ondblclick=ev=>startInlineTextEdit(el,model,ev);
-    el.onpointerdown=ev=>{ev.preventDefault();selEid=el.dataset.eid;markSel();renderProps();
-      const e=getEl(selEid);const sx=e.x,sy=e.y,dx=ev.clientX,dy=ev.clientY;const sc=editorScale();
-      const move=m=>{e.x=Math.max(-2,Math.min(bw(),sx+(m.clientX-dx)/(PXMM*sc)));
-        e.y=Math.max(-2,Math.min(bh(),sy+(m.clientY-dy)/(PXMM*sc)));
-        el.style.left=e.x.toFixed(1)+'mm';el.style.top=e.y.toFixed(1)+'mm';syncNum('px',e.x);syncNum('py',e.y);};
-      const up=()=>{document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);api.saveBadge();};
-      document.addEventListener('pointermove',move);document.addEventListener('pointerup',up);};
-  });
-}
-function startInlineTextEdit(el,e,ev){
-  ev.preventDefault();ev.stopPropagation();
-  el.onpointerdown=null;el.contentEditable='true';el.spellcheck=true;el.focus();
-  const range=document.createRange();range.selectNodeContents(el);const sel=window.getSelection();sel.removeAllRanges();sel.addRange(range);
-  const save=()=>{e.text=el.innerText.replace(/\n+$/,'');el.contentEditable='false';api.saveBadge();refreshStage();renderProps();};
-  el.onblur=save;el.onkeydown=k=>{if(k.key==='Escape'){k.preventDefault();el.innerText=e.text;el.blur();}
-    if(k.key==='Enter'&&!k.shiftKey){k.preventDefault();el.blur();}};
-}
-function markSel(){document.querySelectorAll('#ebox .be').forEach(el=>el.classList.toggle('sel',el.dataset.eid===selEid));}
-function syncNum(id,val){const el=document.getElementById('pf_'+id);if(el)el.value=(+val).toFixed(1);}
+let qrSearch='', qrSize=1024, qrLabel=true;
 
-function renderProps(){
-  const box=document.getElementById('props');if(!box)return;
-  const opts=P().map((p,i)=>`<option value="${i}" ${i===sampleIdx?'selected':''}>${escapeHtml(p.fio)}</option>`).join('');
-  const logoPrev=(S.seminarLogo||ACOUSTIC);
-  let sel='';
-  const e=selEid?getEl(selEid):null;
-  if(e){sel=elementForm(e);}else{sel=`<div class="nofocus">${t('pickEl')}</div>`;}
-  box.innerHTML=`
-    <div class="card pblock"><h4>${t('elements')}</h4>
-      <div class="addrow">
-        <button class="btn" onclick="addEl('field','name')">${t('addField')}</button>
-        <button class="btn" onclick="addEl('text')">${t('addText')}</button>
-        <button class="btn" onclick="addEl('qr')">${t('addQR')}</button>
-        <button class="btn" onclick="addEl('logo')">${t('addLogo')}</button>
-        <button class="btn" onclick="addEl('band')">${t('addBand')}</button>
-      </div>
+function renderQR(v){
+  const q=qrSearch.trim().toLowerCase();
+  const list=P().filter(p=>!q||p.fio.toLowerCase().includes(q)||p.id.toLowerCase().includes(q)
+                            ||String(p.group||'').includes(q));
+  v.innerHTML=`
+    <div class="toolbar">
+      <div class="search"><span class="mag">⌕</span>
+        <input id="qrq" placeholder="${t('search')}" value="${escapeHtml(qrSearch)}"></div>
+      <select id="qrsize" onchange="qrSize=+this.value">
+        ${[512,1024,2048].map(s=>`<option value="${s}"${s===qrSize?' selected':''}>${s}×${s} px</option>`).join('')}
+      </select>
+      <label class="chk"><input type="checkbox" id="qrlabel" ${qrLabel?'checked':''}
+        onchange="qrLabel=this.checked"> ${t('qrWithName')}</label>
+      <button class="btn pri" id="qrall">⬇ ${t('qrAll')} (${list.length})</button>
     </div>
-    <div class="card pblock"><h4>${t('properties')}</h4>${sel}</div>
-    <div class="card pblock"><h4>${t('badgeSize')}</h4>
-      <div class="addrow" style="margin-bottom:10px">
-        ${SIZE_PRESETS.map(([w,h])=>`<button class="btn sm ${bw()==w&&bh()==h?'pri':''}" onclick="setSize(${w},${h})">${w/10}×${h/10}</button>`).join('')}
-      </div>
-      <div class="frow"><label>${t('bwCm')}</label><input type="number" step="0.5" value="${(bw()/10)}" oninput="setSize(Math.round(this.value*10), bh())"></div>
-      <div class="frow"><label>${t('bhCm')}</label><input type="number" step="0.5" value="${(bh()/10)}" oninput="setSize(bw(), Math.round(this.value*10))"></div>
-    </div>
-    <div class="card pblock"><h4>${t('front')}</h4>
-      <div class="frow"><label>${t('samplePerson')}</label><select onchange="sampleIdx=+this.value;refreshStage()">${opts}</select></div>
-      <div class="frow"><label>${t('badgeBg')}</label><input type="color" value="${S.badge.bg}" oninput="S.badge.bg=this.value;api.saveBadge();refreshStage()"></div>
-      <div class="frow" style="align-items:flex-start"><label>${t('seminarLogo')}</label>
-        <div class="logo-up"><div class="prev"><img src="${logoPrev}"></div>
-          <label class="btn sm" style="cursor:pointer">${t('uploadLogo')}<input type="file" accept="image/*" style="display:none" onchange="uploadLogo(this)"></label></div></div>
+    <div class="muted" style="margin:0 0 14px;font-size:12.5px">${t('qrHint')}</div>
+    <div class="qrgrid" id="qrgrid">
+      ${list.map(p=>`
+        <div class="qrcard">
+          <canvas data-qr="${p.id}" width="300" height="300"></canvas>
+          <div class="qrname">${escapeHtml(p.fio)}</div>
+          <div class="qrmeta">${p.id}${p.group?' · '+t('grp')+' '+p.group:''}</div>
+          <button class="btn sm" onclick="downloadQR('${p.id}')">⬇ PNG</button>
+        </div>`).join('')||`<div class="empty" style="padding:26px">${t('notFound')}</div>`}
     </div>`;
+  fillQR(v);
+  document.getElementById('qrq').oninput=e=>{qrSearch=e.target.value;renderQR(document.getElementById('view'));};
+  document.getElementById('qrall').onclick=()=>downloadAllQR(list);
 }
-function elementForm(e){
-  const num=(id,lab,val,step)=>`<div class="frow"><label>${lab}</label><input id="pf_${id}" type="number" step="${step||1}" value="${val}" oninput="setProp('${e.id}','${id.replace(/^p[xy]$/,m=>m==='px'?'x':'y')}',this.value,true)"></div>`;
-  let f=`<div class="frow"><label>${t('posX')}</label><input id="pf_px" type="number" step="0.5" value="${(+e.x).toFixed(1)}" oninput="setProp('${e.id}','x',this.value,true)"></div>
-    <div class="frow"><label>${t('posY')}</label><input id="pf_py" type="number" step="0.5" value="${(+e.y).toFixed(1)}" oninput="setProp('${e.id}','y',this.value,true)"></div>`;
-  if(e.type==='field'||e.type==='text'){
-    if(e.type==='field')f+=`<div class="frow"><label>${t('field')}</label><select onchange="setProp('${e.id}','field',this.value)">
-      <option value="name" ${e.field==='name'?'selected':''}>${t('fieldName')}</option>
-      <option value="id" ${e.field==='id'?'selected':''}>${t('fieldId')}</option></select></div>`;
-    if(e.type==='text')f+=`<div class="frow" style="align-items:flex-start"><label>${t('text')}</label><textarea oninput="setProp('${e.id}','text',this.value,true)">${escapeHtml(e.text)}</textarea></div><div class="hint">${t('editHint')}</div>`;
-    f+=`<div class="frow"><label>${t('width')}</label><input type="number" step="1" value="${e.w}" oninput="setProp('${e.id}','w',this.value,true)"></div>
-      <div class="frow"><label>${t('fsize')}</label><input type="number" step="0.2" value="${e.size}" oninput="setProp('${e.id}','size',this.value,true)"></div>
-      <div class="frow"><label>${t('fontFamily')}</label><select onchange="setProp('${e.id}','font',this.value)">${BADGE_FONTS.map(([v,n])=>`<option value="${v}" ${(e.font||'Inter,Arial,sans-serif')===v?'selected':''}>${n}</option>`).join('')}</select></div>
-      <div class="frow"><label>${t('color')}</label><input type="color" value="${e.color}" oninput="setProp('${e.id}','color',this.value,true)"></div>
-      <div class="frow"><label>${t('weight')}</label><select onchange="setProp('${e.id}','weight',this.value)">
-        ${[[300,'300'],[400,t('wNormal')],[500,'500'],[600,'600'],[700,t('wBold')],[800,t('wBlack')],[900,'900']].map(([v,n])=>`<option value="${v}" ${e.weight==v?'selected':''}>${n}</option>`).join('')}</select></div>
-      <div class="frow"><label>${t('italic')}</label><select onchange="setProp('${e.id}','italic',this.value==='true')"><option value="false" ${!e.italic?'selected':''}>—</option><option value="true" ${e.italic?'selected':''}>✓</option></select></div>
-      <div class="frow"><label>${t('lineHeight')}</label><input type="number" min="0.7" max="3" step="0.05" value="${e.lineHeight||1.05}" oninput="setProp('${e.id}','lineHeight',this.value,true)"></div>
-      <div class="frow"><label>${t('letterSpace')}</label><input type="number" step="0.2" value="${e.letter||0}" oninput="setProp('${e.id}','letter',this.value,true)"></div>
-      <div class="frow"><label>${t('align')}</label><div class="seg">
-        ${['left','center','right'].map(a=>`<button class="${e.align===a?'on':''}" onclick="setProp('${e.id}','align','${a}')">${a==='left'?'⌷◄':a==='center'?'▬':'►⌷'}</button>`).join('')}</div></div>`;
-  }else if(e.type==='qr'){
-    f+=`<div class="frow"><label>${t('qrsize')}</label><input type="number" step="1" value="${e.w}" oninput="setProp('${e.id}','w',this.value,true)"></div>`;
-  }else if(e.type==='logo'){
-    const logoSrc=e.src||(S.seminarLogo||ACOUSTIC);
-    f+=`<div class="frow" style="align-items:flex-start"><label>${t('logoImage')}</label><div class="logo-up"><div class="prev"><img src="${logoSrc}"></div><label class="btn sm" style="cursor:pointer">${t('uploadThisLogo')}<input type="file" accept="image/*" style="display:none" onchange="uploadElementLogo(this,'${e.id}')"></label></div></div>
-      <div class="frow"><label>${t('width')}</label><input type="number" step="1" value="${e.w}" oninput="setProp('${e.id}','w',this.value,true)"></div>
-      <div class="frow"><label>${t('height')}</label><input type="number" step="1" value="${e.h||40}" oninput="setProp('${e.id}','h',this.value,true)"></div>
-      ${e.src?`<button class="btn sm" onclick="setProp('${e.id}','src','')">↺ ${t('useDefaultLogo')}</button>`:''}`;
-  }else if(e.type==='band'){
-    f+=`<div class="frow"><label>${t('width')}</label><input type="number" step="1" value="${e.w}" oninput="setProp('${e.id}','w',this.value,true)"></div>
-      <div class="frow"><label>${t('height')}</label><input type="number" step="0.5" value="${e.h}" oninput="setProp('${e.id}','h',this.value,true)"></div>
-      <div class="frow"><label>${t('color')}</label><input type="color" value="${e.color}" oninput="setProp('${e.id}','color',this.value,true)"></div>`;
+
+/* Bitta QR ni PNG holida chizadi: kod + (xohlasa) ism-familya va ACO raqami. */
+function qrPng(p,size,withLabel){
+  const pad=Math.round(size*0.06), foot=withLabel?Math.round(size*0.16):0;
+  const cv=document.createElement('canvas');
+  cv.width=size+pad*2; cv.height=size+pad*2+foot;
+  const ctx=cv.getContext('2d');
+  ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,cv.width,cv.height);
+  const src=document.createElement('canvas');
+  new QRious({element:src,value:pageUrl(p.id),size:size,level:'M',
+              foreground:'#211F52',background:'#ffffff'});
+  ctx.drawImage(src,pad,pad);
+  if(withLabel){
+    const base=size+pad*2;
+    ctx.fillStyle='#211F52'; ctx.textAlign='center';
+    ctx.font=`700 ${Math.round(size*0.062)}px Inter,Arial,sans-serif`;
+    ctx.fillText(p.fio,cv.width/2,base+Math.round(size*0.06),cv.width-pad*2);
+    ctx.fillStyle='#7A7990';
+    ctx.font=`600 ${Math.round(size*0.045)}px Inter,Arial,sans-serif`;
+    const meta=p.id+(p.group?' · '+t('grp')+' '+p.group:'');
+    ctx.fillText(meta,cv.width/2,base+Math.round(size*0.125),cv.width-pad*2);
   }
-  f+=`<button class="btn sm" style="margin-top:8px;color:#C0392B;border-color:#F3C6C0" onclick="delEl('${e.id}')">🗑 ${t('delEl')}</button>`;
-  return f;
+  return cv;
 }
-function setProp(id,key,val,noRerender){const e=getEl(id);
-  if(['x','y','w','h','size','letter','lineHeight'].includes(key))val=parseFloat(val)||0;
-  e[key]=val;api.saveBadge();
-  if(noRerender){refreshStageOnly();}else{refreshStage();renderProps();}
-}
-function refreshStage(){const box=document.getElementById('ebox');if(!box)return;
-  box.style.background=S.badge.bg;
-  box.innerHTML=`<div class="punch"></div>`+badgeInner(sampleP());
-  fillQR(box);bindDrag();markSel();}
-function refreshStageOnly(){const box=document.getElementById('ebox');if(!box)return;
-  box.innerHTML=`<div class="punch"></div>`+badgeInner(sampleP());fillQR(box);bindDrag();markSel();}
-function addEl(type,field){
-  const id='e_'+Math.random().toString(36).slice(2,7);
-  const base={id,type,x:25,y:50};
-  if(type==='field')Object.assign(base,{field:field||'name',w:40,size:6,color:'#211F52',weight:700,align:'center',font:'Inter,Arial,sans-serif',lineHeight:1.05,italic:false});
-  if(type==='text')Object.assign(base,{text:'MATN',w:40,size:5,color:'#2E2C6E',weight:700,align:'center',letter:0,font:'Inter,Arial,sans-serif',lineHeight:1.05,italic:false});
-  if(type==='qr')Object.assign(base,{w:22});
-  if(type==='logo')Object.assign(base,{w:24,h:40,src:''});
-  if(type==='band')Object.assign(base,{w:70,h:8,color:'#F07E1A',x:0});
-  S.badge.elements.push(base);selEid=id;api.saveBadge();refreshStage();renderProps();
-}
-function delEl(id){S.badge.elements=S.badge.elements.filter(e=>e.id!==id);selEid=null;api.saveBadge();refreshStage();renderProps();}
-function setSize(w,h){w=Math.max(40,Math.min(150,+w||70));h=Math.max(40,Math.min(200,+h||110));
-  S.badge.w=w;S.badge.h=h;api.saveBadge();renderDesigner(document.getElementById('view'));}
-function resetTpl(){S.badge=defaultBadge();selEid=null;api.saveBadge();renderDesigner(document.getElementById('view'));toast(t('resetDone'));}
-function uploadLogo(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();
-  r.onload=()=>{S.seminarLogo=r.result;api.saveLogo(r.result);refreshStage();renderProps();};r.readAsDataURL(f);}
-function uploadElementLogo(inp,id){const f=inp.files[0];if(!f)return;const r=new FileReader();
-  r.onload=()=>{const e=getEl(id);if(!e)return;e.src=r.result;api.saveBadge();refreshStage();renderProps();};r.readAsDataURL(f);}
 
-function printAll(){const wrap=document.getElementById('printwrap');
-  wrap.innerHTML=P().map(p=>`<div class="pbadge" style="width:${bw()}mm;height:${bh()}mm;background:${S.badge.bg}">${badgeInner(p)}</div>`).join('');
-  fillQR(wrap);setTimeout(()=>window.print(),150);}
+function safeName(p){
+  return (p.id+'_'+p.fio).replace(/[^A-Za-z0-9._-]+/g,'_').replace(/_+/g,'_').slice(0,80);
+}
+
+function canvasBlob(cv){return new Promise(res=>cv.toBlob(res,'image/png'));}
+
+async function downloadQR(id){
+  const p=find(id); if(!p)return;
+  const blob=await canvasBlob(qrPng(p,qrSize,qrLabel));
+  saveBlob(blob,safeName(p)+'.png');
+  toast(t('saved'));
+}
+
+function saveBlob(blob,name){
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+}
+
+/* ZIP (siqishsiz "store") — PNG allaqachon siqilgan, shuning uchun kutubxona kerak emas. */
+const CRC_TABLE=(()=>{const t=new Uint32Array(256);
+  for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0;}
+  return t;})();
+function crc32(buf){let c=0xFFFFFFFF;
+  for(let i=0;i<buf.length;i++)c=CRC_TABLE[(c^buf[i])&0xFF]^(c>>>8);
+  return (c^0xFFFFFFFF)>>>0;}
+
+function zipStore(files){
+  const enc=new TextEncoder(), parts=[], central=[]; let offset=0;
+  files.forEach(f=>{
+    const name=enc.encode(f.name), crc=crc32(f.data), size=f.data.length;
+    const local=new Uint8Array(30+name.length), lv=new DataView(local.buffer);
+    lv.setUint32(0,0x04034b50,true); lv.setUint16(4,20,true);
+    lv.setUint32(14,crc,true); lv.setUint32(18,size,true); lv.setUint32(22,size,true);
+    lv.setUint16(26,name.length,true);
+    local.set(name,30);
+    parts.push(local,f.data);
+    const cd=new Uint8Array(46+name.length), cv=new DataView(cd.buffer);
+    cv.setUint32(0,0x02014b50,true); cv.setUint16(4,20,true); cv.setUint16(6,20,true);
+    cv.setUint32(16,crc,true); cv.setUint32(20,size,true); cv.setUint32(24,size,true);
+    cv.setUint16(28,name.length,true); cv.setUint32(42,offset,true);
+    cd.set(name,46);
+    central.push(cd);
+    offset+=local.length+size;
+  });
+  const cdSize=central.reduce((n,c)=>n+c.length,0);
+  const end=new Uint8Array(22), ev=new DataView(end.buffer);
+  ev.setUint32(0,0x06054b50,true);
+  ev.setUint16(8,files.length,true); ev.setUint16(10,files.length,true);
+  ev.setUint32(12,cdSize,true); ev.setUint32(16,offset,true);
+  return new Blob([...parts,...central,end],{type:'application/zip'});
+}
+
+async function downloadAllQR(list){
+  const btn=document.getElementById('qrall'); if(btn){btn.disabled=true;}
+  const files=[];
+  for(let i=0;i<list.length;i++){
+    const p=list[i];
+    const blob=await canvasBlob(qrPng(p,qrSize,qrLabel));
+    files.push({name:safeName(p)+'.png',data:new Uint8Array(await blob.arrayBuffer())});
+    if(btn)btn.textContent=`⏳ ${i+1}/${list.length}`;
+  }
+  saveBlob(zipStore(files),'acoustic2026-qr.zip');
+  if(btn){btn.disabled=false;btn.textContent=`⬇ ${t('qrAll')} (${list.length})`;}
+  toast(t('saved'));
+}
+
+/* ===== kirish (maxfiy kod) ===== */
+const ROLE_LABEL={admin:{uz:"Texnik admin",ru:"Тех. админ"},manager:{uz:"Rahbar",ru:"Руководитель"},
+                  leader:{uz:"Guruh mas'uli",ru:"Староста группы"},member:{uz:"Ishtirokchi",ru:"Участник"}};
+const GATE_ERR={
+  not_found:{uz:"Kod topilmadi. Tekshirib qayta kiriting.",ru:"Код не найден. Проверьте и повторите."},
+  too_short:{uz:"Kod juda qisqa.",ru:"Код слишком короткий."},
+  ambiguous:{uz:"Kod bir nechta odamga to'g'ri keldi \u2014 to'liq holida yozing.",
+             ru:"Код подошёл нескольким \u2014 введите полностью."},
+  too_many_attempts:{uz:"Juda ko'p urinish. 10 daqiqadan keyin qayta urining.",
+                     ru:"Слишком много попыток. Повторите через 10 минут."},
+  network:{uz:"Aloqa xatosi. Qayta urining.",ru:"Ошибка связи. Повторите."}
+};
+
+function showGate(){
+  document.getElementById('gate').classList.add('show');
+  const box=document.getElementById('gateCode');
+  box.value=''; box.focus();
+}
+
+function renderWhoami(){
+  const el=document.getElementById('whoami'); if(!el||!S.user)return;
+  const role=(ROLE_LABEL[S.user.role]||{})[S.lang]||S.user.role;
+  el.innerHTML=`<span><b>${escapeHtml(S.user.fio||'')}</b> · ${role}</span>`+
+    `<button class="out" onclick="logout()">${S.lang==='ru'?'Выйти':'Chiqish'}</button>`;
+}
+
+async function logout(){
+  try{await fetch('/api/auth/logout',{method:'POST'});}catch(e){}
+  location.reload();
+}
+
+async function submitCode(){
+  const input=document.getElementById('gateCode'), btn=document.getElementById('gateGo'),
+        err=document.getElementById('gateErr');
+  const code=input.value.trim();
+  if(!code)return;
+  btn.disabled=true; err.textContent='';
+  let body={};
+  try{
+    const r=await fetch('/api/auth/login',{method:'POST',headers:H,body:JSON.stringify({code})});
+    body=await r.json().catch(()=>({}));
+    if(r.ok){location.reload();return;}
+  }catch(e){ body={error:'network'}; }
+  btn.disabled=false;
+  err.textContent=(GATE_ERR[body.error]||GATE_ERR.not_found)[S.lang]||'';
+  input.select();
+}
 
 /* ===== boot ===== */
 (async function(){
+  document.getElementById('gateGo').onclick=submitCode;
+  document.getElementById('gateCode').onkeydown=e=>{if(e.key==='Enter')submitCode();};
+
   const data=await api.boot();
-  if(data&&data.participants&&data.participants.length){
-    S.participants=data.participants.map(p=>({group:null,leader:false,room:'',branch:'',telegram:'',roles:[],...p}));
-    S.checkins=data.checkins||{};S.badge=data.badge||null;S.seminarLogo=data.seminarLogo||null;
-    S.checkpoints=data.checkpoints||[];S.program=data.program||[];S.roles=data.roles||[];
-    S.meta=data.meta||{};S.pageBase=data.pageBase||null;
-    if(data.lang)S.lang=data.lang;
-  }else{
-    S.participants=BASE.map(p=>({...p,group:null,leader:false,room:'',branch:'',telegram:'',roles:[]}));
-  }
-  if(!S.badge)S.badge=defaultBadge();
-  if(!S.checkpoints||!S.checkpoints.length)S.checkpoints=DEF_CPS.map(c=>({...c}));
-  if(!S.roles||!S.roles.length)S.roles=DEF_ROLES.map(r=>({...r}));
-  if(!S.program)S.program=[];
+  if(!data||data.unauthorized){ showGate(); return; }
+
+  S.user=data.user||null;
+  S.participants=(data.participants||[]).map(p=>({group:null,leader:false,room:'',branch:'',telegram:'',roles:[],...p}));
+  S.checkins=data.checkins||{};S.seminarLogo=data.seminarLogo||null;
+  S.checkpoints=data.checkpoints||[];S.program=data.program||[];S.roles=data.roles||[];
+  S.meta=data.meta||{};S.pageBase=data.pageBase||null;S.groups=data.groups||[];
+
+  if(!S.checkpoints.length)S.checkpoints=DEF_CPS.map(c=>({...c}));
+  if(!S.roles.length)S.roles=DEF_ROLES.map(r=>({...r}));
   if(!S.meta||!S.meta.title)S.meta={...DEF_META};
-  if(!S.checkins)S.checkins={};
   S.checkpoints.forEach(c=>{if(!S.checkins[c.key])S.checkins[c.key]={};});
   activeCP=(S.checkpoints[0]||{}).key||'';
+
   const mt=document.getElementById('modeTag');
-  const dot={server:'#12B886',local:'#F0A81A',memory:'#B0AFC4'}[api.mode];
-  mt.innerHTML=`<span class="dot" style="background:${dot}"></span>${api.mode==='server'?'Server':api.mode==='local'?'Lokal (brauzer)':'Vaqtinchalik'}`;
+  mt.innerHTML=`<span class="dot" style="background:#12B886"></span>Server`;
   document.getElementById('lang-uz').classList.toggle('on',S.lang==='uz');
   document.getElementById('lang-ru').classList.toggle('on',S.lang==='ru');
   render();

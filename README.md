@@ -21,6 +21,7 @@ sharm-seminar/
   static/scan.html        Telegram mini-app QR skaner
   static/vendor/jsQR.min.js
   tools/import_xlsx.py    acoustic2026seminar.xlsx dan import
+  tools/set_role.py       panelga kirish rolini belgilash
   data/seed_participants.json
   data/seed_groups.json   guruh nomlari (Sazanchik/Meduza/Akula/Delfin/Nemo)
   data/seed_program.json
@@ -53,11 +54,12 @@ Muhim qiymatlar:
 BOT_TOKEN=<@sharmseminarbot tokeni>
 API_BASE=http://127.0.0.1:8000
 BOT_API_TOKEN=<uzun tasodifiy maxfiy kalit>
-SECRET=<token hash uchun maxfiy kalit>
+SECRET=<token hash va sessiya imzosi uchun maxfiy kalit>
 PUBLIC_URL=https://sharm.acoustic.uz
 WEBAPP_URL=https://sharm.acoustic.uz
 GROUP_INVITE_CHAT_ID=<telegram guruh id>
 ADMIN_IDS=<vergul bilan telegram id lar>
+PANEL_ADMIN_IDS=<panel texnik adminlari, ACO-004,ACO-012>
 CREDENTIALS_FILE=/absolute/path/service-account.json
 ```
 
@@ -110,9 +112,68 @@ curl -X POST http://127.0.0.1:18080/api/groups -H 'Content-Type: application/jso
   -d '{"groups":[{"id":1,"name":"Sazanchik","leader":"ACO-004"}]}'
 ```
 
-## Rollar
+## Panelga kirish — maxfiy kod va rollar
 
-Rol `/api/bot/whoami` orqali aniqlanadi: `ADMIN_IDS` dagi Telegram ID → **admin**,
+`sharm.acoustic.uz` endi **"Maxfiy kodni kiriting"** oynasi bilan ochiladi. Maxfiy
+kod — odamning **pasport seriya + raqami**. Sahifada pasport so'ralayotgani
+yozilmaydi, faqat kod so'raladi. To'liq (`FA1177095`), faqat raqam (`1177095`)
+yoki boshidagi nollarsiz yozish ham qabul qilinadi; agar faqat raqam bir nechta
+odamga to'g'ri kelsa, to'liq holida so'raladi.
+
+Kirgandan keyin sessiya imzolangan cookie'da 30 kun saqlanadi. Rol har so'rovda
+bazadan qayta o'qiladi, ya'ni rolni o'zgartirsangiz darhol kuchga kiradi.
+
+| Rol | Nimani ko'radi va qila oladi |
+|---|---|
+| `member` — ishtirokchi | faqat **o'zi** haqidagi ma'lumot (xonasi, guruhi, mas'uliyati) + dastur |
+| `leader` — guruh mas'uli | **o'z guruhi** ro'yxati, QR kodlari va check-in (faqat o'z guruhini) |
+| `manager` — rahbar | **barcha guruhlar**, ishtirokchilarni tahrirlash, check-in, pasport ma'lumoti |
+| `admin` — texnik admin | hammasi: sozlamalar, dastur, mas'uliyatlar, guruh nomlari |
+
+Pasport ma'lumoti (seriya, raqam, tug'ilgan sana, telefon, Telegram) faqat
+`manager` va `admin` ga, hamda odamning **o'ziga** ko'rinadi. Guruh mas'uli o'z
+guruhini ko'radi, lekin ularning pasportini ko'rmaydi.
+
+Rol qanday aniqlanadi (yuqoridan pastga):
+
+1. `.env` dagi `PANEL_ADMIN_IDS` ro'yxatidagi ACO raqami → `admin`;
+2. Telegram hisobi `ADMIN_IDS` da bo'lsa → `admin` (bot admini panelda ham admin);
+3. `participants.panel_role` ustuni (`admin`/`manager`/`leader`/`member`);
+4. `participants.leader=1` → `leader`;
+5. aks holda → `member`.
+
+Rol berish:
+
+```bash
+./venv/bin/python sharm-seminar/tools/set_role.py                 # joriy rollar
+./venv/bin/python sharm-seminar/tools/set_role.py ACO-004 admin   # texnik admin
+./venv/bin/python sharm-seminar/tools/set_role.py "Musaev" manager
+systemctl restart sharm-seminar    # faqat .env o'zgarsa kerak
+```
+
+**Ochiq qoladi:** beyjik QR i ochadigan `/p/<token>` sahifasi, uning
+`/api/p/<token>` ma'lumoti va bot mini-app'i (`/scan`) — ular kod so'ramaydi,
+aks holda ishtirokchi o'z sahifasini ocholmay qolardi.
+
+## QR kodlar
+
+Panel → **«QR kodlar»** bo'limi (guruh mas'uli va undan yuqori rollarga ko'rinadi):
+
+- har bir ishtirokchining QR kodi ro'yxatda ko'rinadi;
+- **⬇ PNG** — bittasini yuklab olish;
+- **⬇ Hammasini ZIP qilib yuklash** — ko'rinib turgan hammasini bitta ZIP faylda
+  (guruh yoki ism bo'yicha izlab, faqat kerakligini ham olish mumkin);
+- o'lcham 512 / 1024 / 2048 px, xohlasangiz QR tagida ism-familya va ACO raqami
+  chiziladi.
+
+Fayl nomi `ACO-042_Aziz_Karimov.png` ko'rinishida. ZIP brauzerning o'zida
+yig'iladi — hech qanday tashqi kutubxona yoki server yuklamasi kerak emas.
+
+Beyjik dizayneri bo'limi olib tashlandi.
+
+## Bot rollari
+
+Botdagi rol `/api/bot/whoami` orqali aniqlanadi: `ADMIN_IDS` dagi Telegram ID → **admin**,
 `participants.leader=1` → **guruh rahbari**, bog'langan ishtirokchi → **a'zo**.
 
 | Rol | Menyu |
@@ -173,7 +234,8 @@ ular `initData` bilan himoyalangan).
 | Endpoint | Vazifasi |
 |---|---|
 | `GET /api/p/<id yoki token>` | ishtirokchi sahifasi ma'lumoti (pasportsiz) |
-| `GET /api/bot/whoami?telegram_id=` | rol, guruh, guruh nomi |
+| `GET /api/bot/whoami?telegram_id=` | botdagi rol, guruh, guruh nomi |
+| `POST /api/auth/login` · `/api/auth/logout` · `GET /api/auth/me` | panelga kirish |
 | `GET /api/bot/groups` | guruhlar, mas'ullar, kelganlar soni |
 | `GET /api/bot/group/<n>` | guruh a'zolari + check-in holati |
 | `POST /api/bot/checkin` | `{token\|id, checkpoint, by_telegram_id}` |

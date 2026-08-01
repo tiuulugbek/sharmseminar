@@ -26,9 +26,18 @@ class BotApiTest(unittest.TestCase):
         os.environ["SECRET"] = "test-secret"
         os.environ["ADMIN_IDS"] = "555"
         os.environ["BOT_TOKEN"] = "123:TESTBOTTOKEN"
+        os.environ["PANEL_ADMIN_IDS"] = ""
         server.init_db()
         self.client = server.app.test_client()
         self.headers = {"X-Bot-Token": "test-token"}
+
+    def panel(self, pid):
+        """Maxfiy kod (pasport) bilan kirgan panel klienti."""
+        row = self.one("SELECT passport_series,passport_number FROM participants WHERE id=?", pid)
+        client = server.app.test_client()
+        response = client.post("/api/auth/login", json={"code": (row[0] or "") + (row[1] or "")})
+        self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+        return client
 
     def sql(self, statement, *params):
         con = sqlite3.connect(server.DB_PATH)
@@ -179,7 +188,6 @@ class BotApiTest(unittest.TestCase):
 
     def test_leader_scope_all_lets_leaders_scan_anybody(self):
         _, _, other = self.build_group()
-        self.client.post("/api/pagebase", json={"base": "x"})  # unrelated setting stays intact
         con = sqlite3.connect(server.DB_PATH)
         con.execute("UPDATE settings SET value='\"all\"' WHERE key='leader_scope'")
         con.commit(); con.close()
@@ -318,20 +326,127 @@ class BotApiTest(unittest.TestCase):
 
     def test_saving_groups_moves_the_leader_flag(self):
         leader, member, _ = self.build_group()
-        self.client.post("/api/groups", json={"groups": [
+        os.environ["PANEL_ADMIN_IDS"] = leader["id"]
+        self.panel(leader["id"]).post("/api/groups", json={"groups": [
             {"id": 1, "name": "Sazanchik", "leader": member["id"]}]})
         self.assertEqual(self.one("SELECT leader FROM participants WHERE id=?", member["id"])[0], 1)
         self.assertEqual(self.one("SELECT leader FROM participants WHERE id=?", leader["id"])[0], 0)
 
+    # --------------------------------------------------- panelga kirish (kod)
+    def test_login_accepts_the_passport_in_several_shapes(self):
+        person = self.register("Login Person", "0012345")
+        for code in ("FA0012345", "fa0012345", "FA 0012345", "0012345", "12345", "FA12345"):
+            client = server.app.test_client()
+            response = client.post("/api/auth/login", json={"code": code})
+            self.assertEqual(response.status_code, 200, code)
+            self.assertEqual(response.get_json()["user"]["id"], person["id"], code)
+
+    def test_login_rejects_wrong_short_and_ambiguous_codes(self):
+        self.register("One", "0000001")
+        self.register("Two", "0000002")
+        self.assertEqual(self.client.post("/api/auth/login", json={"code": "FA9999999"}).status_code, 401)
+        self.assertEqual(self.client.post("/api/auth/login", json={"code": "12"}).status_code, 401)
+        self.assertEqual(self.client.post("/api/auth/login", json={}).status_code, 401)
+
+    def test_session_cookie_cannot_be_forged_and_logout_clears_it(self):
+        person = self.register("Cookie Person", "0000321")
+        client = self.panel(person["id"])
+        self.assertEqual(client.get("/api/auth/me").status_code, 200)
+        client.post("/api/auth/logout")
+        self.assertEqual(client.get("/api/auth/me").status_code, 401)
+
+        forged = server.app.test_client()
+        forged.set_cookie(server.SESSION_COOKIE, f"{person['id']}|admin|1|deadbeef")
+        self.assertEqual(forged.get("/api/auth/me").status_code, 401)
+        # A valid signature for "member" must not be replayable as "admin".
+        signed = server._sign_session(person["id"], "member")
+        tampered = server.app.test_client()
+        tampered.set_cookie(server.SESSION_COOKIE, signed.replace("|member|", "|admin|"))
+        self.assertEqual(tampered.get("/api/auth/me").status_code, 401)
+
+    def test_role_comes_from_the_database_not_from_the_cookie(self):
+        person = self.register("Climber", "0000444")
+        client = self.panel(person["id"])
+        self.assertEqual(client.get("/api/auth/me").get_json()["user"]["role"], "member")
+        self.sql("UPDATE participants SET panel_role='manager' WHERE id=?", person["id"])
+        self.assertEqual(client.get("/api/auth/me").get_json()["user"]["role"], "manager")
+
+    def test_bot_admin_telegram_id_also_opens_the_panel_as_admin(self):
+        person = self.register("Bot Admin", "0000555", "555")  # 555 is in ADMIN_IDS
+        self.assertEqual(self.panel(person["id"]).get("/api/auth/me")
+                         .get_json()["user"]["role"], "admin")
+
+    def test_bootstrap_shows_only_what_the_role_may_see(self):
+        leader, member, other = self.build_group()
+        admin = self.register("Panel Admin", "0000777")
+        os.environ["PANEL_ADMIN_IDS"] = admin["id"]
+        self.sql("UPDATE participants SET panel_role='manager' WHERE id=?", other["id"])
+
+        self.assertEqual(self.client.get("/api/bootstrap").status_code, 401)
+
+        seen = {}
+        for pid in (admin["id"], other["id"], leader["id"], member["id"]):
+            data = self.panel(pid).get("/api/bootstrap").get_json()
+            seen[data["user"]["role"]] = data
+
+        self.assertEqual(len(seen["admin"]["participants"]), 4)
+        self.assertEqual(len(seen["manager"]["participants"]), 4)
+        self.assertEqual({p["id"] for p in seen["leader"]["participants"]},
+                         {leader["id"], member["id"]})
+        self.assertEqual([p["id"] for p in seen["member"]["participants"]], [member["id"]])
+
+        # Passports stay with managers and above; a leader sees none but their own.
+        leaked = [p for p in seen["leader"]["participants"]
+                  if p["id"] != leader["id"] and p.get("passport_number")]
+        self.assertEqual(leaked, [])
+        self.assertTrue(any(p.get("passport_number") for p in seen["manager"]["participants"]))
+
+    def test_writes_are_limited_by_role(self):
+        leader, member, other = self.build_group()
+        admin = self.register("Panel Admin", "0000778")
+        os.environ["PANEL_ADMIN_IDS"] = admin["id"]
+        self.sql("UPDATE participants SET panel_role='manager' WHERE id=?", other["id"])
+
+        as_admin, as_manager = self.panel(admin["id"]), self.panel(other["id"])
+        as_leader, as_member = self.panel(leader["id"]), self.panel(member["id"])
+
+        # Settings: admin only.
+        self.assertEqual(as_admin.post("/api/meta", json={"title": "x"}).status_code, 200)
+        for client in (as_manager, as_leader, as_member):
+            self.assertEqual(client.post("/api/meta", json={"title": "x"}).status_code, 403)
+
+        # Participant edits: manager and above.
+        patch = {"id": member["id"], "patch": {"room": "101"}}
+        self.assertEqual(as_manager.post("/api/participant", json=patch).status_code, 200)
+        self.assertEqual(as_leader.post("/api/participant", json=patch).status_code, 403)
+        self.assertEqual(as_member.post("/api/participant", json=patch).status_code, 403)
+
+        # Check-in: a leader only inside their own group, a member never.
+        own = {"id": member["id"], "checkpoint": "seminar", "on": True}
+        outside = {"id": other["id"], "checkpoint": "seminar", "on": True}
+        self.assertEqual(as_leader.post("/api/checkin", json=own).status_code, 200)
+        self.assertEqual(as_leader.post("/api/checkin", json=outside).status_code, 403)
+        self.assertEqual(as_manager.post("/api/checkin", json=outside).status_code, 200)
+        self.assertEqual(as_member.post("/api/checkin", json=own).status_code, 403)
+
+    def test_participant_page_and_scanner_stay_public(self):
+        person = self.register("Public Person", "0000888")
+        self.assertEqual(self.client.get(f"/api/p/{person['token']}").status_code, 200)
+        self.assertEqual(self.client.get(f"/p/{person['token']}").status_code, 200)
+        self.assertEqual(self.client.get("/scan").status_code, 200)
+
     def test_badge_template_keeps_multiple_logo_and_font_settings(self):
+        admin = self.register("Badge Admin", "0009999")
+        os.environ["PANEL_ADMIN_IDS"] = admin["id"]
+        client = self.panel(admin["id"])
         badge = {"w": 70, "h": 110, "bg": "#fff", "elements": [
             {"id": "logo1", "type": "logo", "src": "data:image/png;base64,AAA", "x": 1, "y": 1, "w": 20},
             {"id": "logo2", "type": "logo", "src": "data:image/png;base64,BBB", "x": 30, "y": 1, "w": 20},
             {"id": "text1", "type": "text", "text": "Seminar", "font": "Georgia,serif",
              "italic": True, "lineHeight": 1.2, "letter": 0.4},
         ]}
-        self.assertEqual(self.client.post("/api/badge", json=badge).status_code, 200)
-        saved = self.client.get("/api/bootstrap").get_json()["badge"]
+        self.assertEqual(client.post("/api/badge", json=badge).status_code, 200)
+        saved = client.get("/api/bootstrap").get_json()["badge"]
         self.assertEqual(saved["elements"][1]["src"], "data:image/png;base64,BBB")
         self.assertEqual(saved["elements"][2]["font"], "Georgia,serif")
 

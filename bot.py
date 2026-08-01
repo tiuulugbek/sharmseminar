@@ -7,7 +7,7 @@ from datetime import date, datetime
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.filters import Command, CommandStart
+from aiogram.filters import Command, CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (
@@ -25,6 +25,7 @@ import broadcast
 import api_client
 import config
 import drive
+import messaging
 import seminar_store as sheets
 
 logging.basicConfig(level=logging.INFO)
@@ -38,20 +39,27 @@ sheet_lock = asyncio.Lock()
 
 
 async def send_personal_page(user_id: int, participant_id: str):
-    """Send the live participant page and a QR pointing to the same URL."""
-    url = f"{config.PUBLIC_URL}/p/{participant_id}"
+    """Send the live participant page and a QR pointing to the same URL.
+
+    The link uses the passport-derived token, so neither the URL nor the QR on
+    the badge exposes the passport number or the plain ACO id.
+    """
     details = {}
     try:
         details = await asyncio.to_thread(api_client.participant, participant_id)
     except Exception:
         logger.exception("Shaxsiy sahifa ma'lumotini olishda xato: %s", participant_id)
     p = details.get("participant") or {}
+    url = f"{config.PUBLIC_URL}/p/{p.get('token') or participant_id}"
     roles = ", ".join(r.get("label", "") for r in details.get("roles", []) if r.get("label"))
     lines = ["🎫 <b>Shaxsiy seminar sahifangiz</b>", f'<a href="{url}">{url}</a>']
     if p.get("group"):
-        lines.append(f"👥 Guruhingiz: <b>{p['group']}</b>")
+        group = f"{p['group']}-guruh"
+        if p.get("group_name"):
+            group += f" · {p['group_name']}"
+        lines.append(f"👥 Guruhingiz: <b>{group}</b>")
     if details.get("groupLeader"):
-        lines.append(f"👤 Guruhboshingiz: <b>{details['groupLeader']}</b>")
+        lines.append(f"👤 Guruh mas'ulingiz: <b>{details['groupLeader']}</b>")
     if roles:
         lines.append(f"📌 Mas’uliyatingiz: <b>{roles}</b>")
     await bot.send_message(user_id, "\n".join(lines), disable_web_page_preview=True)
@@ -261,6 +269,12 @@ async def upload_passport_to_drive(passport: dict, person_label: str) -> str:
 @dp.message(CommandStart(), F.chat.type == "private")
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
+    # Allaqachon tanilgan bo'lsa — qaytadan so'ramaymiz, to'g'ridan-to'g'ri menyu.
+    me = await whoami(message.from_user.id)
+    if me.get("role") in {"admin", "leader", "member"}:
+        await show_menu(message.from_user.id, me,
+                        f"👋 Xush kelibsiz{', ' + me['fio'] if me.get('fio') else ''}!")
+        return
     await message.answer(
         "👋 <b>Assalomu alaykum!</b>\n\n"
         "📋 <b>Ro'yxatga olish yakunlandi.</b>\n\n"
@@ -329,6 +343,12 @@ async def _do_join(user_id: int, full_name: str, idx: int, username: str = ""):
         await bot.send_message(user_id, "⚠️ Guruh havolasini yaratishda muammo bo'ldi. Administrator bilan bog'laning.")
 
 
+async def _join_and_menu(user_id: int, full_name: str, idx: str, username: str = ""):
+    """Bog'lanishdan keyin foydalanuvchiga o'z roliga mos menyuni ochadi."""
+    await _do_join(user_id, full_name, idx, username)
+    await show_menu(user_id)
+
+
 @dp.message(Join.series, F.text)
 async def join_check_series(message: Message, state: FSMContext):
     text = message.text.strip()
@@ -346,8 +366,8 @@ async def join_check_series(message: Message, state: FSMContext):
         if len(matches) == 1:
             idx, row = matches[0]
             await state.clear()
-            await _do_join(message.from_user.id, f"{row[5]} {row[4]}".strip(), idx,
-                           f"@{message.from_user.username}" if message.from_user.username else "")
+            await _join_and_menu(message.from_user.id, f"{row[5]} {row[4]}".strip(), idx,
+                                 f"@{message.from_user.username}" if message.from_user.username else "")
             return
         # Bir nechta odam shu sanada — o'zini tanlasin
         names = {}
@@ -374,8 +394,8 @@ async def join_check_series(message: Message, state: FSMContext):
         )
         return
     await state.clear()
-    await _do_join(message.from_user.id, f"{row[5]} {row[4]}".strip(), idx,
-                   f"@{message.from_user.username}" if message.from_user.username else "")
+    await _join_and_menu(message.from_user.id, f"{row[5]} {row[4]}".strip(), idx,
+                         f"@{message.from_user.username}" if message.from_user.username else "")
 
 
 @dp.callback_query(F.data.startswith("join:"))
@@ -385,17 +405,15 @@ async def join_pick(call: CallbackQuery, state: FSMContext):
         await state.clear()
         await call.message.edit_text("❌ Bekor qilindi. Qaytadan boshlash uchun /start")
         return await call.answer()
-    try:
-        idx = int(val)
-    except ValueError:
-        return await call.answer()
+    # Ishtirokchi identifikatori — "ACO-020" ko'rinishidagi matn, son emas.
+    idx = val
     data = await state.get_data()
     full_name = (data.get("join_names") or {}).get(val, "")
     await state.clear()
-    await call.message.edit_text(f"✅ Tanlandi: <b>{full_name or ('#' + val)}</b>")
+    await call.message.edit_text(f"✅ Tanlandi: <b>{full_name or idx}</b>")
     await call.answer()
-    await _do_join(call.from_user.id, full_name, idx,
-                   f"@{call.from_user.username}" if call.from_user.username else "")
+    await _join_and_menu(call.from_user.id, full_name, idx,
+                         f"@{call.from_user.username}" if call.from_user.username else "")
 
 
 @dp.message(Join.series)
@@ -1380,10 +1398,262 @@ async def adm_stats(call: CallbackQuery):
     await call.message.edit_text(text + "\n\n/admin")
 
 
+# ═════════════════════ Rol menyusi va ikki tomonlama xabar ═════════════════════
+# Rol serverdan (`/api/bot/whoami`) olinadi: admin · guruh rahbari · a'zo.
+# Kim kimga yoza olishini ham server hal qiladi, bot faqat yetkazadi.
+
+class Msg(StatesGroup):
+    body = State()    # xabar matnini/rasmini kutish
+    person = State()  # "bitta odamga" — kimga yuborishni so'rash
+    reply = State()   # "↩️ Javob berish" bosilgandan keyingi matn
+
+
+async def whoami(user_id: int) -> dict:
+    try:
+        return await asyncio.to_thread(api_client.whoami, user_id)
+    except api_client.ApiError:
+        logger.exception("whoami xatosi: %s", user_id)
+        return {"role": "guest"}
+
+
+def _me_line(me: dict) -> str:
+    title = {"admin": "Administrator", "leader": "Guruh rahbari", "member": "Ishtirokchi"}
+    parts = [me.get("fio") or title.get(me.get("role"), ""), title.get(me.get("role"), "")]
+    if me.get("group"):
+        parts.append(f"{me['group']}-guruh" + (f" · {me['group_name']}" if me.get("group_name") else ""))
+    return " · ".join(p for p in dict.fromkeys(parts) if p)
+
+
+async def show_menu(user_id: int, me: dict | None = None, note: str = "") -> dict:
+    """Foydalanuvchiga o'z roliga mos menyuni ko'rsatadi."""
+    me = me or await whoami(user_id)
+    if me.get("role") == "guest":
+        await bot.send_message(
+            user_id,
+            "🔍 Sizni ro'yxatdan topa olmadik.\n"
+            "Pasport seriyangiz yoki tug'ilgan sanangiz bilan /start orqali kiring.",
+            reply_markup=ReplyKeyboardRemove())
+        return me
+    text = (note + "\n\n" if note else "") + f"👤 <b>{_me_line(me)}</b>\n\nQuyidagi menyudan tanlang:"
+    await bot.send_message(user_id, text, reply_markup=messaging.role_menu(me["role"]))
+    return me
+
+
+@dp.message(Command("menyu"), F.chat.type == "private")
+async def cmd_menu(message: Message, state: FSMContext):
+    await state.clear()
+    await show_menu(message.from_user.id)
+
+
+async def _ask_text(message: Message, state: FSMContext, scope: str, value=None, prompt: str = ""):
+    await state.set_state(Msg.body)
+    await state.update_data(scope=scope, value=value)
+    await message.answer(
+        (prompt or "✍️ Xabar matnini yozing.") +
+        "\n\n<i>Rasm yoki hujjat ham yuborishingiz mumkin. Bekor qilish — /bekor</i>",
+        reply_markup=ReplyKeyboardRemove())
+
+
+# ── Admin tugmalari ──
+@dp.message(StateFilter(None), F.chat.type == "private", F.text == messaging.BTN_ALL)
+async def menu_all(message: Message, state: FSMContext):
+    me = await whoami(message.from_user.id)
+    if me.get("role") != "admin":
+        return await show_menu(message.from_user.id, me, "⛔ Bu bo'lim faqat adminlar uchun.")
+    await _ask_text(message, state, "all", prompt="📢 <b>Hammaga xabar</b> — matnni yozing.")
+
+
+@dp.message(StateFilter(None), F.chat.type == "private", F.text == messaging.BTN_GROUP)
+async def menu_group(message: Message, state: FSMContext):
+    me = await whoami(message.from_user.id)
+    if me.get("role") != "admin":
+        return await show_menu(message.from_user.id, me, "⛔ Bu bo'lim faqat adminlar uchun.")
+    try:
+        groups = await asyncio.to_thread(api_client.groups)
+    except api_client.ApiError:
+        return await message.answer("⚠️ Guruhlar ro'yxatini olib bo'lmadi.")
+    rows = [[InlineKeyboardButton(
+        text=f"{g['id']}-guruh · {g.get('name') or '—'} ({g['with_telegram']}/{g['total']})",
+        callback_data=f"mgrp:{g['id']}")] for g in groups]
+    rows.append([InlineKeyboardButton(text="❌ Bekor", callback_data="mgrp:cancel")])
+    await message.answer("👥 Qaysi guruhga yuboramiz?\n<i>Qavsda — Telegram ID si borlar soni.</i>",
+                         reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
+
+
+@dp.callback_query(F.data.startswith("mgrp:"))
+async def menu_group_pick(call: CallbackQuery, state: FSMContext):
+    value = call.data.split(":", 1)[1]
+    await call.answer()
+    if value == "cancel":
+        await call.message.edit_text("❌ Bekor qilindi.")
+        return await show_menu(call.from_user.id)
+    await call.message.edit_text(f"📢 <b>{value}-guruhga</b> xabar tayyorlanmoqda.")
+    await state.set_state(Msg.body)
+    await state.update_data(scope="group", value=value)
+    await bot.send_message(call.from_user.id,
+                           "✍️ Xabar matnini yozing.\n\n<i>Rasm/hujjat ham mumkin. Bekor — /bekor</i>",
+                           reply_markup=ReplyKeyboardRemove())
+
+
+@dp.message(StateFilter(None), F.chat.type == "private", F.text == messaging.BTN_ONE)
+async def menu_one(message: Message, state: FSMContext):
+    me = await whoami(message.from_user.id)
+    if me.get("role") != "admin":
+        return await show_menu(message.from_user.id, me, "⛔ Bu bo'lim faqat adminlar uchun.")
+    await state.set_state(Msg.person)
+    await message.answer("👤 Kimga? <b>ACO-042</b> ko'rinishidagi ID, QR token yoki ism-familya yozing.",
+                         reply_markup=ReplyKeyboardRemove())
+
+
+@dp.message(Msg.person, F.text)
+async def menu_one_pick(message: Message, state: FSMContext):
+    raw = message.text.strip()
+    try:
+        found = await asyncio.to_thread(api_client.find, name=raw) if " " in raw or not raw.upper().startswith("ACO-") else []
+    except api_client.ApiError:
+        found = []
+    target = raw
+    if found:
+        if len(found) > 1:
+            names = "\n".join(f"• <code>{p['id']}</code> — {p['fio']}" for p in found[:12])
+            return await message.answer(f"👥 Bir nechta odam topildi, ID sini yozing:\n{names}")
+        target = found[0]["id"]
+        await message.answer(f"👤 Tanlandi: <b>{found[0]['fio']}</b> ({target})")
+    await _ask_text(message, state, "one", target)
+
+
+# ── Guruh rahbari tugmalari ──
+@dp.message(StateFilter(None), F.chat.type == "private", F.text == messaging.BTN_MYGROUP)
+async def menu_my_group(message: Message, state: FSMContext):
+    me = await whoami(message.from_user.id)
+    if me.get("role") != "leader":
+        return await show_menu(message.from_user.id, me, "⛔ Bu bo'lim faqat guruh rahbarlari uchun.")
+    await _ask_text(message, state, "group", me.get("group"),
+                    prompt=f"📢 <b>{me.get('group')}-guruhingizga</b> xabar — matnni yozing.")
+
+
+@dp.message(StateFilter(None), F.chat.type == "private",
+            F.text.in_({messaging.BTN_ROSTER, messaging.BTN_ATT}))
+async def menu_roster(message: Message):
+    me = await whoami(message.from_user.id)
+    if me.get("role") not in {"leader", "admin"} or not me.get("group"):
+        return await show_menu(message.from_user.id, me, "⛔ Bu bo'lim faqat guruh rahbarlari uchun.")
+    try:
+        data = await asyncio.to_thread(api_client.group_members, me["group"])
+    except api_client.ApiError:
+        return await message.answer("⚠️ Guruh ro'yxatini olib bo'lmadi.")
+    attendance = message.text == messaging.BTN_ATT
+    lines = [f"👥 <b>{data['group']}-guruh · {data.get('name') or '—'}</b> "
+             f"({len(data['members'])} kishi)\n"]
+    for i, m in enumerate(data["members"], 1):
+        marks = m.get("checkins") or {}
+        if attendance:
+            state_icon = "✅" if marks else "⬜️"
+            when = " · ".join(f"{k}:{v}" for k, v in sorted(marks.items())) or "belgilanmagan"
+            lines.append(f"{state_icon} {m['fio']} — <i>{when}</i>")
+        else:
+            tag = " 👑" if m["leader"] else ""
+            tg = "" if m.get("telegram_id") else " · <i>Telegramsiz</i>"
+            room = f" · xona {m['room']}" if m.get("room") else ""
+            lines.append(f"{i}. {m['fio']}{tag}{room}{tg}")
+    if attendance:
+        came = sum(1 for m in data["members"] if m.get("checkins"))
+        lines.append(f"\n✅ Keldi: <b>{came}</b> · ⬜️ Yo'q: <b>{len(data['members']) - came}</b>")
+    text = "\n".join(lines)
+    for chunk in [text[i:i + 3500] for i in range(0, len(text), 3500)]:
+        await message.answer(chunk)
+
+
+# ── A'zo tugmalari ──
+@dp.message(StateFilter(None), F.chat.type == "private", F.text == messaging.BTN_ASK)
+async def menu_ask(message: Message, state: FSMContext):
+    me = await whoami(message.from_user.id)
+    if me.get("role") == "guest":
+        return await show_menu(message.from_user.id, me)
+    await _ask_text(message, state, "leader",
+                    prompt="✍️ <b>Guruh rahbaringizga savol</b> — matnni yozing.")
+
+
+@dp.message(StateFilter(None), F.chat.type == "private", F.text == messaging.BTN_PAGE)
+async def menu_page(message: Message):
+    me = await whoami(message.from_user.id)
+    if not me.get("id"):
+        return await show_menu(message.from_user.id, me)
+    await send_personal_page(message.from_user.id, me["id"])
+
+
+@dp.message(StateFilter(None), F.chat.type == "private", F.text == messaging.BTN_STATS)
+async def menu_stats(message: Message):
+    me = await whoami(message.from_user.id)
+    if me.get("role") != "admin":
+        return await show_menu(message.from_user.id, me, "⛔ Bu bo'lim faqat adminlar uchun.")
+    s = await asyncio.to_thread(api_client.stats)
+    groups = await asyncio.to_thread(api_client.groups)
+    lines = ["📊 <b>Umumiy statistika</b>\n",
+             f"👤 Jami: <b>{s['total']}</b>",
+             f"✉️ Telegram ID bor: <b>{s['telegram']}</b> · yo'q: <b>{s['no_telegram']}</b>\n",
+             "<b>Guruhlar</b>"]
+    for g in groups:
+        leader = (g.get("leader") or {}).get("fio") or "mas'ul belgilanmagan"
+        lines.append(f"• {g['id']}-guruh · {g.get('name') or '—'} — {g['total']} kishi, "
+                     f"keldi {g['checked_in']} · 👑 {leader}")
+    await message.answer("\n".join(lines))
+
+
+# ── Xabar matnini qabul qilish va yuborish ──
+@dp.message(Msg.body, F.text | F.photo | F.document)
+async def msg_body(message: Message, state: FSMContext):
+    data = await state.get_data()
+    await state.clear()
+    await message.answer("⏳ Yuborilmoqda…")
+    rep = await messaging.deliver(bot, message.from_user.id, data.get("scope", "all"),
+                                  data.get("value"), message)
+    await show_menu(message.from_user.id, note=messaging.report(rep))
+
+
+@dp.message(Msg.body)
+async def msg_body_invalid(message: Message):
+    await message.answer("Iltimos, matn, rasm yoki hujjat yuboring. Bekor qilish — /bekor")
+
+
+# ── "↩️ Javob berish" — javob DOIM asl yuboruvchiga qaytadi ──
+@dp.callback_query(F.data.startswith("reply:"))
+async def reply_start(call: CallbackQuery, state: FSMContext):
+    try:
+        parent = int(call.data.split(":", 1)[1])
+    except ValueError:
+        return await call.answer()
+    await state.set_state(Msg.reply)
+    await state.update_data(parent=parent)
+    await call.answer()
+    await bot.send_message(call.from_user.id,
+                           "↩️ <b>Javobingizni yozing</b> — u faqat xabarni yuborgan odamga boradi.\n"
+                           "<i>Bekor qilish — /bekor</i>",
+                           reply_markup=ReplyKeyboardRemove())
+
+
+@dp.message(Msg.reply, F.text | F.photo | F.document)
+async def reply_send(message: Message, state: FSMContext):
+    data = await state.get_data()
+    await state.clear()
+    rep = await messaging.deliver_reply(bot, message.from_user.id, data.get("parent"), message)
+    note = "✅ Javobingiz yuborildi." if rep.get("sent") else \
+        f"⚠️ Javob yetkazilmadi: <code>{rep.get('error') or 'noma’lum xato'}</code>"
+    await show_menu(message.from_user.id, note=note)
+
+
+@dp.message(Msg.reply)
+async def reply_invalid(message: Message):
+    await message.answer("Iltimos, javobni matn, rasm yoki hujjat ko'rinishida yuboring. /bekor")
+
+
 # ──────────────────────────── Fallback ────────────────────────────
 # Faqat shaxsiy chatga javob beramiz — guruhda bot jim turadi (admin bo'lsa ham).
 @dp.message(F.chat.type == "private")
 async def fallback(message: Message):
+    me = await whoami(message.from_user.id)
+    if me.get("role") in {"admin", "leader", "member"}:
+        return await show_menu(message.from_user.id, me)
     await message.answer("Boshlash uchun /start buyrug'ini bosing.")
 
 

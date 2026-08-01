@@ -11,6 +11,8 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 API_BASE = os.getenv("API_BASE", "http://127.0.0.1:8000")
 BOT_API_TOKEN = os.getenv("BOT_API_TOKEN", "")
 PUBLIC_URL = os.getenv("PUBLIC_URL", "https://sharm.acoustic.uz").rstrip("/")
+# Telegram mini-app (QR skaner) manzili — HTTPS bo'lishi shart.
+WEBAPP_URL = os.getenv("WEBAPP_URL", PUBLIC_URL).rstrip("/")
 LEGACY_SHEETS = os.getenv("LEGACY_SHEETS", "false").lower() in {"1", "true", "yes"}
 
 # Adminlar — yangi ro'yxat haqida xabar oladi

@@ -833,10 +833,10 @@ def bot_message():
                   if a != actor["telegram_id"] and a not in {str(r["telegram_id"]) for r in rows}]
     con.commit()
     names = _group_names(con)
-    out = {"ok": True, "message_id": msg_id,
+    out = {"ok": True, "message_id": msg_id, "from_role": actor["role"],
            "sender_label": _label(con, con.execute("SELECT * FROM participants WHERE id=?",
                                                    (actor["id"],)).fetchone(), names)
-           if actor["id"] else f"Admin ({actor['telegram_id']})",
+           if actor["id"] else "Administrator",
            "recipients": [{"id": r["id"], "fio": r["fio"], "telegram_id": str(r["telegram_id"]),
                            "group": r["grp"]} for r in rows],
            "copy_to": copies}
@@ -911,7 +911,8 @@ def bot_reply():
     me = con.execute("SELECT * FROM participants WHERE id=?", (actor["id"],)).fetchone() \
         if actor["id"] else None
     out = {"ok": True, "message_id": msg_id, "to_telegram_id": destination,
-           "sender_label": _label(con, me) if me else f"Admin ({actor['telegram_id']})",
+           "from_role": actor["role"],
+           "sender_label": _label(con, me) if me else "Administrator",
            "parent_excerpt": (parent["text"] or "")[:160]}
     con.close()
     return jsonify(out)

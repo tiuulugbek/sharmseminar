@@ -8,7 +8,8 @@ Flask + SQLite. Admin panel + ishtirokchi sahifasi (/p/<id>).
     python server.py
     http://SERVER_IP:8000
 """
-import os, json, sqlite3, datetime, re
+import os, json, sqlite3, datetime, re, hmac, hashlib, secrets
+from urllib.parse import parse_qsl
 from functools import wraps
 from flask import Flask, request, jsonify, send_from_directory, abort
 
@@ -16,6 +17,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH  = os.path.join(BASE_DIR, "data", "sharm.db")
 SEED_P   = os.path.join(BASE_DIR, "data", "seed_participants.json")
 SEED_PR  = os.path.join(BASE_DIR, "data", "seed_program.json")
+SEED_G   = os.path.join(BASE_DIR, "data", "seed_groups.json")
 STATIC   = os.path.join(BASE_DIR, "static")
 
 DEFAULT_CHECKPOINTS = [
@@ -45,7 +47,15 @@ BOT_COLUMNS = {
     "passport_file_url": "TEXT", "main_series": "TEXT",
     "payment_full": "INTEGER DEFAULT 0", "registered_at": "TEXT",
     "roommate_series": "TEXT",
+    # Passport-derived QR token and the remaining spreadsheet fields.
+    "token": "TEXT", "passport_issued": "TEXT", "passport_issuer": "TEXT",
+    "doc_type": "TEXT", "seminar": "TEXT", "international": "INTEGER DEFAULT 0",
+    "izoh": "TEXT",
 }
+
+DEFAULT_GROUPS = [{"id": 1, "name": "Sazanchik"}, {"id": 2, "name": "Meduza"},
+                  {"id": 3, "name": "Akula"}, {"id": 4, "name": "Delfin"},
+                  {"id": 5, "name": "Nemo"}]
 
 
 def db():
@@ -75,6 +85,16 @@ def init_db():
     CREATE TABLE IF NOT EXISTS checkins(
         pid TEXT, checkpoint TEXT, ts TEXT, PRIMARY KEY(pid, checkpoint));
     CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT);
+    CREATE TABLE IF NOT EXISTS messages(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        from_id TEXT, from_telegram_id TEXT, from_role TEXT,
+        to_scope TEXT, to_value TEXT, text TEXT, kind TEXT DEFAULT 'text',
+        created_at TEXT, parent_id INTEGER,
+        delivered INTEGER DEFAULT 0, failed INTEGER DEFAULT 0, replied INTEGER DEFAULT 0);
+    CREATE TABLE IF NOT EXISTS msg_targets(
+        msg_id INTEGER, pid TEXT, telegram_id TEXT, telegram_msg_id TEXT,
+        status TEXT DEFAULT 'pending', PRIMARY KEY(msg_id, pid));
+    CREATE INDEX IF NOT EXISTS ix_msg_targets_msg ON msg_targets(msg_id);
     """)
     # Idempotent migrations: existing databases keep all rows and values.
     cols = [r["name"] for r in con.execute("PRAGMA table_info(participants)").fetchall()]
@@ -93,14 +113,16 @@ def init_db():
         for p in load_json(SEED_P, []):
             con.execute("INSERT INTO participants(id,fio,jinsi,fuqarolik,xona_turi,xona_guruhi,kelish,grp,leader,roles,"
                         "passport_series,passport_number,passport_expiry,dob,phone,telegram_username,telegram_id,category,"
-                        "roommate_series,main_series)"
-                        " VALUES(?,?,?,?,?,?,?,NULL,0,'[]',?,?,?,?,?,?,?,?,?,?)",
+                        "roommate_series,main_series,passport_issued,passport_issuer,doc_type,seminar,izoh)"
+                        " VALUES(?,?,?,?,?,?,?,?,?,'[]',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                         (p["id"], p["fio"], p.get("jinsi"), p.get("fuqarolik"),
                          p.get("xona_turi"), p.get("xona_guruhi"), p.get("kelish"),
+                         p.get("group"), 1 if p.get("leader") else 0,
                          p.get("passport_series"), p.get("passport_number"), p.get("passport_expiry"),
                          p.get("dob"), p.get("phone"), p.get("telegram_username"),
                          p.get("telegram_id"), p.get("category"), p.get("roommate_series"),
-                         p.get("main_series")))
+                         p.get("main_series"), p.get("passport_issued"), p.get("passport_issuer"),
+                         p.get("doc_type"), p.get("seminar"), p.get("izoh")))
         print("Seeded participants.")
     # Backfill roommate_series from existing room groups. This is safe to repeat.
     room_groups = con.execute(
@@ -129,7 +151,67 @@ def init_db():
     seed_setting("checkpoints", DEFAULT_CHECKPOINTS)
     seed_setting("roles", DEFAULT_ROLES)
     seed_setting("meta", DEFAULT_META)
+    seed_setting("groups", load_json(SEED_G, DEFAULT_GROUPS))
+    # Group leaders may scan anybody ("all") or only their own group ("group").
+    seed_setting("leader_scope", "group")
+    seed_setting("copy_member_questions", False)
+    ensure_tokens(con)
     con.commit(); con.close()
+
+
+# ------------------------------------------------------- passport → QR token
+def _token_secret(con=None):
+    """Secret behind every QR token.
+
+    ``SECRET`` from ``.env`` is authoritative.  When it is missing we fall back
+    to a random value persisted in ``settings`` so tokens stay unguessable
+    instead of silently becoming a plain hash of the passport number.
+    """
+    env = os.environ.get("SECRET", "").strip()
+    if env:
+        return env
+    close_after = con is None
+    con = con or db()
+    try:
+        value = sget(con, "token_secret")
+        if not value:
+            value = secrets.token_hex(32)
+            sset(con, "token_secret", value)
+            con.commit()
+        return value
+    finally:
+        if close_after:
+            con.close()
+
+
+def make_token(series, number, pid, con=None):
+    """token = hmac_sha256(SECRET, passport)[:16]; falls back to the id."""
+    passport = f"{series or ''}{number or ''}".upper()
+    base = passport or f"ID:{pid}"
+    return hmac.new(_token_secret(con).encode(), base.encode(), hashlib.sha256).hexdigest()[:16]
+
+
+def ensure_tokens(con):
+    """Fill in any missing token.  Idempotent: existing tokens are never changed."""
+    con.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_participant_token "
+                "ON participants(token) WHERE token IS NOT NULL AND token<>''")
+    rows = con.execute("SELECT id,passport_series,passport_number,token FROM participants "
+                       "WHERE token IS NULL OR token=''").fetchall()
+    if not rows:
+        return 0
+    secret = _token_secret(con)
+    taken = {r["token"] for r in con.execute(
+        "SELECT token FROM participants WHERE token IS NOT NULL AND token<>''")}
+    filled = 0
+    for r in rows:
+        token = make_token(r["passport_series"], r["passport_number"], r["id"], con)
+        if token in taken:  # two people sharing a passport number would collide
+            token = hmac.new(secret.encode(), f"{token}:{r['id']}".encode(),
+                             hashlib.sha256).hexdigest()[:16]
+        taken.add(token)
+        con.execute("UPDATE participants SET token=? WHERE id=?", (token, r["id"]))
+        filled += 1
+    return filled
 
 
 @app.before_request
@@ -203,7 +285,8 @@ def bot_auth(fn):
 def _bot_participant(r):
     p = part_dict(r)
     return {
-        "id": p["id"], "fio": p["fio"], "dob": p.get("dob"),
+        "id": p["id"], "fio": p["fio"], "dob": p.get("dob"), "token": p.get("token"),
+        "leader": bool(p.get("leader")),
         "group": p.get("group"), "telegram_id": p.get("telegram_id"),
         "telegram_username": p.get("telegram_username"),
         "category": p.get("category"), "passport_series": p.get("passport_series"),
@@ -213,6 +296,80 @@ def _bot_participant(r):
         "room": p.get("room"), "main_series": p.get("main_series"),
         "payment_full": bool(p.get("payment_full")), "roommate_series": p.get("roommate_series"),
     }
+
+
+def _resolve(con, key):
+    """Look a participant up by ``ACO-xxx`` id **or** by QR token."""
+    key = str(key or "").strip()
+    if not key:
+        return None
+    # A scanner may hand us a whole URL — keep only the last path segment.
+    key = key.rstrip("/").split("/")[-1].split("?")[0]
+    row = con.execute("SELECT * FROM participants WHERE id=?", (key,)).fetchone()
+    if row:
+        return row
+    return con.execute("SELECT * FROM participants WHERE token=? AND token<>''",
+                       (key.lower(),)).fetchone()
+
+
+def _admin_ids():
+    raw = os.environ.get("ADMIN_IDS", "")
+    return {x.strip() for x in raw.split(",") if x.strip()}
+
+
+def _group_names(con):
+    return {str(g.get("id")): g.get("name") or "" for g in sget(con, "groups", DEFAULT_GROUPS)}
+
+
+def _whoami(con, telegram_id):
+    """Resolve a Telegram user into {role, participant}.
+
+    ``admin`` wins over ``leader`` wins over ``member``; anybody unknown to the
+    database is a ``guest`` and may only read public pages.
+    """
+    tid = str(telegram_id or "").strip()
+    row = con.execute("SELECT * FROM participants WHERE telegram_id=? AND telegram_id<>''",
+                      (tid,)).fetchone() if tid else None
+    admins = _admin_ids() | {str(x) for x in sget(con, "admins", []) or []}
+    if tid and tid in admins:
+        role = "admin"
+    elif row and row["leader"]:
+        role = "leader"
+    elif row:
+        role = "member"
+    else:
+        role = "guest"
+    names = _group_names(con)
+    group = row["grp"] if row else None
+    return {
+        "role": role,
+        "telegram_id": tid,
+        "id": row["id"] if row else None,
+        "fio": row["fio"] if row else None,
+        "token": row["token"] if row else None,
+        "group": group,
+        "group_name": names.get(str(group)) if group else None,
+        "leader_scope": sget(con, "leader_scope", "group"),
+    }
+
+
+def _may_checkin(con, actor, target_row):
+    """Only an admin, or a leader over their own group, may check somebody in."""
+    if actor["role"] == "admin":
+        return True
+    if actor["role"] != "leader":
+        return False
+    if sget(con, "leader_scope", "group") == "all":
+        return True
+    return bool(actor["group"]) and target_row["grp"] == actor["group"]
+
+
+def _label(con, row, names=None):
+    """`ACO-042 · Aziz Karimov (Sazanchik)` — who a message came from."""
+    names = names if names is not None else _group_names(con)
+    group = names.get(str(row["grp"])) if row["grp"] else None
+    suffix = f" ({group})" if group else ""
+    return f"{row['id']} · {row['fio']}{suffix}"
 
 
 def _find_by_passport(con, value):
@@ -234,6 +391,7 @@ def bootstrap():
         checkins.setdefault(r["checkpoint"], {})[r["pid"]] = r["ts"]
     out = {"participants": parts, "checkins": checkins,
            "checkpoints": cps, "program": sget(con, "program", []),
+           "groups": sget(con, "groups", DEFAULT_GROUPS),
            "roles": sget(con, "roles", DEFAULT_ROLES), "meta": sget(con, "meta", DEFAULT_META),
            "badge": sget(con, "badge", None), "seminarLogo": sget(con, "seminarLogo", None),
            "pageBase": sget(con, "pageBase", None)}
@@ -316,6 +474,21 @@ def save_roles(): return _save("roles")
 
 @app.post("/api/meta")
 def save_meta(): return _save("meta")
+
+@app.post("/api/groups")
+def save_groups():
+    """Group names (and optionally their leaders) from the admin panel."""
+    payload = request.get_json(force=True)
+    groups = payload.get("groups", payload) if isinstance(payload, dict) else payload
+    con = db()
+    sset(con, "groups", groups)
+    for g in groups:
+        leader_id = g.get("leader") if isinstance(g, dict) else None
+        if leader_id:
+            con.execute("UPDATE participants SET leader=0 WHERE grp=?", (g.get("id"),))
+            con.execute("UPDATE participants SET leader=1 WHERE id=?", (leader_id,))
+    con.commit(); con.close()
+    return jsonify(ok=True)
 
 @app.post("/api/badge")
 def save_badge(): return _save("badge")
@@ -474,10 +647,293 @@ def bot_roommate():
     return jsonify(ok=True, status="linked", xona_guruhi=group)
 
 
+@app.get("/api/bot/whoami")
+@bot_auth
+def bot_whoami():
+    con = db()
+    out = _whoami(con, request.args.get("telegram_id"))
+    con.close()
+    return jsonify(out)
+
+
+@app.get("/api/bot/groups")
+@bot_auth
+def bot_groups():
+    """Group list with names, leader and member/check-in counts."""
+    con = db()
+    names = _group_names(con)
+    checked = {r["pid"] for r in con.execute("SELECT DISTINCT pid FROM checkins")}
+    out = []
+    for gid in sorted({r["grp"] for r in con.execute("SELECT DISTINCT grp FROM participants")
+                       if r["grp"]}):
+        members = con.execute("SELECT * FROM participants WHERE grp=? ORDER BY fio", (gid,)).fetchall()
+        leader = next((m for m in members if m["leader"]), None)
+        out.append({
+            "id": gid, "name": names.get(str(gid)),
+            "leader": {"id": leader["id"], "fio": leader["fio"],
+                       "telegram_id": leader["telegram_id"]} if leader else None,
+            "total": len(members),
+            "with_telegram": sum(1 for m in members if m["telegram_id"]),
+            "checked_in": sum(1 for m in members if m["id"] in checked),
+        })
+    con.close()
+    return jsonify(groups=out)
+
+
+@app.get("/api/bot/group/<int:gid>")
+@bot_auth
+def bot_group_members(gid):
+    """Members of one group with their check-in state — the leader's roster."""
+    con = db()
+    cps = sget(con, "checkpoints", DEFAULT_CHECKPOINTS)
+    marks = {}
+    for r in con.execute("SELECT pid,checkpoint,ts FROM checkins").fetchall():
+        marks.setdefault(r["pid"], {})[r["checkpoint"]] = r["ts"]
+    members = []
+    for r in con.execute("SELECT * FROM participants WHERE grp=? ORDER BY leader DESC,fio", (gid,)):
+        members.append({"id": r["id"], "fio": r["fio"], "token": r["token"],
+                        "leader": bool(r["leader"]), "room": r["room"],
+                        "telegram_id": r["telegram_id"], "phone": r["phone"],
+                        "checkins": marks.get(r["id"], {})})
+    out = {"group": gid, "name": _group_names(con).get(str(gid)),
+           "checkpoints": cps, "members": members}
+    con.close()
+    return jsonify(out)
+
+
+@app.post("/api/bot/checkin")
+@bot_auth
+def bot_checkin():
+    """Check somebody in by QR token (or id), on behalf of a leader/admin."""
+    d = request.get_json(silent=True) or {}
+    con = db()
+    actor = _whoami(con, d.get("by_telegram_id"))
+    row = _resolve(con, d.get("token") or d.get("id"))
+    if not row:
+        con.close()
+        return jsonify(error="participant_not_found"), 404
+    if not _may_checkin(con, actor, row):
+        con.close()
+        return jsonify(error="forbidden", role=actor["role"]), 403
+    cp = str(d.get("checkpoint") or "").strip()
+    known = {c["key"] for c in sget(con, "checkpoints", DEFAULT_CHECKPOINTS)}
+    if cp not in known:
+        con.close()
+        return jsonify(error="unknown_checkpoint", checkpoints=sorted(known)), 400
+    on = d.get("on", True)
+    if on:
+        ts = datetime.datetime.now().strftime("%H:%M")
+        con.execute("INSERT INTO checkins(pid,checkpoint,ts) VALUES(?,?,?) "
+                    "ON CONFLICT(pid,checkpoint) DO UPDATE SET ts=excluded.ts",
+                    (row["id"], cp, ts))
+    else:
+        ts = None
+        con.execute("DELETE FROM checkins WHERE pid=? AND checkpoint=?", (row["id"], cp))
+    con.commit()
+    marks = {r["checkpoint"]: r["ts"] for r in
+             con.execute("SELECT checkpoint,ts FROM checkins WHERE pid=?", (row["id"],))}
+    out = {"ok": True, "ts": ts, "checkpoint": cp, "checkins": marks,
+           "participant": {"id": row["id"], "fio": row["fio"], "group": row["grp"],
+                           "group_name": _group_names(con).get(str(row["grp"])),
+                           "room": row["room"], "xona_turi": row["xona_turi"]}}
+    con.close()
+    return jsonify(out)
+
+
+# ---------------------------------------------------------- messaging (3 roles)
+def _resolve_targets(con, actor, scope, value):
+    """Who a message from *actor* with this scope may reach.
+
+    Returns ``(rows, error)``.  Permission rules live here so both the bot API
+    and any future caller obey the same limits:
+    admin → everybody / one group / one person; leader → own group only;
+    member → own group leader only.
+    """
+    scope = (scope or "").strip() or "all"
+    if actor["role"] == "guest":
+        return [], "unknown_sender"
+
+    if scope == "all":
+        if actor["role"] != "admin":
+            return [], "forbidden"
+        rows = con.execute("SELECT * FROM participants WHERE telegram_id IS NOT NULL "
+                           "AND telegram_id<>'' ORDER BY grp,fio").fetchall()
+    elif scope == "group":
+        try:
+            gid = int(value) if value not in (None, "") else actor["group"]
+        except (TypeError, ValueError):
+            return [], "bad_group"
+        if not gid:
+            return [], "bad_group"
+        if actor["role"] == "leader" and gid != actor["group"]:
+            return [], "forbidden"
+        if actor["role"] == "member":
+            return [], "forbidden"
+        rows = con.execute("SELECT * FROM participants WHERE grp=? AND telegram_id IS NOT NULL "
+                           "AND telegram_id<>'' ORDER BY fio", (gid,)).fetchall()
+    elif scope == "one":
+        row = _resolve(con, value)
+        if not row:
+            return [], "participant_not_found"
+        if actor["role"] == "leader" and row["grp"] != actor["group"]:
+            return [], "forbidden"
+        if actor["role"] == "member":
+            return [], "forbidden"
+        rows = [row]
+    elif scope == "leader":
+        # A member asking their own group leader a question.
+        gid = actor["group"]
+        if not gid:
+            return [], "no_group"
+        rows = con.execute("SELECT * FROM participants WHERE grp=? AND leader=1", (gid,)).fetchall()
+        if not rows:
+            return [], "leader_not_set"
+    else:
+        return [], "bad_scope"
+
+    # Never send to somebody we cannot reach, and never back to the sender.
+    return [r for r in rows if r["telegram_id"] and str(r["telegram_id"]) != actor["telegram_id"]], None
+
+
+@app.post("/api/bot/message")
+@bot_auth
+def bot_message():
+    """Record an outgoing message and return the list of recipients.
+
+    The bot itself does the Telegram sending, then reports the per-recipient
+    result back through ``/api/bot/message/sent``.
+    """
+    d = request.get_json(silent=True) or {}
+    text = str(d.get("text") or "").strip()
+    con = db()
+    actor = _whoami(con, d.get("from_telegram_id"))
+    rows, error = _resolve_targets(con, actor, d.get("scope"), d.get("value"))
+    if error:
+        con.close()
+        return jsonify(error=error, role=actor["role"]), 403 if error == "forbidden" else 400
+    if not text and not d.get("kind"):
+        con.close()
+        return jsonify(error="empty_text"), 400
+
+    cur = con.execute(
+        "INSERT INTO messages(from_id,from_telegram_id,from_role,to_scope,to_value,text,kind,"
+        "created_at,parent_id) VALUES(?,?,?,?,?,?,?,?,NULL)",
+        (actor["id"], actor["telegram_id"], actor["role"], d.get("scope") or "all",
+         str(d.get("value") or ""), text, d.get("kind") or "text", _now()))
+    msg_id = cur.lastrowid
+    for r in rows:
+        con.execute("INSERT OR REPLACE INTO msg_targets(msg_id,pid,telegram_id,status) "
+                    "VALUES(?,?,?,'pending')", (msg_id, r["id"], str(r["telegram_id"])))
+
+    # Optionally mirror member questions to the admins.
+    copies = []
+    if actor["role"] == "member" and sget(con, "copy_member_questions", False):
+        admins = _admin_ids() | {str(x) for x in sget(con, "admins", []) or []}
+        copies = [a for a in sorted(admins)
+                  if a != actor["telegram_id"] and a not in {str(r["telegram_id"]) for r in rows}]
+    con.commit()
+    names = _group_names(con)
+    out = {"ok": True, "message_id": msg_id,
+           "sender_label": _label(con, con.execute("SELECT * FROM participants WHERE id=?",
+                                                   (actor["id"],)).fetchone(), names)
+           if actor["id"] else f"Admin ({actor['telegram_id']})",
+           "recipients": [{"id": r["id"], "fio": r["fio"], "telegram_id": str(r["telegram_id"]),
+                           "group": r["grp"]} for r in rows],
+           "copy_to": copies}
+    con.close()
+    return jsonify(out)
+
+
+@app.post("/api/bot/message/sent")
+@bot_auth
+def bot_message_sent():
+    """Store the Telegram message ids (and failures) of one broadcast."""
+    d = request.get_json(silent=True) or {}
+    msg_id = d.get("message_id")
+    if not msg_id:
+        return jsonify(error="message_id is required"), 400
+    con = db()
+    delivered = failed = 0
+    for item in d.get("results") or []:
+        ok = bool(item.get("ok"))
+        delivered, failed = delivered + (1 if ok else 0), failed + (0 if ok else 1)
+        con.execute("INSERT INTO msg_targets(msg_id,pid,telegram_id,telegram_msg_id,status) "
+                    "VALUES(?,?,?,?,?) ON CONFLICT(msg_id,pid) DO UPDATE SET "
+                    "telegram_msg_id=excluded.telegram_msg_id,status=excluded.status",
+                    (msg_id, item.get("id"), str(item.get("telegram_id") or ""),
+                     str(item.get("telegram_msg_id") or ""), "sent" if ok else "failed"))
+    con.execute("UPDATE messages SET delivered=?,failed=? WHERE id=?", (delivered, failed, msg_id))
+    con.commit(); con.close()
+    return jsonify(ok=True, delivered=delivered, failed=failed)
+
+
+@app.post("/api/bot/reply")
+@bot_auth
+def bot_reply():
+    """Route a reply back to whoever sent the original message — and only there.
+
+    Everything stays in private chats: the answer goes to the original sender's
+    Telegram id, never to a group chat.
+    """
+    d = request.get_json(silent=True) or {}
+    parent_id = d.get("parent_msg_id")
+    text = str(d.get("text") or "").strip()
+    con = db()
+    actor = _whoami(con, d.get("from_telegram_id"))
+    parent = con.execute("SELECT * FROM messages WHERE id=?", (parent_id,)).fetchone()
+    if not parent:
+        con.close()
+        return jsonify(error="message_not_found"), 404
+    # Only a recipient of that message (or its author) may reply to it.
+    allowed = {str(r["telegram_id"]) for r in
+               con.execute("SELECT telegram_id FROM msg_targets WHERE msg_id=?", (parent_id,))}
+    allowed.add(str(parent["from_telegram_id"]))
+    if actor["telegram_id"] not in allowed:
+        con.close()
+        return jsonify(error="forbidden"), 403
+    if not text and not d.get("kind"):
+        con.close()
+        return jsonify(error="empty_text"), 400
+
+    destination = str(parent["from_telegram_id"])
+    cur = con.execute(
+        "INSERT INTO messages(from_id,from_telegram_id,from_role,to_scope,to_value,text,kind,"
+        "created_at,parent_id) VALUES(?,?,?,'reply',?,?,?,?,?)",
+        (actor["id"], actor["telegram_id"], actor["role"], destination, text,
+         d.get("kind") or "text", _now(), parent_id))
+    msg_id = cur.lastrowid
+    if actor["id"]:
+        con.execute("INSERT OR REPLACE INTO msg_targets(msg_id,pid,telegram_id,status) "
+                    "VALUES(?,?,?,'pending')", (msg_id, parent["from_id"] or "", destination))
+    con.execute("UPDATE messages SET replied=replied+1 WHERE id=?", (parent_id,))
+    con.commit()
+
+    me = con.execute("SELECT * FROM participants WHERE id=?", (actor["id"],)).fetchone() \
+        if actor["id"] else None
+    out = {"ok": True, "message_id": msg_id, "to_telegram_id": destination,
+           "sender_label": _label(con, me) if me else f"Admin ({actor['telegram_id']})",
+           "parent_excerpt": (parent["text"] or "")[:160]}
+    con.close()
+    return jsonify(out)
+
+
 @app.get("/api/bot/recipients")
 @bot_auth
 def bot_recipients():
     con = db()
+    scope = (request.args.get("scope") or "").strip()
+    value = request.args.get("value")
+    if scope:
+        # Scoped form used by the messaging flows: [{id, fio, telegram_id, group}]
+        actor = _whoami(con, request.args.get("telegram_id"))
+        rows, error = _resolve_targets(con, actor, scope, value)
+        if error:
+            con.close()
+            return jsonify(error=error), 403 if error == "forbidden" else 400
+        out = [{"id": r["id"], "fio": r["fio"], "telegram_id": str(r["telegram_id"]),
+                "group": r["grp"], "token": r["token"]} for r in rows]
+        con.close()
+        return jsonify(recipients=out)
     rows = con.execute("SELECT * FROM participants ORDER BY xona_guruhi,id").fetchall()
     by_room = {}
     for r in rows:
@@ -486,6 +942,7 @@ def bot_recipients():
     out = []
     for r in rows:
         out.append({"id": r["id"], "fio": r["fio"], "telegram_id": r["telegram_id"],
+                    "token": r["token"], "leader": bool(r["leader"]),
                     "group": r["grp"], "room": r["room"], "xona_turi": r["xona_turi"],
                     "xona_guruhi": r["xona_guruhi"], "category": r["category"],
                     "phone": r["phone"], "passport_series": r["passport_series"],
@@ -523,13 +980,126 @@ def bot_stats():
     return jsonify(out)
 
 
+# ------------------------------------------------- Telegram WebApp (mini-app)
+WEBAPP_MAX_AGE = 24 * 3600  # initData older than a day is rejected
+
+
+def verify_init_data(init_data, bot_token):
+    """Validate ``Telegram.WebApp.initData`` server-side.
+
+    Follows the documented scheme: the signing key is
+    ``HMAC_SHA256("WebAppData", bot_token)`` and the payload is every field
+    except ``hash``, sorted by key and joined with newlines.  Returns the parsed
+    user dict, or ``None`` when the signature is missing, forged or stale.
+    """
+    if not init_data or not bot_token:
+        return None
+    try:
+        pairs = dict(parse_qsl(init_data, keep_blank_values=True))
+    except Exception:
+        return None
+    received = pairs.pop("hash", "")
+    if not received:
+        return None
+    check_string = "\n".join(f"{k}={pairs[k]}" for k in sorted(pairs))
+    secret_key = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
+    expected = hmac.new(secret_key, check_string.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, received):
+        return None
+    try:
+        issued = int(pairs.get("auth_date", "0"))
+    except ValueError:
+        return None
+    if issued and abs(datetime.datetime.now(datetime.timezone.utc).timestamp() - issued) > WEBAPP_MAX_AGE:
+        return None
+    try:
+        return json.loads(pairs.get("user") or "{}")
+    except json.JSONDecodeError:
+        return None
+
+
+def webapp_user():
+    """Telegram user behind the current mini-app request, or ``None``."""
+    init_data = (request.get_json(silent=True) or {}).get("init_data") \
+        or request.headers.get("X-Telegram-Init-Data", "") \
+        or request.args.get("init_data", "")
+    return verify_init_data(init_data, os.environ.get("BOT_TOKEN", ""))
+
+
+@app.post("/api/webapp/whoami")
+def webapp_whoami():
+    user = webapp_user()
+    if not user:
+        return jsonify(error="invalid_init_data"), 401
+    con = db()
+    out = _whoami(con, user.get("id"))
+    out["telegram_username"] = user.get("username")
+    out["checkpoints"] = sget(con, "checkpoints", DEFAULT_CHECKPOINTS)
+    con.close()
+    return jsonify(out)
+
+
+@app.post("/api/webapp/checkin")
+def webapp_checkin():
+    """Check-in from the in-Telegram QR scanner.
+
+    The caller is trusted only after ``initData`` verifies — a forged
+    ``by_telegram_id`` cannot get past this.
+    """
+    user = webapp_user()
+    if not user:
+        return jsonify(error="invalid_init_data"), 401
+    d = request.get_json(silent=True) or {}
+    con = db()
+    actor = _whoami(con, user.get("id"))
+    row = _resolve(con, d.get("token") or d.get("id"))
+    if not row:
+        con.close()
+        return jsonify(error="participant_not_found"), 404
+    if not _may_checkin(con, actor, row):
+        con.close()
+        return jsonify(error="forbidden", role=actor["role"],
+                       reason="boshqa guruh a'zosi" if actor["role"] == "leader"
+                       else "ruxsat yo'q"), 403
+    cp = str(d.get("checkpoint") or "").strip()
+    known = {c["key"] for c in sget(con, "checkpoints", DEFAULT_CHECKPOINTS)}
+    if cp not in known:
+        con.close()
+        return jsonify(error="unknown_checkpoint"), 400
+    ts = datetime.datetime.now().strftime("%H:%M")
+    con.execute("INSERT INTO checkins(pid,checkpoint,ts) VALUES(?,?,?) "
+                "ON CONFLICT(pid,checkpoint) DO UPDATE SET ts=excluded.ts",
+                (row["id"], cp, ts))
+    con.commit()
+    marks = {r["checkpoint"]: r["ts"] for r in
+             con.execute("SELECT checkpoint,ts FROM checkins WHERE pid=?", (row["id"],))}
+    out = {"ok": True, "ts": ts, "checkpoint": cp, "checkins": marks,
+           "participant": {"id": row["id"], "fio": row["fio"], "group": row["grp"],
+                           "group_name": _group_names(con).get(str(row["grp"])),
+                           "room": row["room"], "xona_turi": row["xona_turi"],
+                           "leader": bool(row["leader"])}}
+    con.close()
+    return jsonify(out)
+
+
+@app.get("/scan")
+def scan_page():
+    return send_from_directory(STATIC, "scan.html")
+
+
 # ---------------------------------------------------------------- participant view
 @app.get("/api/p/<pid>")
 def participant_view(pid):
+    """Public participant page data.  Accepts an id or a QR token.
+
+    The passport itself is never part of the response — the token in the URL is
+    all the badge exposes.
+    """
     con = db()
-    row = con.execute("SELECT * FROM participants WHERE id=?", (pid,)).fetchone()
+    row = _resolve(con, pid)
     if not row:
         con.close(); abort(404)
+    pid = row["id"]
     p = part_dict(row)
     roles_def = {r["id"]: r for r in sget(con, "roles", DEFAULT_ROLES)}
     my_roles = [roles_def[rid] for rid in p["roles"] if rid in roles_def]
@@ -544,8 +1114,11 @@ def participant_view(pid):
     checkins = {}
     for r in con.execute("SELECT checkpoint,ts FROM checkins WHERE pid=?", (pid,)).fetchall():
         checkins[r["checkpoint"]] = r["ts"]
-    out = {"participant": {k: p[k] for k in ("id", "fio", "group", "leader", "room",
-                                             "xona_turi", "xona_guruhi", "fuqarolik")},
+    person = {k: p[k] for k in ("id", "fio", "group", "leader", "room",
+                                "xona_turi", "xona_guruhi", "fuqarolik")}
+    person["token"] = p.get("token")
+    person["group_name"] = _group_names(con).get(str(p["group"])) if p["group"] else None
+    out = {"participant": person,
            "roles": my_roles, "groupLeader": leader, "roommates": roommates,
            "program": sget(con, "program", []), "checkpoints": sget(con, "checkpoints", DEFAULT_CHECKPOINTS),
            "checkins": checkins, "meta": sget(con, "meta", DEFAULT_META),

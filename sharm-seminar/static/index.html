@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Acoustic · Sharm seminar</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+<script src="/vendor/jsQR.min.js"></script>
 <style>
 :root{
   --indigo:#2E2C6E; --indigo-2:#3F3C8F; --indigo-ink:#211F52;
@@ -190,6 +191,12 @@ tbody tr:hover{background:#FAFAFE}
 .whoami b{color:#211F52;font-weight:700}
 .whoami .out{border:1px solid #E7E8F0;background:#fff;border-radius:8px;padding:6px 10px;
   font-weight:700;cursor:pointer;color:#7A7990}
+/* ===== kamera skaneri ===== */
+.camwrap video{width:100%;max-width:340px;border-radius:12px;background:#000;display:block;
+  aspect-ratio:1/1;object-fit:cover;margin:0 auto}
+.camhit{display:flex;align-items:center;gap:8px;margin-top:8px;padding:9px 12px;border-radius:10px;
+  font-size:13px;font-weight:600;background:#EAFBF3;color:#0B7A5A}
+.camhit.bad{background:#FFECEC;color:#B00000}
 /* ===== QR gridi ===== */
 .qrgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:14px}
 .qrcard{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;text-align:center}
@@ -230,10 +237,7 @@ tbody tr:hover{background:#FAFAFE}
       <div><h1 id="vtitle">Boshqaruv paneli</h1><div class="desc" id="vdesc"></div></div>
       <div class="sp"></div>
       <div class="whoami" id="whoami"></div>
-      <div class="lang">
-        <button id="lang-uz" class="on" onclick="setLang('uz')">UZ</button>
-        <button id="lang-ru" onclick="setLang('ru')">RU</button>
-      </div>
+      <div class="lang" id="langbar"></div>
     </div>
     <div class="view" id="view"><div class="muted" style="padding:40px">Yuklanmoqda…</div></div>
   </div>
@@ -252,63 +256,91 @@ const SIZE_PRESETS=[[70,100],[70,110],[80,120],[90,130]];  // cm: 7x10, 7x11, 8x
 /* ===== i18n ===== */
 const T = {
  uz:{dash:"Boshqaruv paneli",parts:"Ishtirokchilar",groups:"Guruhlar",qr:"QR kodlar",checkin:"Check-in",
-  total:"Jami ishtirokchi",assigned:"Guruhga biriktirilgan",leaders:"Guruhboshilar",foreign:"Chet eldan alohida",
+  roles:"Mas'ullar",program:"Rejalar",
+  total:"Jami ishtirokchi",assigned:"Guruhga biriktirilgan",leaders:"Guruh mas'ullari",foreign:"Chet eldan alohida",
   byGroup:"Guruhlar bo'yicha taqsimot",cpProgress:"Check-in holati",search:"Ism yoki ID bo'yicha qidirish…",
   allGroups:"Barcha guruhlar",allRooms:"Barcha xonalar",noGroup:"Guruhsiz",grp:"Guruh",room:"Xona turi",
-  roommate:"Sherik",leaderCol:"Guruhboshi",arrival:"Kelish",autoDist:"Avtomatik taqsimlash",clearAll:"Tozalash",
-  member:"a'zo",noMembers:"Hali a'zo yo'q",leaderTag:"Guruhboshi",noRight:"Buning uchun ruxsatingiz yo'q",qrAll:"Hammasini ZIP qilib yuklash",qrWithName:"Ism-familya bilan",
+  roommate:"Sherik",leaderCol:"Mas'ul",arrival:"Kelish",autoDist:"Avtomatik taqsimlash",clearAll:"Tozalash",
+  member:"a'zo",noMembers:"Hali a'zo yo'q",leaderTag:"Guruh mas'uli",noRight:"Buning uchun ruxsatingiz yo'q",
+  qrAll:"Hammasini ZIP qilib yuklash",qrWithName:"Ism-familya bilan",
+  langCol:"Til",langAuto:"Avto",langHint:"Ishtirokchi QR ni skanlaganda sahifa shu tilda ochiladi",
+  camScan:"📷 Kamera bilan skanlash",camStop:"⏹ To'xtatish",
+  camHint:"Beyjik QR ini ramkaga tuting — topilishi bilan belgilanadi",
+  camErr:"Kameraga ruxsat berilmadi",
   roomNo:"Xona №",scanPh:"QR / ID kiriting (ACO-001) va Enter",checkedIn:"belgilangan",notYet:"belgilanmagan",
-  cpAero:"Aeroport",cpHotel:"Mehmonxona",cpSem:"Seminar",cpFood:"Ovqatlanish",saved:"Saqlandi",
-  distDone:"Guruhlarga taqsimlandi",cleared:"Guruhlar tozalandi",notFound:"Topilmadi",pos:"belgilandi",neg:"bekor qilindi",
-  vdesc_dash:"Umumiy holat va check-in monitoringi",vdesc_parts:"Guruh va guruhboshini shu yerda belgilang",
+  saved:"Saqlandi",distDone:"Guruhlarga taqsimlandi",cleared:"Guruhlar tozalandi",notFound:"Topilmadi",
+  pos:"belgilandi",neg:"bekor qilindi",
+  vdesc_dash:"Umumiy holat va check-in monitoringi",vdesc_parts:"Guruh, mas'ul va tilni shu yerda belgilang",
   vdesc_groups:"5 guruh · sheriklar birga saqlanadi",vdesc_qr:"Har bir ishtirokchining QR kodi · PNG yoki ZIP",
   vdesc_checkin:"Nuqta tanlang va ishtirokchini belgilang",
-  addField:"+ Maydon",addText:"+ Matn",addQR:"+ QR",addLogo:"+ Logo",addBand:"+ Rang chizig'i",
-  elements:"Elementlar",fieldName:"Ism familya",fieldId:"ID raqam",properties:"Element sozlamalari",
-  pickEl:"Element tanlang yoki suring",delEl:"Elementni o'chirish",samplePerson:"Namuna ishtirokchi",
-  badgeBg:"Beyjik foni",seminarLogo:"Seminar logotipi",uploadLogo:"Logo yuklash",resetTpl:"Standart shablon",
-  posX:"Chap (mm)",posY:"Yuqori (mm)",width:"Kenglik (mm)",height:"Balandlik (mm)",fsize:"Shrift (mm)",fontFamily:"Shrift turi",italic:"Kursiv",lineHeight:"Qator",letterSpace:"Oraliq",
-  editHint:"Matnni bevosita tahrirlash uchun beyjikdagi yozuvni ikki marta bosing",logoImage:"Logo rasmi",uploadThisLogo:"Rasm tanlash",useDefaultLogo:"Asosiy logo",
-  color:"Rang",weight:"Qalinlik",align:"Tekislash",text:"Matn",qrsize:"QR o'lchami (mm)",field:"Maydon",
-  wNormal:"Oddiy",wBold:"Qalin",wBlack:"Juda qalin",front:"Old tomon",resetDone:"Standart shablon tiklandi",
-  badgeSize:"Beyjik o'lchami",bwCm:"Kenglik (sm)",bhCm:"Balandlik (sm)",sizeCustom:"Ixtiyoriy",
-  roles:"Mas'ullar",program:"Rejalar",vdesc_roles:"Mas'uliyatlarni belgilash — koordinator, sayr, dengiz va h.k.",
+  vdesc_roles:"Mas'uliyatlarni belgilash — koordinator, sayr, dengiz va h.k.",
   vdesc_program:"Seminar dasturi — ishtirokchi sahifasida ko'rinadi",
-  cpAdd:"+ Nuqta",cpDel:"O'chirish",cpAddQ:"Yangi check-in nuqta nomi:",cpIconQ:"Emoji (belgi):",cpDelQ:"Nuqtani o'chirasizmi? Belgilangan check-inlar ham o'chadi.",
+  cpAdd:"+ Nuqta",cpDel:"O'chirish",cpAddQ:"Yangi check-in nuqta nomi:",cpIconQ:"Emoji (belgi):",
+  cpDelQ:"Nuqtani o'chirasizmi? Belgilangan check-inlar ham o'chadi.",
   addRole:"+ Yangi mas'uliyat",roleLabel:"Nomi",roleColor:"Rang",delRole:"O'chirish",assign:"Biriktirish",
   noRole:"Mas'ul yo'q",assignedTo:"Biriktirilgan",pickRole:"Mas'uliyatni tanlang",
   progDay:"Kun",progAddItem:"+ Band",progAddBlock:"+ Bo'lim",progTime:"Vaqt",progText:"Matn",progBlockLabel:"Bo'lim nomi",
   eventMeta:"Tadbir ma'lumoti",metaTitle:"Sarlavha",metaSub:"Kichik sarlavha",metaDates:"Sanalar",metaLoc:"Manzil",
-  pageBase:"Sahifa manzili (domen)",qrHint:"QR skanlanganda ishtirokchining shaxsiy sahifasi ochiladi. Kod ichida pasportdan olingan maxfiy token turadi \u2014 pasport raqami ko'rinmaydi.",roleTag:"Mas'ul",openPage:"Sahifani ochish"},
+  pageBase:"Sahifa manzili (domen)",roleTag:"Mas'ul",openPage:"Sahifani ochish",
+  qrHint:"QR skanlanganda ishtirokchining shaxsiy sahifasi ochiladi. Kod ichida pasportdan olingan maxfiy token turadi — pasport raqami ko'rinmaydi."},
+
  ru:{dash:"Панель управления",parts:"Участники",groups:"Группы",qr:"QR коды",checkin:"Check-in",
-  total:"Всего участников",assigned:"Распределены в группы",leaders:"Старосты групп",foreign:"Прилетают отдельно",
+  roles:"Ответственные",program:"Программа",
+  total:"Всего участников",assigned:"Распределено по группам",leaders:"Старосты групп",foreign:"Из-за рубежа отдельно",
   byGroup:"Распределение по группам",cpProgress:"Статус check-in",search:"Поиск по имени или ID…",
   allGroups:"Все группы",allRooms:"Все номера",noGroup:"Без группы",grp:"Группа",room:"Тип номера",
-  roommate:"Сосед",leaderCol:"Староста",arrival:"Прибытие",autoDist:"Авто-распределение",clearAll:"Очистить",
-  member:"чел.",noMembers:"Пока нет участников",leaderTag:"Староста",noRight:"Недостаточно прав",qrAll:"Скачать все в ZIP",qrWithName:"С именем и фамилией",
+  roommate:"Сосед",leaderCol:"Староста",arrival:"Прибытие",autoDist:"Распределить автоматически",clearAll:"Очистить",
+  member:"чел.",noMembers:"Пока нет участников",leaderTag:"Староста группы",noRight:"Недостаточно прав",
+  qrAll:"Скачать все в ZIP",qrWithName:"С именем и фамилией",
+  langCol:"Язык",langAuto:"Авто",langHint:"На этом языке откроется страница при сканировании QR",
+  camScan:"📷 Сканировать камерой",camStop:"⏹ Остановить",
+  camHint:"Наведите камеру на QR бейджа — отметка произойдёт сразу",
+  camErr:"Доступ к камере не разрешён",
   roomNo:"Номер",scanPh:"Введите QR / ID (ACO-001) и Enter",checkedIn:"отмечено",notYet:"не отмечено",
-  cpAero:"Аэропорт",cpHotel:"Отель",cpSem:"Семинар",cpFood:"Питание",saved:"Сохранено",
-  distDone:"Распределено по группам",cleared:"Группы очищены",notFound:"Не найдено",pos:"отмечен",neg:"снят",
-  vdesc_dash:"Общий статус и мониторинг check-in",vdesc_parts:"Назначьте группу и старосту здесь",
+  saved:"Сохранено",distDone:"Распределено по группам",cleared:"Группы очищены",notFound:"Не найдено",
+  pos:"отмечен",neg:"снята отметка",
+  vdesc_dash:"Общий статус и мониторинг check-in",vdesc_parts:"Здесь задаются группа, староста и язык",
   vdesc_groups:"5 групп · соседи вместе",vdesc_qr:"QR-код каждого участника · PNG или ZIP",
   vdesc_checkin:"Выберите точку и отметьте участника",
-  addField:"+ Поле",addText:"+ Текст",addQR:"+ QR",addLogo:"+ Лого",addBand:"+ Полоса",
-  elements:"Элементы",fieldName:"Имя фамилия",fieldId:"ID номер",properties:"Свойства элемента",
-  pickEl:"Выберите или перетащите элемент",delEl:"Удалить элемент",samplePerson:"Пример участника",
-  badgeBg:"Фон бейджа",seminarLogo:"Логотип семинара",uploadLogo:"Загрузить лого",resetTpl:"Шаблон по умолчанию",
-  posX:"Слева (мм)",posY:"Сверху (мм)",width:"Ширина (мм)",height:"Высота (мм)",fsize:"Шрифт (мм)",fontFamily:"Шрифт",italic:"Курсив",lineHeight:"Интервал",letterSpace:"Буквы",
-  editHint:"Дважды нажмите на текст на бейдже для быстрого редактирования",logoImage:"Изображение",uploadThisLogo:"Выбрать",useDefaultLogo:"Основной логотип",
-  color:"Цвет",weight:"Насыщенность",align:"Выравнивание",text:"Текст",qrsize:"Размер QR (мм)",field:"Поле",
-  wNormal:"Обычный",wBold:"Жирный",wBlack:"Очень жирный",front:"Лицевая сторона",resetDone:"Шаблон сброшен",
-  badgeSize:"Размер бейджа",bwCm:"Ширина (см)",bhCm:"Высота (см)",sizeCustom:"Свой",
-  roles:"Ответственные",program:"Программа",vdesc_roles:"Назначение ответственных — координатор, экскурсии, море и т.д.",
+  vdesc_roles:"Назначение ответственности — координатор, экскурсия, море и т.д.",
   vdesc_program:"Программа семинара — видна на странице участника",
-  cpAdd:"+ Точка",cpDel:"Удалить",cpAddQ:"Название новой точки check-in:",cpIconQ:"Эмодзи (значок):",cpDelQ:"Удалить точку? Отметки check-in тоже удалятся.",
-  addRole:"+ Новая роль",roleLabel:"Название",roleColor:"Цвет",delRole:"Удалить",assign:"Назначить",
-  noRole:"Нет ответственных",assignedTo:"Назначены",pickRole:"Выберите роль",
+  cpAdd:"+ Точка",cpDel:"Удалить",cpAddQ:"Название новой точки check-in:",cpIconQ:"Эмодзи (значок):",
+  cpDelQ:"Удалить точку? Отметки check-in тоже удалятся.",
+  addRole:"+ Новая ответственность",roleLabel:"Название",roleColor:"Цвет",delRole:"Удалить",assign:"Назначить",
+  noRole:"Нет ответственного",assignedTo:"Назначено",pickRole:"Выберите ответственность",
   progDay:"День",progAddItem:"+ Пункт",progAddBlock:"+ Блок",progTime:"Время",progText:"Текст",progBlockLabel:"Название блока",
-  eventMeta:"О мероприятии",metaTitle:"Заголовок",metaSub:"Подзаголовок",metaDates:"Даты",metaLoc:"Место",
-  pageBase:"Адрес страницы (домен)",qrHint:"При сканировании QR открывается личная страница участника. Внутри кода \u2014 секретный токен, номер паспорта не виден.",roleTag:"Ответ.",openPage:"Открыть страницу"}
+  eventMeta:"Данные мероприятия",metaTitle:"Заголовок",metaSub:"Подзаголовок",metaDates:"Даты",metaLoc:"Место",
+  pageBase:"Адрес страницы (домен)",roleTag:"Ответ.",openPage:"Открыть страницу",
+  qrHint:"При сканировании QR открывается личная страница участника. Внутри кода — секретный токен, номер паспорта не виден."},
+
+ en:{dash:"Dashboard",parts:"Participants",groups:"Groups",qr:"QR codes",checkin:"Check-in",
+  roles:"Responsibilities",program:"Programme",
+  total:"Participants in total",assigned:"Assigned to a group",leaders:"Group leaders",foreign:"Arriving separately",
+  byGroup:"Distribution by group",cpProgress:"Check-in progress",search:"Search by name or ID…",
+  allGroups:"All groups",allRooms:"All room types",noGroup:"No group",grp:"Group",room:"Room type",
+  roommate:"Roommate",leaderCol:"Leader",arrival:"Arrival",autoDist:"Distribute automatically",clearAll:"Clear",
+  member:"members",noMembers:"No members yet",leaderTag:"Group leader",noRight:"You do not have permission for this",
+  qrAll:"Download all as ZIP",qrWithName:"With name",
+  langCol:"Language",langAuto:"Auto",langHint:"The page opens in this language when the QR is scanned",
+  camScan:"📷 Scan with camera",camStop:"⏹ Stop",
+  camHint:"Point the camera at the badge QR — it checks in as soon as it reads",
+  camErr:"Camera permission denied",
+  roomNo:"Room no.",scanPh:"Enter QR / ID (ACO-001) and press Enter",checkedIn:"checked in",notYet:"not yet",
+  saved:"Saved",distDone:"Distributed into groups",cleared:"Groups cleared",notFound:"Nothing found",
+  pos:"checked in",neg:"cleared",
+  vdesc_dash:"Overall status and check-in monitoring",vdesc_parts:"Set group, leader and language here",
+  vdesc_groups:"5 groups · roommates stay together",vdesc_qr:"Every participant's QR code · PNG or ZIP",
+  vdesc_checkin:"Pick a checkpoint and mark participants",
+  vdesc_roles:"Assign responsibilities — coordinator, excursion, sea trip and so on",
+  vdesc_program:"Seminar programme — shown on the participant page",
+  cpAdd:"+ Checkpoint",cpDel:"Delete",cpAddQ:"Name of the new check-in point:",cpIconQ:"Emoji (icon):",
+  cpDelQ:"Delete this checkpoint? Its check-ins will be removed too.",
+  addRole:"+ New responsibility",roleLabel:"Name",roleColor:"Colour",delRole:"Delete",assign:"Assign",
+  noRole:"No one assigned",assignedTo:"Assigned",pickRole:"Pick a responsibility",
+  progDay:"Day",progAddItem:"+ Item",progAddBlock:"+ Block",progTime:"Time",progText:"Text",progBlockLabel:"Block name",
+  eventMeta:"Event details",metaTitle:"Title",metaSub:"Subtitle",metaDates:"Dates",metaLoc:"Location",
+  pageBase:"Page address (domain)",roleTag:"Resp.",openPage:"Open page",
+  qrHint:"Scanning the QR opens the participant's personal page. The code carries a secret token derived from the passport — the passport number is never shown."}
 };
 function t(k){return (T[S.lang]&&T[S.lang][k])||T.uz[k]||k;}
 const CPS=()=>S.checkpoints||[];
@@ -329,9 +361,9 @@ const BADGE_FONTS=[
 /* ===== defaults ===== */
 const DEF_CPS=[{key:"aeroport",label:"Aeroport",icon:"✈️"},{key:"mehmonxona",label:"Mehmonxona",icon:"🏨"},
   {key:"seminar",label:"Seminar",icon:"🎤"},{key:"ovqatlanish",label:"Ovqatlanish",icon:"🍽️"}];
-const DEF_ROLES=[{id:"coord",label:"Koordinator",color:"#2E2C6E"},{id:"prep",label:"Seminar tayyorgarligi",color:"#E4508B"},
-  {id:"logi",label:"Transfer / logistika",color:"#12B886"},{id:"sea",label:"Dengiz / qayiq sayohati",color:"#1B9AAA"},
-  {id:"city",label:"Shahar aylanish / madaniy",color:"#F07E1A"},{id:"event",label:"Gala / kechalar",color:"#8A63D2"}];
+const DEF_ROLES=[{id:"coord",label:"Koordinator",},{id:"prep",label:"Seminar tayyorgarligi",},
+  {id:"logi",label:"Transfer / logistika",},{id:"sea",label:"Dengiz / qayiq sayohati",},
+  {id:"city",label:"Shahar aylanish / madaniy",},{id:"event",label:"Gala / kechalar",}];
 const DEF_META={title:"ACOUSTIC 2026",subtitle:"Xalqaro seminar-trening",dates:"8–15 avgust 2026",location:"Sharm El Sheikh, Misr"};
 
 /* ===== state ===== */
@@ -391,9 +423,14 @@ const can=need=>myRank()>=RANK[need];
 const visibleNav=()=>NAV.filter(([,,need])=>can(need));
 function renderNav(){document.getElementById('nav').innerHTML=visibleNav().map(([id,ic])=>
   `<button class="${VIEW===id?'on':''}" onclick="go('${id}')"><span class="ic">${ic}</span>${t(id)}</button>`).join('');}
-function go(v){VIEW=v;selEid=null;toggleNav(false);render();}
+function go(v){if(camOn)stopCam();VIEW=v;selEid=null;toggleNav(false);render();}
 function toggleNav(open){document.getElementById('side').classList.toggle('open',open);document.getElementById('scrim').classList.toggle('show',open);}
-function setLang(l){S.lang=l;document.getElementById('lang-uz').classList.toggle('on',l==='uz');document.getElementById('lang-ru').classList.toggle('on',l==='ru');api.saveLocal();render();}
+const UI_LANGS=['uz','ru','en'];
+function renderLangBar(){document.getElementById('langbar').innerHTML=UI_LANGS.map(l=>
+  `<button class="${S.lang===l?'on':''}" onclick="setLang('${l}')">${l.toUpperCase()}</button>`).join('');}
+function setLang(l){if(!UI_LANGS.includes(l))return;S.lang=l;
+  try{localStorage.setItem('sharm_ui_lang',l);}catch(e){}
+  renderLangBar();render();}
 
 function render(){
   if(!visibleNav().some(([id])=>id===VIEW))VIEW=(visibleNav()[0]||['dash'])[0];
@@ -442,7 +479,8 @@ function renderParts(v){
       ${['1 kishilik','2 kishilik','3 kishilik','Posh club'].map(r=>`<option ${fRoom==r?'selected':''}>${r}</option>`).join('')}</select></div>
     <div class="tablewrap"><table><thead><tr>
       <th>ID</th><th>F.I.O.</th><th>${t('room')}</th><th>${t('roommate')}</th><th>${t('arrival')}</th>
-      <th style="width:96px">${t('grp')}</th><th style="width:70px">${t('leaderCol')}</th></tr></thead><tbody id="tb"></tbody></table></div>`;
+      <th style="width:96px">${t('grp')}</th><th style="width:70px">${t('leaderCol')}</th>
+      <th style="width:86px" title="${t('langHint')}">${t('langCol')}</th></tr></thead><tbody id="tb"></tbody></table></div>`;
   document.getElementById('q').oninput=e=>{fSearch=e.target.value;fillRows();};
   document.getElementById('fg').onchange=e=>{fGroup=e.target.value;fillRows();};
   document.getElementById('fr').onchange=e=>{fRoom=e.target.value;fillRows();};
@@ -467,8 +505,11 @@ function fillRows(){const tb=document.getElementById('tb');if(!tb)return;
       <td><span class="muted tnum">${p.xona_guruhi}</span></td><td>${fc}</td>
       <td><select class="gsel" onchange="setGroup('${p.id}',this.value)"><option value="">—</option>
         ${[1,2,3,4,5].map(g=>`<option value="${g}" ${p.group==g?'selected':''}>${t('grp')} ${g}</option>`).join('')}</select></td>
-      <td>${p.group?`<button class="star ${p.leader?'on':'off'}" onclick="toggleLeader('${p.id}')">${p.leader?'★':'☆'}</button>`:'<span class="muted">—</span>'}</td></tr>`;
-  }).join('')||`<tr><td colspan="7" class="muted" style="padding:30px;text-align:center">${t('notFound')}</td></tr>`;
+      <td>${p.group?`<button class="star ${p.leader?'on':'off'}" onclick="toggleLeader('${p.id}')">${p.leader?'★':'☆'}</button>`:'<span class="muted">—</span>'}</td>
+      <td><select class="gsel" onchange="setPartLang('${p.id}',this.value)" title="${t('langHint')}">
+        <option value="" ${!p.lang?'selected':''}>${t('langAuto')}</option>
+        ${UI_LANGS.map(l=>`<option value="${l}" ${p.lang===l?'selected':''}>${l.toUpperCase()}</option>`).join('')}</select></td></tr>`;
+  }).join('')||`<tr><td colspan="8" class="muted" style="padding:30px;text-align:center">${t('notFound')}</td></tr>`;
 }
 function setGroup(id,g){const p=find(id);p.group=g?+g:null;if(!p.group)p.leader=false;
   api.patch(id,{group:p.group,leader:p.leader});toast(t('saved'));if(VIEW==='parts')fillRows();}
@@ -565,10 +606,10 @@ function setPageBase(val){S.pageBase=val.trim().replace(/\/+$/,'');api.savePageB
 function setDay(di,k,val){S.program[di][k]=val;api.saveProgram();}
 function setBlock(di,bi,val){S.program[di].blocks[bi].label=val;api.saveProgram();}
 function setItem(di,bi,ii,k,val){S.program[di].blocks[bi].items[ii][k]=val;api.saveProgram();}
-function addDay(){S.program.push({date:"",dow:"",title:"Yangi kun",subtitle:"",blocks:[{label:"",items:[{time:"",text:""}]}]});api.saveProgram();renderProgram(VW());}
+function addDay(){S.program.push({date:"",dow:"",title:"Yangi kun",subtitle:"",blocks:[{label:"",items:[{time:"",}]}]});api.saveProgram();renderProgram(VW());}
 function delDay(di){if(!confirm('?'))return;S.program.splice(di,1);api.saveProgram();renderProgram(VW());}
-function addBlock(di){S.program[di].blocks.push({label:"",items:[{time:"",text:""}]});api.saveProgram();renderProgram(VW());}
-function addItem(di,bi){S.program[di].blocks[bi].items.push({time:"",text:""});api.saveProgram();renderProgram(VW());}
+function addBlock(di){S.program[di].blocks.push({label:"",items:[{time:"",}]});api.saveProgram();renderProgram(VW());}
+function addItem(di,bi){S.program[di].blocks[bi].items.push({time:"",});api.saveProgram();renderProgram(VW());}
 function delItem(di,bi,ii){S.program[di].blocks[bi].items.splice(ii,1);api.saveProgram();renderProgram(VW());}
 
 /* ===== checkin ===== */
@@ -583,7 +624,13 @@ function renderCheckin(v){
     <button class="btn" onclick="addCP()" style="min-width:auto">${t('cpAdd')}</button></div>
     <div class="toolbar">
       <input id="scan" placeholder="${t('scanPh')}" autocomplete="off" style="flex:1;min-width:200px;padding:11px 14px;border:1px solid var(--line-2);border-radius:10px;font-weight:600">
+      <button class="btn pri" id="camBtn" onclick="toggleCam()">${t('camScan')}</button>
       <div class="search"><span class="mag">⌕</span><input id="ciq" placeholder="${t('search')}" value="${ciSearch}"></div></div>
+    <div class="card camwrap" id="camwrap" style="display:none">
+      <video id="camvid" playsinline muted></video>
+      <div class="muted" id="camhint" style="font-size:12.5px;margin-top:9px">${t('camHint')}</div>
+      <div id="camlog"></div>
+    </div>
     <div class="card"><div id="cil"></div></div>`;
   const sc=document.getElementById('scan');if(!sc)return;
   sc.onkeydown=e=>{if(e.key==='Enter'){const p=lookupScan(sc.value);
@@ -618,8 +665,10 @@ function fillCI(){const cil=document.getElementById('cil');if(!cil)return;
 async function doCheck(id,on){const ts=await api.checkin(id,activeCP,on);const map=S.checkins[activeCP]=S.checkins[activeCP]||{};
   if(on){map[id]=ts||nowHM();toast(find(id).fio+' — '+cpName(activeCP)+': '+t('pos'));}
   else{delete map[id];toast(find(id).fio+' — '+t('neg'));}
-  renderCheckin(document.getElementById('view'));}
+  if(camOn)fillCI(); else renderCheckin(document.getElementById('view'));}
 function setRoom(id,val){find(id).room=val;api.patch(id,{room:val});toast(t('saved'));}
+// Ishtirokchining asosiy tili: QR skanlanganda sahifa shu tilda ochiladi.
+function setPartLang(id,val){find(id).lang=val||null;api.patch(id,{lang:val||null});toast(t('saved'));}
 function addCP(){const label=prompt(t('cpAddQ'));if(!label)return;
   const icon=prompt(t('cpIconQ'),'📍')||'📍';
   const key='cp_'+Math.random().toString(36).slice(2,7);
@@ -628,6 +677,65 @@ function addCP(){const label=prompt(t('cpAddQ'));if(!label)return;
 function delCP(key){if(!confirm(t('cpDelQ')))return;
   S.checkpoints=S.checkpoints.filter(c=>c.key!==key);delete S.checkins[key];
   api.saveCheckpoints();renderCheckin(document.getElementById('view'));}
+
+
+/* ===== kamera bilan check-in ===== */
+// Panelda ham, botning mini-appida ham bitta narsa kerak: QR ni ko'rish va
+// darrov belgilash. Bu yerda skaner check-in bo'limining ichida ochiladi.
+let camStream=null, camOn=false, camLast='', camLastAt=0;
+
+async function toggleCam(){ camOn ? stopCam() : startCam(); }
+
+async function startCam(){
+  const wrap=document.getElementById('camwrap'), btn=document.getElementById('camBtn');
+  wrap.style.display='block';
+  try{ camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}); }
+  catch(e){ document.getElementById('camhint').textContent=t('camErr')+': '+e.message; return; }
+  const v=document.getElementById('camvid');
+  v.srcObject=camStream; await v.play();
+  camOn=true; btn.textContent=t('camStop');
+  const cv=document.createElement('canvas'), ctx=cv.getContext('2d',{willReadFrequently:true});
+  (function tick(){
+    if(!camOn)return;
+    if(v.readyState===v.HAVE_ENOUGH_DATA){
+      cv.width=v.videoWidth; cv.height=v.videoHeight;
+      ctx.drawImage(v,0,0,cv.width,cv.height);
+      const img=ctx.getImageData(0,0,cv.width,cv.height);
+      const code=window.jsQR&&jsQR(img.data,img.width,img.height,{inversionAttempts:'dontInvert'});
+      if(code&&code.data)camHit(code.data);
+    }
+    requestAnimationFrame(tick);
+  })();
+}
+
+function stopCam(){
+  camOn=false;
+  if(camStream)camStream.getTracks().forEach(s=>s.stop());
+  camStream=null;
+  document.getElementById('camwrap').style.display='none';
+  const btn=document.getElementById('camBtn'); if(btn)btn.textContent=t('camScan');
+}
+
+async function camHit(raw){
+  const now=Date.now();
+  if(raw===camLast&&now-camLastAt<2500)return;   // bitta QR — bitta belgilash
+  camLast=raw; camLastAt=now;
+  const p=lookupScan(raw);
+  if(!p)return camNote(t('notFound')+': '+String(raw).slice(-24),false);
+  const already=(S.checkins[activeCP]||{})[p.id];
+  if(already)return camNote(p.fio+' — '+t('checkedIn')+' '+already,true);
+  await doCheck(p.id,true);
+  camNote('✓ '+p.fio+' — '+cpName(activeCP),true);
+}
+
+function camNote(text,ok){
+  const box=document.getElementById('camlog'); if(!box)return;
+  const line=document.createElement('div');
+  line.className='camhit'+(ok?'':' bad');
+  line.textContent=text;
+  box.prepend(line);
+  while(box.children.length>4)box.lastChild.remove();
+}
 
 /* ===== QR KODLAR ===== */
 // QR ichida pasportdan olingan token turadi, ochiq ACO id emas.
@@ -834,8 +942,8 @@ async function submitCode(){
 
   const mt=document.getElementById('modeTag');
   mt.innerHTML=`<span class="dot" style="background:#12B886"></span>Server`;
-  document.getElementById('lang-uz').classList.toggle('on',S.lang==='uz');
-  document.getElementById('lang-ru').classList.toggle('on',S.lang==='ru');
+  try{const saved=localStorage.getItem('sharm_ui_lang');if(UI_LANGS.includes(saved))S.lang=saved;}catch(e){}
+  renderLangBar();
   render();
 })();
 </script>

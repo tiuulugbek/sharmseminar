@@ -20,7 +20,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Ar
   background:radial-gradient(120% 90% at 80% -10%,#5B4BC4 0%,#2E2C6E 42%,#1A1848 100%)}
 .hero .waves{position:absolute;inset:0;opacity:.5}
 .hero .waves path{fill:none;stroke:var(--orange);stroke-width:2.4;stroke-linecap:round}
-.hero .logo{height:30px;background:#fff;border-radius:8px;padding:6px 9px;display:inline-block;position:relative;z-index:2}
+.hero .logo{height:54px;background:#fff;border-radius:12px;padding:9px 15px;display:inline-block;
+  position:relative;z-index:2;box-shadow:0 8px 24px rgba(0,0,0,.22)}
+.hero .top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;position:relative;z-index:3}
+.langbar{display:flex;gap:2px;background:rgba(255,255,255,.14);border-radius:999px;padding:3px;
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.langbar button{border:0;background:transparent;color:#D9D7FA;font-size:11.5px;font-weight:800;
+  letter-spacing:.06em;padding:6px 11px;border-radius:999px;cursor:pointer;transition:.16s}
+.langbar button.on{background:#fff;color:#2E2C6E}
+.langbar button:not(.on):active{background:rgba(255,255,255,.2)}
+/* kirish animatsiyasi */
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.rise{animation:rise .5s cubic-bezier(.22,.8,.28,1) both}
+@media (prefers-reduced-motion:reduce){.rise{animation:none}}
+.cpln,.day,.prow{transition:transform .16s ease}
+.cpln:active,.day .day-h:active{transform:scale(.985)}
 .hero .kicker{position:relative;z-index:2;margin-top:22px;font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:#B9B6EA;font-weight:700}
 .hero h1{position:relative;z-index:2;font-size:34px;font-weight:900;letter-spacing:-.02em;margin-top:6px;line-height:1}
 .hero .sub{position:relative;z-index:2;font-size:14px;color:#D7D5F5;margin-top:8px;font-weight:500}
@@ -106,33 +120,96 @@ const PID=(location.pathname.match(/\/p\/([^\/?#]+)/)||[])[1]||new URLSearchPara
 const GHEX=['#8A8FB0','#5B7CFA','#F07E1A','#12B886','#E4508B','#8A63D2'];
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
 
+/* ===== tillar ===== */
+const T={
+ uz:{loading:"Yuklanmoqda…",noId:"ID topilmadi",notFound:"Bu havola bo'yicha ishtirokchi topilmadi",
+     loadErr:"Ma'lumotni yuklab bo'lmadi. Internetni tekshiring.",
+     welcome:"Xush kelibsiz,",group:"Guruhingiz",noGroup:"Guruhsiz",grpWord:"guruh",
+     leader:"Guruh mas'uli",you:"Siz",roommate:"Xona sherigi",room:"Xona",
+     duties:"Sizning mas'uliyatingiz",progKick:"Dastur",progTitle:"Seminar tartibi",
+     stateKick:"Holat",stateTitle:"Ro'yxatdan o'tish",tba:"Batafsil e'lon qilinadi",
+     mon:"AVG",subtitle:"Xalqaro seminar-trening",
+     foot:"ACOUSTIC · eshitish markazlari tarmog'i"},
+ ru:{loading:"Загрузка…",noId:"ID не найден",notFound:"Участник по этой ссылке не найден",
+     loadErr:"Не удалось загрузить данные. Проверьте интернет.",
+     welcome:"Добро пожаловать,",group:"Ваша группа",noGroup:"Без группы",grpWord:"группа",
+     leader:"Староста группы",you:"Вы",roommate:"Сосед по номеру",room:"Номер",
+     duties:"Ваша ответственность",progKick:"Программа",progTitle:"Расписание семинара",
+     stateKick:"Статус",stateTitle:"Регистрация",tba:"Будет объявлено",
+     mon:"АВГ",subtitle:"Международный семинар-тренинг",
+     foot:"ACOUSTIC · сеть центров слуха"},
+ en:{loading:"Loading…",noId:"No ID found",notFound:"No participant found for this link",
+     loadErr:"Could not load the data. Please check your connection.",
+     welcome:"Welcome,",group:"Your group",noGroup:"No group",grpWord:"group",
+     leader:"Group leader",you:"you",roommate:"Roommate",room:"Room",
+     duties:"Your responsibilities",progKick:"Programme",progTitle:"Seminar schedule",
+     stateKick:"Status",stateTitle:"Check-in",tba:"To be announced",
+     mon:"AUG",subtitle:"International seminar & training",
+     foot:"ACOUSTIC · hearing care network"}
+};
+const LANGS=['uz','ru','en'];
+let LANG='uz', DATA=null;
+const t=k=>(T[LANG]||T.uz)[k]||k;
+
+/* Til tanlash tartibi: havoladagi ?lang= → oldin tanlangani →
+   ishtirokchiga admin panelda belgilangan til → brauzer tili → uz. */
+function pickLang(participantLang){
+  const q=new URLSearchParams(location.search).get('lang');
+  if(LANGS.includes(q))return q;
+  let saved=null; try{saved=localStorage.getItem('sharm_lang');}catch(e){}
+  if(LANGS.includes(saved))return saved;
+  if(LANGS.includes(participantLang))return participantLang;
+  const nav=(navigator.language||'').slice(0,2).toLowerCase();
+  if(nav==='ru')return 'ru';
+  if(nav==='uz')return 'uz';
+  if(nav==='en')return 'en';
+  return 'uz';
+}
+function setLang(l){
+  if(!LANGS.includes(l))return;
+  LANG=l;
+  try{localStorage.setItem('sharm_lang',l);}catch(e){}
+  document.documentElement.lang=l;
+  if(DATA)render(DATA);
+}
+
 async function boot(){
-  if(!PID){return fail("ID topilmadi");}
+  if(!PID){return fail(t('noId'));}
   let d;
   try{const r=await fetch('/api/p/'+encodeURIComponent(PID));
-    if(r.status===404)return fail("Bu ID bo'yicha ishtirokchi topilmadi");
+    if(r.status===404)return fail(t('notFound'));
     if(!r.ok)throw 0; d=await r.json();}
-  catch(e){return fail("Ma'lumotni yuklab bo'lmadi. Internetni tekshiring.");}
+  catch(e){return fail(t('loadErr'));}
+  DATA=d;
+  LANG=pickLang((d.participant||{}).lang);
+  document.documentElement.lang=LANG;
   render(d);
 }
 function fail(msg){document.getElementById('wrap').innerHTML=
   `<div class="err"><h3>ACOUSTIC 2026</h3><p>${esc(msg)}</p></div>`;}
 
+function langBar(){
+  return `<div class="langbar">${LANGS.map(l=>
+    `<button class="${l===LANG?'on':''}" onclick="setLang('${l}')">${l.toUpperCase()}</button>`
+  ).join('')}</div>`;
+}
+
 function render(d){
   const p=d.participant, m=d.meta||{}, g=p.group||0, logo=d.seminarLogo||'';
-  const first=p.fio.split(' ').slice(-1)[0]||p.fio; // ism odatda oxirida emas — to'liq ko'rsatamiz
   const roommates=(d.roommates||[]).join(', ');
   const roleBlock=(d.roles&&d.roles.length)?`
-    <div class="resp" style="background:linear-gradient(135deg,${d.roles[0].color},${shade(d.roles[0].color)})">
-      <div class="rk">Sizning mas'uliyatingiz</div>
+    <div class="resp rise" style="animation-delay:.14s;background:linear-gradient(135deg,${d.roles[0].color},${shade(d.roles[0].color)})">
+      <div class="rk">${t('duties')}</div>
       <div class="rlist">${d.roles.map(r=>`<div class="ri"><span class="b"></span>${esc(r.label)}</div>`).join('')}</div>
     </div>`:'';
 
-  const gLabel = g?(p.group_name?`${g}-guruh · ${esc(p.group_name)}`:`Guruh ${g}`):'Guruhsiz';
+  const gLabel = g?(p.group_name?`${g}-${t('grpWord')} · ${esc(p.group_name)}`:`${t('grpWord')} ${g}`):t('noGroup');
   const leaderRow = d.groupLeader?`
-    <div class="prow"><div class="ic">★</div><div class="lab">Guruhboshi</div><div class="val">${esc(d.groupLeader)}${p.leader?' (Siz)':''}</div></div>`:'';
+    <div class="prow"><div class="ic">★</div><div class="lab">${t('leader')}</div><div class="val">${esc(d.groupLeader)}${p.leader?' ('+t('you')+')':''}</div></div>`:'';
   const roomRow = roommates?`
-    <div class="prow"><div class="ic">🤝</div><div class="lab">Xona sherigi</div><div class="val">${esc(roommates)}</div></div>`:'';
+    <div class="prow"><div class="ic">🤝</div><div class="lab">${t('roommate')}</div><div class="val">${esc(roommates)}</div></div>`:'';
+  const roomNo = p.room?`
+    <div class="prow"><div class="ic">🛏</div><div class="lab">${t('room')}</div><div class="val">${esc(p.room)}</div></div>`:'';
 
   const days = (d.program||[]).map((day,i)=>{
     const blocks=(day.blocks||[]).map(b=>`
@@ -143,17 +220,17 @@ function render(d){
     const dnum=(day.date||'').split('-')[0]||'';
     return `<div class="day ${i===0?'open':''}" onclick="this.classList.toggle('open')">
       <div class="day-h">
-        <div class="dnum"><b>${esc(dnum)}</b><s>AVG</s></div>
+        <div class="dnum"><b>${esc(dnum)}</b><s>${t('mon')}</s></div>
         <div class="dt"><div class="t">${esc(day.title)}</div>
           <div class="s">${esc(day.dow||'')}${day.subtitle?' · '+esc(day.subtitle):''}</div></div>
         <span class="chev">▶</span>
       </div>
-      <div class="day-b"><div class="inner">${blocks||'<div class="item notime"><div class="tm"></div><div class="tx">Batafsil e\'lon qilinadi</div></div>'}</div></div>
+      <div class="day-b"><div class="inner">${blocks||`<div class="item notime"><div class="tm"></div><div class="tx">${t('tba')}</div></div>`}</div></div>
     </div>`;
   }).join('');
 
   const cps=(d.checkpoints||[]);
-  const timeline=cps.length?`<div class="sec"><div class="sec-h"><span class="eb">Holat</span><h2>Ro'yxatdan o'tish</h2></div>
+  const timeline=cps.length?`<div class="sec rise" style="animation-delay:.26s"><div class="sec-h"><span class="eb">${t('stateKick')}</span><h2>${t('stateTitle')}</h2></div>
     <div class="cptl">${cps.map(c=>{const ts=(d.checkins||{})[c.key];return `
       <div class="cpln ${ts?'done':''}"><div class="cc">${ts?'✓':(c.icon||'•')}</div>
       <div class="cn">${esc(c.label)}</div>${ts?`<div class="ct">${esc(ts)}</div>`:''}</div>`;}).join('')}</div></div>`:'';
@@ -163,31 +240,33 @@ function render(d){
       <svg class="waves" viewBox="0 0 460 200" preserveAspectRatio="none">
         <path d="M-20 150 Q115 60 230 150 T480 150"/><path d="M-20 172 Q115 92 230 172 T480 172"/>
         <path d="M-20 128 Q115 34 230 128 T480 128"/></svg>
-      ${logo?`<img class="logo" src="${logo}">`:''}
-      <div class="kicker">${esc(m.subtitle||'Xalqaro seminar-trening')}</div>
+      <div class="top">
+        ${logo?`<img class="logo" src="${logo}">`:'<span></span>'}
+        ${langBar()}
+      </div>
+      <div class="kicker">${esc(m.subtitle||t('subtitle'))}</div>
       <h1>${esc(m.title||'ACOUSTIC 2026')}</h1>
       <div class="meta"><span>📅 ${esc(m.dates||'')}</span><span>📍 ${esc(m.location||'')}</span></div>
     </div>
 
-    <div class="pcard"><div class="ribbon"></div>
-      <div class="hi">Xush kelibsiz,</div>
+    <div class="pcard rise"><div class="ribbon"></div>
+      <div class="hi">${t('welcome')}</div>
       <div class="nm">${esc(p.fio)}</div>
       <div class="pid">${esc(p.id)}</div>
       <div class="rows">
-        <div class="prow"><div class="ic">👥</div><div class="lab">Guruhingiz</div>
+        <div class="prow"><div class="ic">👥</div><div class="lab">${t('group')}</div>
           <div class="val"><span class="gchip" style="background:${GHEX[g]||GHEX[0]}">${gLabel}</span></div></div>
-        ${leaderRow}${roomRow}
+        ${leaderRow}${roomNo}${roomRow}
       </div>
     </div>
 
     ${roleBlock}
 
-    <div class="sec"><div class="sec-h"><span class="eb">Dastur</span><h2>Seminar tartibi</h2></div>${days}</div>
+    <div class="sec rise" style="animation-delay:.2s"><div class="sec-h"><span class="eb">${t('progKick')}</span><h2>${t('progTitle')}</h2></div>${days}</div>
     ${timeline}
 
     <div class="foot">${logo?`<img class="lg" src="${logo}"><br>`:''}
-      ACOUSTIC · eshitish markazlari tarmog'i<br>Sharm El Sheikh · 2026</div>`;
-
+      ${t('foot')}<br>Sharm El Sheikh · 2026</div>`;
 }
 function shade(hex){ // biroz to'qroq variant
   try{const n=parseInt(hex.slice(1),16);let r=(n>>16)-26,g=((n>>8)&255)-26,b=(n&255)-26;

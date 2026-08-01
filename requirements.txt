@@ -6,3 +6,5 @@ python-dotenv>=1.0
 requests>=2.31
 qrcode[pil]>=7.4
 gunicorn>=22,<24
+# tools/import_xlsx.py uchun
+openpyxl>=3.1

@@ -114,18 +114,26 @@ sharm-seminar/
 | POST | `/api/program` · `/api/meta` | seminar dasturi va tadbir ma'lumoti |
 | POST | `/api/roles` | mas'uliyatlar ro'yxati |
 | POST | `/api/badge` · `/api/seminar-logo` · `/api/pagebase` | beyjik shabloni, logo, sahifa domeni |
-| GET  | `/api/p/<id>` | bitta ishtirokchi ma'lumoti (sahifa uchun) |
-| GET  | `/p/<id>` | **ishtirokchining shaxsiy sahifasi** (QR shu yerga olib boradi) |
+| GET  | `/api/p/<id yoki token>` | bitta ishtirokchi ma'lumoti (sahifa uchun) |
+| GET  | `/p/<id yoki token>` | **ishtirokchining shaxsiy sahifasi** (QR shu yerga olib boradi) |
+| POST | `/api/groups` | guruh nomlari va mas'ullari |
 | POST | `/api/bot/find` | pasport, DOB yoki ism bo'yicha qidirish |
 | POST | `/api/bot/link` | Telegram ID/username bog'lash |
 | POST | `/api/bot/register` | yangi ishtirokchi yaratish |
 | POST | `/api/bot/update` | ruxsat etilgan maydonlarni yangilash |
 | POST | `/api/bot/roommate` | xona sheriklarini bog'lash |
 | GET | `/api/bot/recipients` · `/api/bot/stats` | xabar oluvchilar va statistika |
+| GET | `/api/bot/whoami` · `/api/bot/groups` · `/api/bot/group/<n>` | rol, guruhlar, guruh ro'yxati |
+| POST | `/api/bot/checkin` | QR token bilan check-in (rol tekshiriladi) |
+| POST | `/api/bot/message` · `/api/bot/message/sent` · `/api/bot/reply` | xabar va javob |
+| GET  | `/scan` | Telegram mini-app QR skaner |
+| POST | `/api/webapp/whoami` · `/api/webapp/checkin` | mini-app (`initData` imzosi bilan) |
 
 ## 6. Muhim eslatmalar
 
-- **QR → shaxsiy sahifa:** har beyjikdagi QR `<domen>/p/ACO-001` ga olib boradi. Ishtirokchi skanlaganda o'ziga xos sahifa ochiladi: ismi, guruhi, guruhboshisi, xona sherigi, **mas'uliyati** (agar bo'lsa) va to'liq **seminar dasturi**. Shuning uchun panelда "Rejalar" bo'limida **sahifa manzili (domen)** ni to'g'ri kiriting — QR o'sha domenni ishlatadi.
+- **QR → shaxsiy sahifa:** har beyjikdagi QR `<domen>/p/<token>` ga olib boradi, bunda
+  `token = hmac_sha256(SECRET, pasport)[:16]` — ya'ni QR na pasportni, na `ACO-xxx` ID sini
+  oshkor qilmaydi. Eski `<domen>/p/ACO-001` havolalari ham ishlaydi. Ishtirokchi skanlaganda o'ziga xos sahifa ochiladi: ismi, guruhi, guruhboshisi, xona sherigi, **mas'uliyati** (agar bo'lsa) va to'liq **seminar dasturi**. Shuning uchun panelда "Rejalar" bo'limida **sahifa manzili (domen)** ni to'g'ri kiriting — QR o'sha domenni ishlatadi.
 - **Mas'ullar:** "Mas'ullar" bo'limida rollarni (Koordinator, Dengiz sayri, Shahar aylanish va h.k.) yaratasiz, ranglaysiz va ishtirokchilarга biriktrasiz. Rol egasining sahifasida mas'uliyat alohida ajratib ko'rsatiladi.
 - **Check-in nuqtalari** o'zgaruvchan: "Check-in" bo'limida "+ Nuqta" bilan qo'shasiz, ✕ bilan o'chirasiz.
 - **Dastur** hozir taxminiy — aniqlashganda "Rejalar" bo'limida tahrirlaysiz; o'zgarish darhol ishtirokchi sahifalarida aks etadi.

@@ -571,12 +571,13 @@ def bot_register():
     fields = ["id", "fio", "jinsi", "fuqarolik", "xona_turi", "xona_guruhi", "kelish",
               "telegram_id", "telegram_username", "category", "passport_series", "passport_number",
               "passport_expiry", "dob", "phone", "passport_file_url", "main_series", "payment_full",
-              "registered_at", "roommate_series"]
+              "registered_at", "roommate_series", "token"]
     values = [pid, fio, d.get("jinsi"), d.get("fuqarolik"), d.get("xona_turi"),
               d.get("xona_guruhi"), d.get("kelish"), str(d.get("telegram_id") or ""),
               str(d.get("telegram_username") or ""), d.get("category"), ps, pn,
               d.get("passport_expiry"), d.get("dob"), d.get("phone"), d.get("passport_file_url"),
-              d.get("main_series"), 1 if d.get("payment_full") else 0, _now(), d.get("roommate_series")]
+              d.get("main_series"), 1 if d.get("payment_full") else 0, _now(),
+              d.get("roommate_series"), make_token(ps, pn, pid, con)]
     con.execute(f"INSERT INTO participants({','.join(fields)}) VALUES({','.join('?' for _ in fields)})", values)
     con.commit()
     out = _bot_participant(con.execute("SELECT * FROM participants WHERE id=?", (pid,)).fetchone())
@@ -613,6 +614,11 @@ def bot_update():
         if any(r["id"] != row["id"] for r in clash):
             con.close()
             return jsonify(error="passport_already_exists"), 409
+    if "passport_series" in patch:
+        # The token is derived from the passport, so a corrected passport means a
+        # new token — and a badge that has to be reprinted.
+        patch["token"] = make_token(patch["passport_series"], patch["passport_number"],
+                                    row["id"], con)
     cols = list(patch)
     con.execute(f"UPDATE participants SET {','.join(k+'=?' for k in cols)} WHERE id=?",
                 [patch[k] for k in cols] + [row["id"]])

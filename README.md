@@ -171,6 +171,32 @@ yig'iladi — hech qanday tashqi kutubxona yoki server yuklamasi kerak emas.
 
 Beyjik dizayneri bo'limi olib tashlandi.
 
+## Tillar (uz / ru / en)
+
+Ikkala sahifa ham uch tilli:
+
+- **Ishtirokchi sahifasi** (`/p/<token>`) — yuqori o'ng burchakda UZ/RU/EN tugmasi.
+  Ochilish tili shu tartibda tanlanadi: havoladagi `?lang=ru` → mehmon oldin
+  tanlagan til → **admin panelda o'sha odamga belgilangan til** → brauzer tili → uz.
+- **Admin panel** — sarlavhadagi UZ/RU/EN tugmasi, tanlov brauzerda saqlanadi.
+
+Har bir ishtirokchining asosiy tili panelning «Ishtirokchilar» bo'limidagi
+**«Til»** ustunidan qo'yiladi (`Avto` = brauzer tili bo'yicha). Chet eldan
+kelgan mehmonga `EN` yoki `RU` qo'ysangiz, u beyjik QR ini skanlaganda sahifa
+o'sha tilda ochiladi.
+
+## Check-in — kamera bilan
+
+Ikki joyda ham bir xil ishlaydi:
+
+- **Panelda:** «Check-in» bo'limi → **«📷 Kamera bilan skanlash»**. Kamera QR ni
+  o'qishi bilan odam belgilanadi, natija ro'yxatda darhol ko'rinadi. Bitta QR
+  ikki soniya ichida ikki marta hisoblanmaydi.
+- **Botda:** «📷 QR skanlash» → inline tugma → Telegram mini-app.
+
+`POST /api/checkin` endi `id` ni ham, QR dan o'qilgan `token` ni ham qabul
+qiladi, shuning uchun bitta skaner ikkala joyda ishlaydi.
+
 ## Bot rollari
 
 Botdagi rol `/api/bot/whoami` orqali aniqlanadi: `ADMIN_IDS` dagi Telegram ID → **admin**,
@@ -194,6 +220,10 @@ shaxsiy chat (DM) orqali — ochiq guruh chatiga hech narsa yozilmaydi.
 | Guruh rahbari → o'z guruhiga | guruh a'zolari | O'sha rahbar |
 | A'zo → "Rahbarimga savol" | o'z guruh rahbari | Javob bergan rahbardan → a'zoga |
 
+Guruh o'zgarsa, panel o'sha odamga botdan xabar yuboradi (uning tilida) va
+QR o'zgarmasligini alohida eslatadi — token pasportdan olinadi, guruhga bog'liq
+emas, ya'ni chop etilgan beyjik hech qachon yaroqsiz bo'lmaydi.
+
 Har bir yuborilgan nusxa `msg_targets` jadvaliga `telegram_msg_id` bilan
 yoziladi, javob shu orqali manzilini topadi. Rahbar boshqa guruhga, a'zo esa
 hammaga yoza olmaydi — buni server rad etadi (`403 forbidden`).
@@ -216,10 +246,13 @@ eski imzoni rad etadi. Soxta `telegram_id` bilan check-in qilib bo'lmaydi.
 
 ## Bot buyruqlari
 
-- `/start` — pasport yoki tug'ilgan sana orqali aniqlash, Telegram ID bog'lash,
-  shaxsiy sahifa (`/p/<token>`) va QR yuborish, guruhga taklif. Allaqachon
-  bog'langan bo'lsa — to'g'ridan-to'g'ri rol menyusi ochiladi.
+- `/start` — **pasport seriya va raqami** orqali aniqlash (tug'ilgan sana ham
+  qabul qilinadi), Telegram ID bog'lash, guruh kartasi (guruh nomi, mas'uli,
+  xonasi, sheriklari), shaxsiy sahifa (`/p/<token>`) va QR. Allaqachon
+  bog'langan bo'lsa ham guruh kartasi qayta ko'rsatiladi — guruhlar keyin
+  taqsimlangani uchun eski foydalanuvchilar uni ko'rmagan.
 - `/menyu` — rol menyusini qayta ochish.
+- `/skaner` — check-in skanerini (mini-app) ochish.
 - `/royxat` — yangi ishtirokchi/oila a'zosini to'liq ro'yxatga olish.
 - `/yangilash` — mavjud ma'lumotni pasport orqali yangilash.
 - `/bekor` — joriy jarayonni bekor qilish.

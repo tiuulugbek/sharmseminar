@@ -46,9 +46,16 @@ BTN_ASK     = "✍️ Rahbarimga savol"
 BTN_PAGE    = "📄 Mening sahifam"
 
 
-def scan_button(label=BTN_SCAN) -> KeyboardButton:
-    """Mini-app tugmasi — Telegram ichida kamerali QR skaner ochadi."""
-    return KeyboardButton(text=label, web_app=WebAppInfo(url=f"{config.WEBAPP_URL}/scan"))
+def scan_inline_kb() -> InlineKeyboardMarkup:
+    """Mini-appni ochadigan inline tugma.
+
+    Reply klaviaturadagi ``web_app`` tugmasi ba'zi mijozlarda ``initData`` siz
+    ochiladi va server foydalanuvchini tanimaydi; inline tugma esa har doim
+    imzolangan ma'lumot bilan keladi.  Shuning uchun menyu reply klaviaturada
+    qoladi, mini-app esa faqat shu tugma orqali ochiladi.
+    """
+    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(
+        text="📷 Skanerni ochish", web_app=WebAppInfo(url=f"{config.WEBAPP_URL}/scan"))]])
 
 
 def role_menu(role: str) -> ReplyKeyboardMarkup:
@@ -56,10 +63,10 @@ def role_menu(role: str) -> ReplyKeyboardMarkup:
     if role == "admin":
         rows = [[KeyboardButton(text=BTN_ALL), KeyboardButton(text=BTN_GROUP)],
                 [KeyboardButton(text=BTN_ONE), KeyboardButton(text=BTN_STATS)],
-                [scan_button()]]
+                [KeyboardButton(text=BTN_SCAN)]]
     elif role == "leader":
         rows = [[KeyboardButton(text=BTN_MYGROUP), KeyboardButton(text=BTN_ROSTER)],
-                [scan_button("📷 QR skanlash (check-in)"), KeyboardButton(text=BTN_ATT)],
+                [KeyboardButton(text=BTN_SCAN), KeyboardButton(text=BTN_ATT)],
                 [KeyboardButton(text=BTN_PAGE)]]
     else:
         rows = [[KeyboardButton(text=BTN_ASK)], [KeyboardButton(text=BTN_PAGE)]]

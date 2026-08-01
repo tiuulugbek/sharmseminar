@@ -53,7 +53,11 @@ BOT_COLUMNS = {
     "izoh": "TEXT",
     # Panelga kirish roli: bo'sh bo'lsa leader/member avtomatik aniqlanadi.
     "panel_role": "TEXT",
+    # Ishtirokchining asosiy tili: shaxsiy sahifa shu tilda ochiladi.
+    "lang": "TEXT",
 }
+
+LANGS = ("uz", "ru", "en")
 
 # Panel rollari, kuchsizdan kuchligiga qarab.
 PANEL_ROLES = ["member", "leader", "manager", "admin"]
@@ -558,6 +562,58 @@ def auth_me():
     return jsonify(user=user)
 
 
+# ═══════════════════ Guruh o'zgarganda ishtirokchiga xabar ═══════════════════
+GROUP_CHANGED = {
+    "uz": ("👥 <b>Guruhingiz o'zgartirildi</b>\n\nYangi guruh: <b>{group}</b>\n"
+           "Guruh mas'uli: <b>{leader}</b>\n\nShaxsiy sahifangiz va QR kodingiz "
+           "<b>o'zgarmadi</b> — eski QR ishlashda davom etadi."),
+    "ru": ("👥 <b>Ваша группа изменена</b>\n\nНовая группа: <b>{group}</b>\n"
+           "Староста группы: <b>{leader}</b>\n\nВаша личная страница и QR-код "
+           "<b>не изменились</b> — старый QR продолжает работать."),
+    "en": ("👥 <b>Your group has changed</b>\n\nNew group: <b>{group}</b>\n"
+           "Group leader: <b>{leader}</b>\n\nYour personal page and QR code are "
+           "<b>unchanged</b> — the old QR still works."),
+}
+
+
+def _telegram_send(chat_id, text):
+    """Telegramga bitta xabar. Bot alohida jarayon, shuning uchun to'g'ridan-to'g'ri API."""
+    token = os.environ.get("BOT_TOKEN", "")
+    if not token or not chat_id:
+        return
+    import urllib.request
+    payload = json.dumps({"chat_id": str(chat_id), "text": text,
+                          "parse_mode": "HTML"}).encode()
+    request_obj = urllib.request.Request(
+        f"https://api.telegram.org/bot{token}/sendMessage", data=payload,
+        headers={"Content-Type": "application/json"})
+    try:
+        urllib.request.urlopen(request_obj, timeout=10).read()
+    except Exception as exc:  # xabar yetmasa ham panel ishlashda davom etsin
+        app.logger.warning("Guruh xabari yuborilmadi (%s): %s", chat_id, exc)
+
+
+def notify_group_change(pid, new_group):
+    """Guruhi o'zgargan odamga DM yuboradi — fonда, panelni kutkazmasdan."""
+    con = db()
+    try:
+        row = con.execute("SELECT * FROM participants WHERE id=?", (pid,)).fetchone()
+        if not row or not row["telegram_id"]:
+            return
+        leader = con.execute("SELECT fio FROM participants WHERE grp=? AND leader=1",
+                             (new_group,)).fetchone()
+        name = _group_names(con).get(str(new_group)) or ""
+        label = f"{new_group}-guruh" + (f" · {name}" if name else "")
+        lang = (row["lang"] or "uz").lower()
+        text = GROUP_CHANGED.get(lang, GROUP_CHANGED["uz"]).format(
+            group=label, leader=leader["fio"] if leader else "—")
+        chat_id = row["telegram_id"]
+    finally:
+        con.close()
+    import threading
+    threading.Thread(target=_telegram_send, args=(chat_id, text), daemon=True).start()
+
+
 def _find_by_passport(con, value):
     series, number = _passport(value)
     key = number.lstrip("0") or "0"
@@ -625,41 +681,58 @@ def upd_participant():
         grp = patch.get("group", row["grp"] if row else None)
         if grp:
             con.execute("UPDATE participants SET leader=0 WHERE grp=?", (grp,))
-    m = {"group": "grp", "leader": "leader", "room": "room", "branch": "branch", "telegram": "telegram"}
+    before = con.execute("SELECT grp FROM participants WHERE id=?", (pid,)).fetchone()
+    m = {"group": "grp", "leader": "leader", "room": "room", "branch": "branch",
+         "telegram": "telegram", "lang": "lang"}
     for k, col in m.items():
         if k in patch:
             v = patch[k]
             if k == "leader": v = 1 if v else 0
+            if k == "lang": v = v if v in LANGS else None
             con.execute("UPDATE participants SET %s=? WHERE id=?" % col, (v, pid))
     if "roles" in patch:
         con.execute("UPDATE participants SET roles=? WHERE id=?",
                     (json.dumps(patch["roles"], ensure_ascii=False), pid))
     con.commit(); con.close()
-    return jsonify(ok=True)
+    moved = "group" in patch and before and before["grp"] != patch["group"] and patch["group"]
+    if moved:
+        notify_group_change(pid, patch["group"])
+    return jsonify(ok=True, notified=bool(moved))
 
 
 @app.post("/api/participants/bulk")
 @panel_auth("manager")
 def bulk_participants():
+    moved = []
     for it in request.get_json(force=True).get("items", []):
         con = db()
+        before = con.execute("SELECT grp FROM participants WHERE id=?", (it["id"],)).fetchone()
         con.execute("UPDATE participants SET grp=?, leader=? WHERE id=?",
                     (it.get("group"), 1 if it.get("leader") else 0, it["id"]))
         con.commit(); con.close()
-    return jsonify(ok=True)
+        if it.get("group") and before and before["grp"] != it.get("group"):
+            moved.append((it["id"], it.get("group")))
+    for pid, group in moved:
+        notify_group_change(pid, group)
+    return jsonify(ok=True, notified=len(moved))
 
 
 @app.post("/api/checkin")
 @panel_auth("leader")
 def checkin():
+    """Check-in paneldan. ``id`` yoki kameradan o'qilgan ``token`` qabul qilinadi."""
     d = request.get_json(force=True)
-    pid, cp, on = d["id"], d["checkpoint"], d.get("on", True)
+    cp, on = d["checkpoint"], d.get("on", True)
     con = db()
+    target = _resolve(con, d.get("id") or d.get("token"))
+    if not target:
+        con.close()
+        return jsonify(error="participant_not_found"), 404
+    pid = target["id"]
     user = request.panel_user
     if user["rank"] < ROLE_RANK["manager"]:
         # Guruh mas'uli faqat o'z guruhini belgilaydi.
-        target = con.execute("SELECT grp FROM participants WHERE id=?", (pid,)).fetchone()
-        if not target or not user["group"] or target["grp"] != user["group"]:
+        if not user["group"] or target["grp"] != user["group"]:
             con.close()
             return jsonify(error="forbidden"), 403
     if on:
@@ -669,8 +742,12 @@ def checkin():
     else:
         ts = None
         con.execute("DELETE FROM checkins WHERE pid=? AND checkpoint=?", (pid, cp))
-    con.commit(); con.close()
-    return jsonify(ok=True, ts=ts)
+    con.commit()
+    name = _group_names(con).get(str(target["grp"])) if target["grp"] else None
+    con.close()
+    return jsonify(ok=True, ts=ts, id=pid,
+                   participant={"id": pid, "fio": target["fio"], "group": target["grp"],
+                                "group_name": name, "room": target["room"]})
 
 
 @app.post("/api/checkpoints")
@@ -1357,6 +1434,7 @@ def participant_view(pid):
     person = {k: p[k] for k in ("id", "fio", "group", "leader", "room",
                                 "xona_turi", "xona_guruhi", "fuqarolik")}
     person["token"] = p.get("token")
+    person["lang"] = p.get("lang") or None
     person["group_name"] = _group_names(con).get(str(p["group"])) if p["group"] else None
     out = {"participant": person,
            "roles": my_roles, "groupLeader": leader, "roommates": roommates,

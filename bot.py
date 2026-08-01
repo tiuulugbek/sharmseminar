@@ -52,17 +52,9 @@ async def send_personal_page(user_id: int, participant_id: str):
         logger.exception("Shaxsiy sahifa ma'lumotini olishda xato: %s", participant_id)
     p = details.get("participant") or {}
     url = f"{config.PUBLIC_URL}/p/{p.get('token') or participant_id}"
-    roles = ", ".join(r.get("label", "") for r in details.get("roles", []) if r.get("label"))
-    lines = ["🎫 <b>Shaxsiy seminar sahifangiz</b>", f'<a href="{url}">{url}</a>']
-    if p.get("group"):
-        group = f"{p['group']}-guruh"
-        if p.get("group_name"):
-            group += f" · {p['group_name']}"
-        lines.append(f"👥 Guruhingiz: <b>{group}</b>")
-    if details.get("groupLeader"):
-        lines.append(f"👤 Guruh mas'ulingiz: <b>{details['groupLeader']}</b>")
-    if roles:
-        lines.append(f"📌 Mas’uliyatingiz: <b>{roles}</b>")
+    lines = ["🎫 <b>Shaxsiy seminar sahifangiz</b>", f'<a href="{url}">{url}</a>',
+             "\n<i>Sahifa uz / ru / en tillarida ochiladi. Havola va QR kod "
+             "o'zgarmaydi — guruhingiz almashsa ham eski QR ishlayveradi.</i>"]
     await bot.send_message(user_id, "\n".join(lines), disable_web_page_preview=True)
     try:
         import qrcode
@@ -270,22 +262,55 @@ async def upload_passport_to_drive(passport: dict, person_label: str) -> str:
 @dp.message(CommandStart(), F.chat.type == "private")
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
-    # Allaqachon tanilgan bo'lsa — qaytadan so'ramaymiz, to'g'ridan-to'g'ri menyu.
+    # Allaqachon tanilgan bo'lsa ham guruh kartasini qaytadan ko'rsatamiz:
+    # guruhlar keyin taqsimlangani uchun eski foydalanuvchilar uni ko'rmagan.
     me = await whoami(message.from_user.id)
     if me.get("role") in {"admin", "leader", "member"}:
+        if me.get("id"):
+            await send_group_card(message.from_user.id, me["id"])
         await show_menu(message.from_user.id, me,
                         f"👋 Xush kelibsiz{', ' + me['fio'] if me.get('fio') else ''}!")
         return
     await message.answer(
         "👋 <b>Assalomu alaykum!</b>\n\n"
-        "📋 <b>Ro'yxatga olish yakunlandi.</b>\n\n"
-        "Agar siz ro'yxatdan o'tgan bo'lsangiz, quyidagilardan <b>birini</b> kiriting — "
-        "tekshirib, sizni safar guruhiga taklif qilamiz:\n"
-        "• <b>Pasport seriya raqami</b> (masalan: <code>AA1234567</code>), yoki\n"
-        "• <b>Tug'ilgan sana</b> (kun-oy-yil, masalan: <code>21-05-1990</code>)",
+        "Sizni ro'yxatdan topish uchun <b>pasport seriya va raqamingizni</b> kiriting.\n"
+        "Masalan: <code>FA1234567</code>\n\n"
+        "<i>Pasportingiz yoningizda bo'lmasa, tug'ilgan sanangizni ham yozishingiz "
+        "mumkin (kun-oy-yil, masalan 21-05-1990).</i>",
         reply_markup=ReplyKeyboardRemove(),
     )
     await state.set_state(Join.series)
+
+
+async def send_group_card(user_id: int, participant_id: str):
+    """Guruh nomi, mas'uli va xona ma'lumoti — bitta ixcham karta."""
+    try:
+        details = await asyncio.to_thread(api_client.participant, participant_id)
+    except Exception:
+        logger.exception("Guruh kartasini olishda xato: %s", participant_id)
+        return
+    p = details.get("participant") or {}
+    lines = [f"👤 <b>{p.get('fio') or ''}</b>"]
+    if p.get("group"):
+        group = f"{p['group']}-guruh"
+        if p.get("group_name"):
+            group += f" · {p['group_name']}"
+        lines.append(f"👥 Guruhingiz: <b>{group}</b>")
+    else:
+        lines.append("👥 Guruhingiz: <i>hali biriktirilmagan</i>")
+    if details.get("groupLeader"):
+        lines.append(f"⭐️ Guruh mas'uli: <b>{details['groupLeader']}</b>")
+    if p.get("room"):
+        lines.append(f"🛏 Xona: <b>{p['room']}</b>")
+    elif p.get("xona_turi"):
+        lines.append(f"🛏 Xona turi: <b>{p['xona_turi']}</b>")
+    roommates = details.get("roommates") or []
+    if roommates:
+        lines.append("🤝 Xona sheriklaringiz: <b>" + ", ".join(roommates) + "</b>")
+    roles = ", ".join(r.get("label", "") for r in details.get("roles", []) if r.get("label"))
+    if roles:
+        lines.append(f"📌 Mas'uliyatingiz: <b>{roles}</b>")
+    await bot.send_message(user_id, "\n".join(lines))
 
 
 @dp.message(Command("bekor"), F.chat.type == "private")
@@ -331,7 +356,9 @@ async def _do_join(user_id: int, full_name: str, idx: int, username: str = ""):
         return
 
     await bot.send_message(user_id, f"✅ <b>Topildi:</b> {full_name}\nRo'yxatdan o'tganingiz tasdiqlandi.")
-    await send_personal_page(user_id, (participant or {}).get("id") or str(idx))
+    pid = (participant or {}).get("id") or str(idx)
+    await send_group_card(user_id, pid)
+    await send_personal_page(user_id, pid)
 
     if not config.GROUP_CHAT_ID:
         await bot.send_message(user_id, "ℹ️ Guruh havolasi hozircha mavjud emas. Administrator bilan bog'laning.")
@@ -1447,21 +1474,22 @@ async def cmd_menu(message: Message, state: FSMContext):
 
 
 @dp.message(Command("skaner"), F.chat.type == "private")
+@dp.message(StateFilter(None), F.chat.type == "private", F.text == messaging.BTN_SCAN)
 async def cmd_scanner(message: Message, state: FSMContext):
-    """Mini-appni inline tugma orqali ochadi.
-
-    Ba'zi mijozlarda klaviatura tugmasi mini-appni `initData` siz ochadi —
-    inline tugma esa har doim imzolangan ma'lumot bilan keladi.
-    """
+    """Check-in skanerini ochadi — mini-app inline tugma orqali."""
     await state.clear()
     me = await whoami(message.from_user.id)
     if me.get("role") not in {"admin", "leader"}:
         return await show_menu(message.from_user.id, me,
-                               "⛔ QR skaner faqat admin va guruh rahbarlari uchun.")
+                               "⛔ QR skaner faqat admin va guruh mas'ullari uchun.")
+    scope = ("O'z guruhingiz a'zolarini belgilay olasiz."
+             if me.get("role") == "leader" and me.get("leader_scope") == "group"
+             else "Barcha ishtirokchilarni belgilay olasiz.")
     await message.answer(
-        "📷 <b>QR skaner</b>\n\nQuyidagi tugmani bosing — skaner Telegram ichida ochiladi.",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(
-            text="📷 QR skanlash", web_app=WebAppInfo(url=f"{config.WEBAPP_URL}/scan"))]]))
+        "📷 <b>Check-in — QR skanlash</b>\n\n"
+        f"{scope}\nTugmani bosing, skaner Telegram ichida ochiladi va beyjik QR ini "
+        "o'qishi bilan check-in bo'ladi.",
+        reply_markup=messaging.scan_inline_kb())
 
 
 async def _ask_text(message: Message, state: FSMContext, scope: str, value=None, prompt: str = ""):

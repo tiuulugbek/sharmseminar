@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>QR skanlash · ACOUSTIC 2026</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="/vendor/jsQR.min.js"></script>
+<style>
+:root{--indigo:#2E2C6E;--ink:#1B1A2E;--muted:#7A7990;--line:#E7E8F0;--orange:#F07E1A;
+      --ok:#12B886;--err:#E03131;--bg:#F4F5FA;--card:#fff}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+     background:var(--bg);color:var(--ink);line-height:1.5;-webkit-font-smoothing:antialiased}
+.wrap{max-width:460px;margin:0 auto;min-height:100vh;padding:0 0 30px}
+.hero{background:radial-gradient(120% 90% at 80% -10%,#5B4BC4 0%,#2E2C6E 42%,#1A1848 100%);
+      color:#fff;padding:20px 20px 22px}
+.hero h1{font-size:21px;font-weight:900;letter-spacing:-.01em}
+.hero .who{margin-top:6px;font-size:13px;color:#B9B6EA;font-weight:600}
+.pad{padding:16px 16px 0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+.lab{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:800;margin-bottom:9px}
+.cps{display:flex;flex-wrap:wrap;gap:8px}
+.cp{border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 13px;font-size:14px;
+    font-weight:700;cursor:pointer;color:var(--ink)}
+.cp.on{background:var(--indigo);border-color:var(--indigo);color:#fff}
+video{width:100%;border-radius:12px;background:#000;display:block;aspect-ratio:1/1;object-fit:cover}
+.btn{display:block;width:100%;border:0;border-radius:12px;padding:14px;font-size:15px;font-weight:800;
+     cursor:pointer;background:var(--indigo);color:#fff;margin-top:10px}
+.btn.alt{background:#fff;color:var(--indigo);border:1px solid var(--line)}
+.row{display:flex;gap:8px}
+.row input{flex:1;padding:12px;border:1px solid var(--line);border-radius:10px;font-size:15px;font-weight:600}
+.row .btn{width:auto;margin:0;padding:12px 18px}
+.res{border-radius:12px;padding:13px 14px;margin-bottom:12px;font-size:14px;font-weight:600;
+     border-left:4px solid var(--muted);background:#fff;border:1px solid var(--line)}
+.res.ok{border-left-color:var(--ok)}
+.res.err{border-left-color:var(--err)}
+.res b{display:block;font-size:16px;font-weight:800;margin-bottom:2px}
+.res .sub{color:var(--muted);font-weight:600;font-size:12.5px}
+.hint{color:var(--muted);font-size:12.5px;margin-top:8px}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <h1>📷 QR skanlash</h1>
+    <div class="who" id="who">Tekshirilmoqda…</div>
+  </div>
+  <div class="pad">
+    <div id="denied" class="card hidden">
+      <div class="lab">Ruxsat yo'q</div>
+      <div id="deniedText">Check-in qilish faqat guruh rahbari va adminlarga ruxsat etilgan.</div>
+    </div>
+
+    <div id="app" class="hidden">
+      <div class="card">
+        <div class="lab">Nuqta</div>
+        <div class="cps" id="cps"></div>
+      </div>
+
+      <div id="results"></div>
+
+      <div class="card">
+        <div class="lab">Kamera</div>
+        <video id="video" playsinline muted class="hidden"></video>
+        <canvas id="canvas" class="hidden"></canvas>
+        <button class="btn" id="start">📷 Kamerani yoqish</button>
+        <button class="btn alt hidden" id="stop">⏹ To'xtatish</button>
+        <div class="hint" id="camHint">Beyjikdagi QR ni ramkaga tuting — topilishi bilan check-in bo'ladi.</div>
+      </div>
+
+      <div class="card">
+        <div class="lab">Qo'lda kiritish</div>
+        <div class="row">
+          <input id="manual" placeholder="ACO-001 yoki token" autocomplete="off">
+          <button class="btn" id="go">✓</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const tg = window.Telegram && window.Telegram.WebApp;
+if (tg) { tg.ready(); tg.expand(); }
+
+const $ = id => document.getElementById(id);
+const initData = (tg && tg.initData) || '';
+let checkpoint = 'seminar';
+let stream = null, scanning = false, lastToken = '', lastAt = 0;
+
+/* Every request carries initData; the server re-checks its HMAC signature, so
+   a forged Telegram id cannot check anybody in. */
+async function api(path, body) {
+  const r = await fetch(path, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-Telegram-Init-Data': initData},
+    body: JSON.stringify(Object.assign({init_data: initData}, body || {})),
+  });
+  let data = {};
+  try { data = await r.json(); } catch (e) {}
+  return {status: r.status, data};
+}
+
+function result(ok, title, sub) {
+  const box = document.createElement('div');
+  box.className = 'res ' + (ok ? 'ok' : 'err');
+  box.innerHTML = '<b></b><span class="sub"></span>';
+  box.querySelector('b').textContent = title;
+  box.querySelector('.sub').textContent = sub || '';
+  $('results').prepend(box);
+  while ($('results').children.length > 6) $('results').lastChild.remove();
+  if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred(ok ? 'success' : 'error');
+}
+
+function renderCheckpoints(list) {
+  $('cps').innerHTML = '';
+  (list || []).forEach((c, i) => {
+    if (i === 0 && !list.some(x => x.key === checkpoint)) checkpoint = c.key;
+    const b = document.createElement('button');
+    b.className = 'cp' + (c.key === checkpoint ? ' on' : '');
+    b.textContent = (c.icon ? c.icon + ' ' : '') + c.label;
+    b.onclick = () => { checkpoint = c.key; renderCheckpoints(list); };
+    $('cps').appendChild(b);
+  });
+}
+
+async function submit(token) {
+  if (!token) return;
+  const now = Date.now();
+  if (token === lastToken && now - lastAt < 2500) return;  // one QR, one check-in
+  lastToken = token; lastAt = now;
+  const {status, data} = await api('/api/webapp/checkin', {token, checkpoint});
+  if (status === 200) {
+    const p = data.participant || {};
+    result(true, '✅ ' + (p.fio || token),
+      [p.id, p.group_name || (p.group ? 'Guruh ' + p.group : ''), data.checkpoint, data.ts]
+        .filter(Boolean).join(' · '));
+  } else if (status === 404) {
+    result(false, '❌ Topilmadi', token);
+  } else if (status === 403) {
+    result(false, '⛔ Ruxsat yo\'q', data.reason || 'bu ishtirokchini belgilay olmaysiz');
+  } else {
+    result(false, '⚠️ Xato', data.error || ('HTTP ' + status));
+  }
+}
+
+/* Telegram's own scanner is nicer when available; getUserMedia is the fallback
+   for the plain-browser case and for older clients. */
+function nativeScan() {
+  if (!(tg && tg.showScanQrPopup)) return false;
+  try {
+    tg.showScanQrPopup({text: 'Beyjik QR kodini skanerlang'}, text => {
+      submit(String(text || '').replace(/[?#].*$/, '').replace(/\/+$/, '').split('/').pop());
+      return false;  // keep the scanner open for the next person
+    });
+    return true;
+  } catch (e) { return false; }
+}
+
+async function startCamera() {
+  if (nativeScan()) return;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: 'environment'}});
+  } catch (e) {
+    $('camHint').textContent = 'Kameraga ruxsat berilmadi: ' + e.message +
+      ' — pastdagi maydonga ID/token yozib ham belgilashingiz mumkin.';
+    return;
+  }
+  const v = $('video'), c = $('canvas'), ctx = c.getContext('2d', {willReadFrequently: true});
+  v.srcObject = stream; v.classList.remove('hidden');
+  $('start').classList.add('hidden'); $('stop').classList.remove('hidden');
+  await v.play();
+  scanning = true;
+  (function tick() {
+    if (!scanning) return;
+    if (v.readyState === v.HAVE_ENOUGH_DATA) {
+      c.width = v.videoWidth; c.height = v.videoHeight;
+      ctx.drawImage(v, 0, 0, c.width, c.height);
+      const img = ctx.getImageData(0, 0, c.width, c.height);
+      const code = window.jsQR && jsQR(img.data, img.width, img.height, {inversionAttempts: 'dontInvert'});
+      if (code && code.data) {
+        submit(String(code.data).replace(/[?#].*$/, '').replace(/\/+$/, '').split('/').pop());
+      }
+    }
+    requestAnimationFrame(tick);
+  })();
+}
+
+function stopCamera() {
+  scanning = false;
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = null;
+  $('video').classList.add('hidden');
+  $('stop').classList.add('hidden'); $('start').classList.remove('hidden');
+}
+
+$('start').onclick = startCamera;
+$('stop').onclick = stopCamera;
+$('go').onclick = () => { submit($('manual').value.trim()); $('manual').value = ''; };
+$('manual').onkeydown = e => { if (e.key === 'Enter') $('go').click(); };
+
+(async function boot() {
+  if (!initData) {
+    $('who').textContent = 'Telegram orqali oching';
+    $('denied').classList.remove('hidden');
+    $('deniedText').textContent =
+      'Bu sahifa @sharmseminarbot ichidagi "📷 QR skanlash" tugmasi orqali ochilishi kerak.';
+    return;
+  }
+  const {status, data} = await api('/api/webapp/whoami', {});
+  if (status !== 200) {
+    $('who').textContent = 'Tasdiqlanmadi';
+    $('denied').classList.remove('hidden');
+    $('deniedText').textContent = 'Telegram imzosi tekshiruvdan o\'tmadi. Botni qaytadan oching.';
+    return;
+  }
+  const roles = {admin: 'Administrator', leader: 'Guruh rahbari', member: 'Ishtirokchi', guest: 'Mehmon'};
+  $('who').textContent = [data.fio || 'Admin', roles[data.role] || data.role,
+                          data.group_name || ''].filter(Boolean).join(' · ');
+  if (data.role !== 'admin' && data.role !== 'leader') {
+    $('denied').classList.remove('hidden');
+    $('deniedText').textContent = data.role === 'member'
+      ? 'Check-in qilish faqat guruh rahbari va adminlarga ruxsat etilgan.'
+      : 'Siz ro\'yxatda topilmadingiz. Avval botda /start orqali ro\'yxatdan o\'ting.';
+    return;
+  }
+  if (data.role === 'leader' && data.leader_scope === 'group') {
+    $('camHint').textContent = 'Siz faqat o\'z guruhingiz (' +
+      (data.group_name || data.group) + ') a\'zolarini belgilay olasiz.';
+  }
+  renderCheckpoints(data.checkpoints);
+  $('app').classList.remove('hidden');
+})();
+</script>
+</body>
+</html>

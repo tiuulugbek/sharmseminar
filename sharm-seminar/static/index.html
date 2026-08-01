@@ -548,11 +548,21 @@ function renderCheckin(v){
       <div class="search"><span class="mag">⌕</span><input id="ciq" placeholder="${t('search')}" value="${ciSearch}"></div></div>
     <div class="card"><div id="cil"></div></div>`;
   const sc=document.getElementById('scan');if(!sc)return;
-  sc.onkeydown=e=>{if(e.key==='Enter'){const raw=sc.value.trim().toUpperCase().replace(/[^0-9]/g,'');
-    const p=P().find(x=>x.id.replace(/[^0-9]/g,'')===raw||x.id.toUpperCase()===sc.value.trim().toUpperCase());
+  sc.onkeydown=e=>{if(e.key==='Enter'){const p=lookupScan(sc.value);
     if(p){doCheck(p.id,!(S.checkins[activeCP]||{})[p.id]);sc.value='';}else{toast(t('notFound'));sc.select();}}};
   document.getElementById('ciq').oninput=e=>{ciSearch=e.target.value;fillCI();};
   fillCI();sc.focus();
+}
+// A scanner may type "ACO-042", bare digits, a QR token or the whole
+// https://.../p/<token> URL — all four resolve to the same participant.
+function lookupScan(value){
+  const raw=String(value||'').trim();if(!raw)return null;
+  const tail=raw.replace(/[?#].*$/,'').replace(/\/+$/,'').split('/').pop();
+  const up=tail.toUpperCase(), digits=up.replace(/[^0-9]/g,'');
+  return P().find(x=>x.id.toUpperCase()===up)
+      || P().find(x=>(x.token||'').toLowerCase()===tail.toLowerCase())
+      || (digits?P().find(x=>x.id.replace(/[^0-9]/g,'')===digits):null)
+      || null;
 }
 function setCP(k){activeCP=k;renderCheckin(document.getElementById('view'));}
 function fillCI(){const cil=document.getElementById('cil');if(!cil)return;
@@ -597,7 +607,13 @@ function badgeInner(p){
     return `<div class="be betext" data-eid="${e.id}" data-etype="${e.type}" style="${pos}width:${e.w}mm;font-size:${e.size}mm;color:${e.color};font-family:${font};font-style:${italic};font-weight:${e.weight};text-align:${e.align};${ls}line-height:${lh}">${escapeHtml(txt)}</div>`;
   }).join('');
 }
-function pageUrl(id){const base=(S.pageBase||location.origin||'').replace(/\/+$/,'');return (base||'')+'/p/'+id;}
+// Badge QR encodes the passport-derived token, never the plain ACO id.
+// The id still works as a URL, so older printed badges keep opening.
+function pageUrl(id){
+  const base=(S.pageBase||location.origin||'').replace(/\/+$/,'');
+  const p=(S.participants||[]).find(x=>x.id===id);
+  return (base||'')+'/p/'+encodeURIComponent((p&&p.token)||id);
+}
 function fillQR(root){root.querySelectorAll('canvas[data-qr]').forEach(cv=>{
   new QRious({element:cv,value:pageUrl(cv.dataset.qr),size:300,level:'M',foreground:'#211F52',background:'#ffffff'});});}
 

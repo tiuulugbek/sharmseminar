@@ -128,7 +128,7 @@ function render(d){
       <div class="rlist">${d.roles.map(r=>`<div class="ri"><span class="b"></span>${esc(r.label)}</div>`).join('')}</div>
     </div>`:'';
 
-  const gLabel = g?`Guruh ${g}`:'Guruhsiz';
+  const gLabel = g?(p.group_name?`${g}-guruh · ${esc(p.group_name)}`:`Guruh ${g}`):'Guruhsiz';
   const leaderRow = d.groupLeader?`
     <div class="prow"><div class="ic">★</div><div class="lab">Guruhboshi</div><div class="val">${esc(d.groupLeader)}${p.leader?' (Siz)':''}</div></div>`:'';
   const roomRow = roommates?`

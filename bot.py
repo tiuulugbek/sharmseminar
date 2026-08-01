@@ -39,6 +39,13 @@ dp = Dispatcher()
 sheet_lock = asyncio.Lock()
 
 
+def tx(value, lang="uz"):
+    """Matn maydoni {uz,ru,en} bo'lishi ham, oddiy satr bo'lishi ham mumkin."""
+    if isinstance(value, dict):
+        return value.get(lang) or value.get("uz") or value.get("ru") or value.get("en") or ""
+    return value or ""
+
+
 async def send_personal_page(user_id: int, participant_id: str):
     """Send the live participant page and a QR pointing to the same URL.
 
@@ -307,9 +314,10 @@ async def send_group_card(user_id: int, participant_id: str):
     roommates = details.get("roommates") or []
     if roommates:
         lines.append("🤝 Xona sheriklaringiz: <b>" + ", ".join(roommates) + "</b>")
-    roles = ", ".join(r.get("label", "") for r in details.get("roles", []) if r.get("label"))
+    lang = (p.get("lang") or "uz")
+    roles = ", ".join(tx(r.get("label"), lang) for r in details.get("roles", []) if r.get("label"))
     if roles:
-        lines.append(f"📌 Mas'uliyatingiz: <b>{roles}</b>")
+        lines.append(f"📌 Vazifalari: <b>{roles}</b>")
     await bot.send_message(user_id, "\n".join(lines))
 
 

@@ -22,6 +22,7 @@ sharm-seminar/
   static/vendor/jsQR.min.js
   tools/import_xlsx.py    acoustic2026seminar.xlsx dan import
   tools/set_role.py       panelga kirish rolini belgilash
+  tools/translate_content.py  dastur va matnlarni uch tilga o'tkazish
   data/seed_participants.json
   data/seed_groups.json   guruh nomlari (Sazanchik/Meduza/Akula/Delfin/Nemo)
   data/seed_program.json
@@ -175,6 +176,10 @@ Beyjik dizayneri bo'limi olib tashlandi.
 
 Ikkala sahifa ham uch tilli:
 
+Sahifa **uchinchi shaxsda** yozilgan: beyjik QR ini kim skanlasa ham, u odam
+haqidagi umumiy ma'lumotni ko'radi (kimligi, qaysi guruhda, mas'uli kim,
+seminardagi vazifalari), «siz» deb murojaat qilinmaydi.
+
 - **Ishtirokchi sahifasi** (`/p/<token>`) — yuqori o'ng burchakda UZ/RU/EN tugmasi.
   Ochilish tili shu tartibda tanlanadi: havoladagi `?lang=ru` → mehmon oldin
   tanlagan til → **admin panelda o'sha odamga belgilangan til** → brauzer tili → uz.
@@ -184,6 +189,33 @@ Har bir ishtirokchining asosiy tili panelning «Ishtirokchilar» bo'limidagi
 **«Til»** ustunidan qo'yiladi (`Avto` = brauzer tili bo'yicha). Chet eldan
 kelgan mehmonga `EN` yoki `RU` qo'ysangiz, u beyjik QR ini skanlaganda sahifa
 o'sha tilda ochiladi.
+
+### Dastur va matnlarni uch tilda kiritish
+
+Dastur bandlari, check-in nuqtalari, mas'uliyat nomlari va tadbir ma'lumoti
+bazada uch tilli saqlanadi:
+
+```json
+{"uz": "Kelish kuni", "ru": "День приезда", "en": "Arrival day"}
+```
+
+Panelda tahrirlash oson: **yuqoridagi UZ/RU/EN tugmasi bilan tilni almashtirasiz
+va o'sha tildagi matnni yozasiz** — boshqa tillar tegilmaydi. «Rejalar» va
+«Mas'ullar» bo'limlarida qaysi tilda yozayotganingiz alohida yozib turiladi.
+Vaqt (`10:30`) hamma tilda bitta.
+
+Eski, bir tilli matn ham ishlaydi — sahifa uni o'zbekcha deb oladi, birinchi
+tahrirda esa avtomatik uch tilli bo'ladi.
+
+Mavjud matnlarni bir marta tarjima qilib qo'yish:
+
+```bash
+./venv/bin/python sharm-seminar/tools/translate_content.py --dry-run
+./venv/bin/python sharm-seminar/tools/translate_content.py
+```
+
+Skript idempotent: qo'lda kiritilgan tarjima ustidan yozmaydi, ikkinchi marta
+ishga tushirilsa hech narsa o'zgarmaydi.
 
 ## Check-in — kamera bilan
 

@@ -118,31 +118,33 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Ar
 <script>
 const PID=(location.pathname.match(/\/p\/([^\/?#]+)/)||[])[1]||new URLSearchParams(location.search).get('id');
 const GHEX=['#8A8FB0','#5B7CFA','#F07E1A','#12B886','#E4508B','#8A63D2'];
+// Matn maydoni {uz,ru,en} bo'lishi ham, oddiy satr bo'lishi ham mumkin.
+const tx=v=>(v&&typeof v==='object')?(v[LANG]||v.uz||v.ru||v.en||''):(v||'');
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
 
 /* ===== tillar ===== */
 const T={
  uz:{loading:"Yuklanmoqda…",noId:"ID topilmadi",notFound:"Bu havola bo'yicha ishtirokchi topilmadi",
      loadErr:"Ma'lumotni yuklab bo'lmadi. Internetni tekshiring.",
-     welcome:"Xush kelibsiz,",group:"Guruhingiz",noGroup:"Guruhsiz",grpWord:"guruh",
-     leader:"Guruh mas'uli",you:"Siz",roommate:"Xona sherigi",room:"Xona",
-     duties:"Sizning mas'uliyatingiz",progKick:"Dastur",progTitle:"Seminar tartibi",
+     card:"Ishtirokchi",group:"Guruhi",noGroup:"Guruhsiz",grpWord:"guruh",
+     leader:"Guruh mas'uli",you:"mas'ul",roommate:"Xona sheriklari",room:"Xona",
+     duties:"Seminardagi vazifalari",progKick:"Dastur",progTitle:"Seminar tartibi",
      stateKick:"Holat",stateTitle:"Ro'yxatdan o'tish",tba:"Batafsil e'lon qilinadi",
      mon:"AVG",subtitle:"Xalqaro seminar-trening",
      foot:"ACOUSTIC · eshitish markazlari tarmog'i"},
  ru:{loading:"Загрузка…",noId:"ID не найден",notFound:"Участник по этой ссылке не найден",
      loadErr:"Не удалось загрузить данные. Проверьте интернет.",
-     welcome:"Добро пожаловать,",group:"Ваша группа",noGroup:"Без группы",grpWord:"группа",
-     leader:"Староста группы",you:"Вы",roommate:"Сосед по номеру",room:"Номер",
-     duties:"Ваша ответственность",progKick:"Программа",progTitle:"Расписание семинара",
+     card:"Участник",group:"Группа",noGroup:"Без группы",grpWord:"группа",
+     leader:"Староста группы",you:"староста",roommate:"Соседи по номеру",room:"Номер",
+     duties:"Ответственность на семинаре",progKick:"Программа",progTitle:"Расписание семинара",
      stateKick:"Статус",stateTitle:"Регистрация",tba:"Будет объявлено",
      mon:"АВГ",subtitle:"Международный семинар-тренинг",
      foot:"ACOUSTIC · сеть центров слуха"},
  en:{loading:"Loading…",noId:"No ID found",notFound:"No participant found for this link",
      loadErr:"Could not load the data. Please check your connection.",
-     welcome:"Welcome,",group:"Your group",noGroup:"No group",grpWord:"group",
-     leader:"Group leader",you:"you",roommate:"Roommate",room:"Room",
-     duties:"Your responsibilities",progKick:"Programme",progTitle:"Seminar schedule",
+     card:"Participant",group:"Group",noGroup:"No group",grpWord:"group",
+     leader:"Group leader",you:"leader",roommate:"Roommates",room:"Room",
+     duties:"Responsibilities at the seminar",progKick:"Programme",progTitle:"Seminar schedule",
      stateKick:"Status",stateTitle:"Check-in",tba:"To be announced",
      mon:"AUG",subtitle:"International seminar & training",
      foot:"ACOUSTIC · hearing care network"}
@@ -200,12 +202,12 @@ function render(d){
   const roleBlock=(d.roles&&d.roles.length)?`
     <div class="resp rise" style="animation-delay:.14s;background:linear-gradient(135deg,${d.roles[0].color},${shade(d.roles[0].color)})">
       <div class="rk">${t('duties')}</div>
-      <div class="rlist">${d.roles.map(r=>`<div class="ri"><span class="b"></span>${esc(r.label)}</div>`).join('')}</div>
+      <div class="rlist">${d.roles.map(r=>`<div class="ri"><span class="b"></span>${esc(tx(r.label))}</div>`).join('')}</div>
     </div>`:'';
 
   const gLabel = g?(p.group_name?`${g}-${t('grpWord')} · ${esc(p.group_name)}`:`${t('grpWord')} ${g}`):t('noGroup');
   const leaderRow = d.groupLeader?`
-    <div class="prow"><div class="ic">★</div><div class="lab">${t('leader')}</div><div class="val">${esc(d.groupLeader)}${p.leader?' ('+t('you')+')':''}</div></div>`:'';
+    <div class="prow"><div class="ic">★</div><div class="lab">${t('leader')}</div><div class="val">${esc(d.groupLeader)}${p.leader?' · '+t('you'):''}</div></div>`:'';
   const roomRow = roommates?`
     <div class="prow"><div class="ic">🤝</div><div class="lab">${t('roommate')}</div><div class="val">${esc(roommates)}</div></div>`:'';
   const roomNo = p.room?`
@@ -213,16 +215,16 @@ function render(d){
 
   const days = (d.program||[]).map((day,i)=>{
     const blocks=(day.blocks||[]).map(b=>`
-      <div class="blk">${b.label?`<div class="bl">${esc(b.label)}</div>`:''}
+      <div class="blk">${tx(b.label)?`<div class="bl">${esc(tx(b.label))}</div>`:''}
         ${(b.items||[]).map(it=>`<div class="item ${it.time?'':'notime'}">
-          <div class="tm">${esc(it.time||'')}</div><div class="tx">${esc(it.text)}</div></div>`).join('')}
+          <div class="tm">${esc(it.time||'')}</div><div class="tx">${esc(tx(it.text))}</div></div>`).join('')}
       </div>`).join('');
-    const dnum=(day.date||'').split('-')[0]||'';
+    const dnum=(tx(day.date).match(/\d+/)||[''])[0];
     return `<div class="day ${i===0?'open':''}" onclick="this.classList.toggle('open')">
       <div class="day-h">
         <div class="dnum"><b>${esc(dnum)}</b><s>${t('mon')}</s></div>
-        <div class="dt"><div class="t">${esc(day.title)}</div>
-          <div class="s">${esc(day.dow||'')}${day.subtitle?' · '+esc(day.subtitle):''}</div></div>
+        <div class="dt"><div class="t">${esc(tx(day.title))}</div>
+          <div class="s">${esc(tx(day.dow))}${tx(day.subtitle)?' · '+esc(tx(day.subtitle)):''}</div></div>
         <span class="chev">▶</span>
       </div>
       <div class="day-b"><div class="inner">${blocks||`<div class="item notime"><div class="tm"></div><div class="tx">${t('tba')}</div></div>`}</div></div>
@@ -233,7 +235,7 @@ function render(d){
   const timeline=cps.length?`<div class="sec rise" style="animation-delay:.26s"><div class="sec-h"><span class="eb">${t('stateKick')}</span><h2>${t('stateTitle')}</h2></div>
     <div class="cptl">${cps.map(c=>{const ts=(d.checkins||{})[c.key];return `
       <div class="cpln ${ts?'done':''}"><div class="cc">${ts?'✓':(c.icon||'•')}</div>
-      <div class="cn">${esc(c.label)}</div>${ts?`<div class="ct">${esc(ts)}</div>`:''}</div>`;}).join('')}</div></div>`:'';
+      <div class="cn">${esc(tx(c.label))}</div>${ts?`<div class="ct">${esc(ts)}</div>`:''}</div>`;}).join('')}</div></div>`:'';
 
   document.getElementById('wrap').innerHTML=`
     <div class="hero">
@@ -244,13 +246,13 @@ function render(d){
         ${logo?`<img class="logo" src="${logo}">`:'<span></span>'}
         ${langBar()}
       </div>
-      <div class="kicker">${esc(m.subtitle||t('subtitle'))}</div>
-      <h1>${esc(m.title||'ACOUSTIC 2026')}</h1>
-      <div class="meta"><span>📅 ${esc(m.dates||'')}</span><span>📍 ${esc(m.location||'')}</span></div>
+      <div class="kicker">${esc(tx(m.subtitle)||t('subtitle'))}</div>
+      <h1>${esc(tx(m.title)||'ACOUSTIC 2026')}</h1>
+      <div class="meta"><span>📅 ${esc(tx(m.dates))}</span><span>📍 ${esc(tx(m.location))}</span></div>
     </div>
 
     <div class="pcard rise"><div class="ribbon"></div>
-      <div class="hi">${t('welcome')}</div>
+      <div class="hi">${t('card')}</div>
       <div class="nm">${esc(p.fio)}</div>
       <div class="pid">${esc(p.id)}</div>
       <div class="rows">

@@ -87,6 +87,8 @@ const tg = window.Telegram && window.Telegram.WebApp;
 if (tg) { tg.ready(); tg.expand(); }
 
 const $ = id => document.getElementById(id);
+// Nuqta nomlari uch tilli saqlanadi; skanerda uz ni ko'rsatamiz.
+const tx = v => (v && typeof v === 'object') ? (v.uz || v.ru || v.en || '') : (v || '');
 const initData = (tg && tg.initData) || '';
 let checkpoint = 'seminar';
 let stream = null, scanning = false, lastToken = '', lastAt = 0;
@@ -121,7 +123,7 @@ function renderCheckpoints(list) {
     if (i === 0 && !list.some(x => x.key === checkpoint)) checkpoint = c.key;
     const b = document.createElement('button');
     b.className = 'cp' + (c.key === checkpoint ? ' on' : '');
-    b.textContent = (c.icon ? c.icon + ' ' : '') + c.label;
+    b.textContent = (c.icon ? c.icon + ' ' : '') + tx(c.label);
     b.onclick = () => { checkpoint = c.key; renderCheckpoints(list); };
     $('cps').appendChild(b);
   });

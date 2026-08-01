@@ -127,7 +127,10 @@ def match(sheet_rows, db_rows):
             pairs[index] = row
 
     # Leftover spreadsheet rows take over leftover seats, keeping file order.
-    free_seats = [r for r in db_rows if r["id"] not in used]
+    # Organisers (anyone with a panel role) are never on the spreadsheet and must
+    # not be overwritten by an unmatched row.
+    free_seats = [r for r in db_rows
+                  if r["id"] not in used and not str(r["panel_role"] or "").strip()]
     replaced = []
     for index, record in enumerate(sheet_rows):
         if pairs[index] is not None or not free_seats:

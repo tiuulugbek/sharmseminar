@@ -74,12 +74,12 @@ video{width:100%;border-radius:12px;background:#000;display:block;aspect-ratio:1
         <div class="cps" id="cps"></div>
       </div>
 
-      <div id="results"></div>
-
       <div class="card">
         <div class="lab">Kamera</div>
         <video id="video" playsinline muted class="hidden"></video>
         <canvas id="canvas" class="hidden"></canvas>
+        <!-- Natija aynan videoning tagida: skanerlab turib ko'zni uzmasdan o'qiladi -->
+        <div id="results"></div>
         <button class="btn" id="start">📷 Kamerani yoqish</button>
         <button class="btn alt hidden" id="stop">⏹ To'xtatish</button>
         <div class="hint" id="camHint">Beyjikdagi QR ni ramkaga tuting — topilishi bilan check-in bo'ladi.</div>
@@ -164,13 +164,11 @@ function banner(status, name, sub, warnings) {
   }
   const list = $('results');
   list.prepend(box);
+  box.scrollIntoView({block: 'nearest', behavior: 'smooth'});
   // Oldingi banner kichik satrga aylanadi — oxirgisi doim eng tepada, katta.
   list.querySelectorAll('.big').forEach((el, i) => { if (i > 0) shrink(el); });
   while (list.children.length > 6) list.lastChild.remove();
   beep(meta.tone);
-  if (tg && tg.HapticFeedback)
-    tg.HapticFeedback.notificationOccurred(status === 'ok' ? 'success'
-      : status === 'already' ? 'warning' : 'error');
 }
 
 function shrink(el) {
@@ -221,32 +219,40 @@ async function submit(token) {
   banner('forbidden', p.fio || '', st);
 }
 
-/* Telegram's own scanner is nicer when available; getUserMedia is the fallback
-   for the plain-browser case and for older clients. */
+/* Telegram'ning o'z skaneri butun ekranni egallaydi — natija yozuvi uning
+   ortida qolib ketadi va foydalanuvchi faqat tebranishni sezadi. Shuning uchun
+   asosiy yo'l — sahifaning o'z kamerasi: video ustida natija darrov ko'rinadi
+   va skaner to'xtamaydi. Telegram skaneri faqat kamera ochilmasa taklif etiladi
+   va har o'qishdan keyin yopiladi, shunda javob ko'rinadi. */
 function nativeScan() {
-  if (!(tg && tg.showScanQrPopup)) return false;
+  if (!(tg && tg.showScanQrPopup)) {
+    $('camHint').textContent = 'Bu qurilmada skaner ochilmadi — pastdagi maydonga '
+      + 'ID yoki token yozib belgilashingiz mumkin.';
+    return false;
+  }
   try {
     tg.showScanQrPopup({text: 'Beyjik QR kodini skanerlang'}, text => {
       submit(String(text || '').replace(/[?#].*$/, '').replace(/\/+$/, '').split('/').pop());
-      return false;  // keep the scanner open for the next person
+      return true;   // yopamiz — aks holda javob oyna ortida ko'rinmaydi
     });
     return true;
   } catch (e) { return false; }
 }
 
 async function startCamera() {
-  if (nativeScan()) return;
   try {
     stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: 'environment'}});
   } catch (e) {
-    $('camHint').textContent = 'Kameraga ruxsat berilmadi: ' + e.message +
-      ' — pastdagi maydonga ID/token yozib ham belgilashingiz mumkin.';
+    // Kamera ochilmadi — Telegram skaneriga o'tamiz (natija u yopilgach ko'rinadi).
+    $('camHint').textContent = 'Kamera ochilmadi, Telegram skaneri ishlatiladi.';
+    nativeScan();
     return;
   }
   const v = $('video'), c = $('canvas'), ctx = c.getContext('2d', {willReadFrequently: true});
   v.srcObject = stream; v.classList.remove('hidden');
   $('start').classList.add('hidden'); $('stop').classList.remove('hidden');
   await v.play();
+  v.scrollIntoView({block: 'center', behavior: 'smooth'});
   scanning = true;
   (function tick() {
     if (!scanning) return;

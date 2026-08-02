@@ -191,6 +191,10 @@ tbody tr:hover{background:#FAFAFE}
 .whoami b{color:#211F52;font-weight:700}
 .whoami .out{border:1px solid #E7E8F0;background:#fff;border-radius:8px;padding:6px 10px;
   font-weight:700;cursor:pointer;color:#7A7990}
+.mlbox{display:flex;flex-direction:column;gap:4px;flex:1;min-width:0}
+.mlbox>span+input{margin-bottom:2px}
+.mltag{font-size:9.5px;font-weight:800;letter-spacing:.1em;color:var(--muted);margin-top:2px}
+.mlbox input{width:100%}
 .langnote{display:inline-flex;align-items:center;gap:5px;background:#EEF0FA;color:#2E2C6E;
   border-radius:999px;padding:6px 12px;font-size:12px;font-weight:700}
 /* ===== kamera skaneri ===== */
@@ -265,7 +269,7 @@ const T = {
   roommate:"Sherik",leaderCol:"Mas'ul",arrival:"Kelish",autoDist:"Avtomatik taqsimlash",clearAll:"Tozalash",
   member:"a'zo",noMembers:"Hali a'zo yo'q",leaderTag:"Guruh mas'uli",noRight:"Buning uchun ruxsatingiz yo'q",
   qrAll:"Hammasini ZIP qilib yuklash",qrWithName:"Ism-familya bilan",
-  langCol:"Til",editingIn:"Tahrirlanayotgan til:",langAuto:"Avto",langHint:"Ishtirokchi QR ni skanlaganda sahifa shu tilda ochiladi",
+  langCol:"Til",editingIn:"Tahrirlanayotgan til:",allLangs:"Uchala tilni birdan",langAuto:"Avto",langHint:"Ishtirokchi QR ni skanlaganda sahifa shu tilda ochiladi",
   camScan:"📷 Kamera bilan skanlash",camStop:"⏹ To'xtatish",
   camHint:"Beyjik QR ini ramkaga tuting — topilishi bilan belgilanadi",
   camErr:"Kameraga ruxsat berilmadi",
@@ -294,7 +298,7 @@ const T = {
   roommate:"Сосед",leaderCol:"Староста",arrival:"Прибытие",autoDist:"Распределить автоматически",clearAll:"Очистить",
   member:"чел.",noMembers:"Пока нет участников",leaderTag:"Староста группы",noRight:"Недостаточно прав",
   qrAll:"Скачать все в ZIP",qrWithName:"С именем и фамилией",
-  langCol:"Язык",editingIn:"Язык редактирования:",langAuto:"Авто",langHint:"На этом языке откроется страница при сканировании QR",
+  langCol:"Язык",editingIn:"Язык редактирования:",allLangs:"Все три языка сразу",langAuto:"Авто",langHint:"На этом языке откроется страница при сканировании QR",
   camScan:"📷 Сканировать камерой",camStop:"⏹ Остановить",
   camHint:"Наведите камеру на QR бейджа — отметка произойдёт сразу",
   camErr:"Доступ к камере не разрешён",
@@ -323,7 +327,7 @@ const T = {
   roommate:"Roommate",leaderCol:"Leader",arrival:"Arrival",autoDist:"Distribute automatically",clearAll:"Clear",
   member:"members",noMembers:"No members yet",leaderTag:"Group leader",noRight:"You do not have permission for this",
   qrAll:"Download all as ZIP",qrWithName:"With name",
-  langCol:"Language",editingIn:"Editing in:",langAuto:"Auto",langHint:"The page opens in this language when the QR is scanned",
+  langCol:"Language",editingIn:"Editing in:",allLangs:"All three languages",langAuto:"Auto",langHint:"The page opens in this language when the QR is scanned",
   camScan:"📷 Scan with camera",camStop:"⏹ Stop",
   camHint:"Point the camera at the badge QR — it checks in as soon as it reads",
   camErr:"Camera permission denied",
@@ -349,9 +353,9 @@ const CPS=()=>S.checkpoints||[];
 // Dastur, nuqta va mas'uliyat matnlari {uz,ru,en} shaklida saqlanadi.
 // tx() — joriy panel tilida o'qiydi, mx() — faqat shu tilni yangilaydi.
 const tx=v=>(v&&typeof v==='object')?(v[S.lang]||v.uz||v.ru||v.en||''):(v||'');
-function mx(old,val){
+function mx(old,val,lang){
   const base=(old&&typeof old==='object')?{...old}:{uz:old||'',ru:old||'',en:old||''};
-  base[S.lang]=val;
+  base[lang||S.lang]=val;
   return base;
 }
 const cpName=k=>{const c=(S.checkpoints||[]).find(x=>x.key===k);return c?tx(c.label):k;};
@@ -587,45 +591,65 @@ function assignRole(pid,rid){if(!pid)return;const p=find(pid);p.roles=p.roles||[
 function unassign(pid,rid){const p=find(pid);p.roles=(p.roles||[]).filter(x=>x!==rid);api.patch(pid,{roles:p.roles});renderRoles(VW());}
 
 /* ===== program editor ===== */
+let progAllLangs=false;
+try{progAllLangs=localStorage.getItem('sharm_prog_all')==='1';}catch(e){}
+function setProgAllLangs(on){progAllLangs=on;
+  try{localStorage.setItem('sharm_prog_all',on?'1':'0');}catch(e){}
+  renderProgram(VW());}
+
+/* Bitta matn maydoni. Uch tilli rejimda UZ/RU/EN uchtasi birdan chiqadi —
+   yangi band qo'shganda tilni almashtirib yurish shart bo'lmasin. */
+function ml(value,setter,opts){
+  const o=opts||{};
+  const one=(lang,val)=>`<input value="${escapeHtml(val||'')}" ${o.ph?`placeholder="${o.ph}${progAllLangs?'':''}"`:''}
+    onchange="${setter.replace('%L%',lang)}" style="${o.style||''}">`;
+  if(!progAllLangs)return one(S.lang,tx(value));
+  const v=(value&&typeof value==='object')?value:{uz:value||'',ru:value||'',en:value||''};
+  return `<div class="mlbox">${UI_LANGS.map(l=>
+    `<span class="mltag">${l.toUpperCase()}</span>${one(l,v[l])}`).join('')}</div>`;
+}
+
 function renderProgram(v){
   const m=S.meta||{};
-  const inp=(lab,val,fn)=>`<div class="frow"><label>${lab}</label><input value="${escapeHtml(val||'')}" onchange="${fn}"></div>`;
+  const inp=(lab,value,fn)=>`<div class="frow"><label>${lab}</label>${ml(value,fn,{style:'flex:1'})}</div>`;
   const metaBlock=`<div class="card pblock"><h4>${t('eventMeta')}</h4>
-    ${inp(t('metaTitle'),tx(m.title),"setMeta('title',this.value)")}
-    ${inp(t('metaSub'),tx(m.subtitle),"setMeta('subtitle',this.value)")}
-    ${inp(t('metaDates'),tx(m.dates),"setMeta('dates',this.value)")}
-    ${inp(t('metaLoc'),tx(m.location),"setMeta('location',this.value)")}
+    ${inp(t('metaTitle'),m.title,"setMeta('title',this.value,'%L%')")}
+    ${inp(t('metaSub'),m.subtitle,"setMeta('subtitle',this.value,'%L%')")}
+    ${inp(t('metaDates'),m.dates,"setMeta('dates',this.value,'%L%')")}
+    ${inp(t('metaLoc'),m.location,"setMeta('location',this.value,'%L%')")}
     <div class="frow"><label>${t('pageBase')}</label><input value="${escapeHtml(S.pageBase||'')}" placeholder="${location.origin}" onchange="setPageBase(this.value)"></div>
     <div class="muted" style="font-size:11.5px;margin-top:4px">${t('qrHint')}</div></div>`;
   const days=(S.program||[]).map((d,di)=>`<div class="card pblock">
     <div class="frow" style="margin-bottom:8px">
-      <input value="${escapeHtml(tx(d.date))}" onchange="setDay(${di},'date',this.value)" style="width:96px;font-weight:700">
-      <input value="${escapeHtml(tx(d.dow))}" onchange="setDay(${di},'dow',this.value)" style="width:110px">
-      <input value="${escapeHtml(tx(d.title))}" onchange="setDay(${di},'title',this.value)" style="flex:1;font-weight:700">
+      ${ml(d.date,`setDay(${di},'date',this.value,'%L%')`,{style:'width:96px;font-weight:700'})}
+      ${ml(d.dow,`setDay(${di},'dow',this.value,'%L%')`,{style:'width:110px'})}
+      ${ml(d.title,`setDay(${di},'title',this.value,'%L%')`,{style:'flex:1;font-weight:700'})}
       <button class="btn sm" style="color:#C0392B;border-color:#F3C6C0" onclick="delDay(${di})">🗑</button></div>
     ${(d.blocks||[]).map((b,bi)=>`<div style="margin:8px 0;padding-left:12px;border-left:3px solid var(--line-2)">
-      <input value="${escapeHtml(tx(b.label))}" placeholder="${t('progBlockLabel')}" onchange="setBlock(${di},${bi},this.value)" style="width:100%;font-weight:600;padding:5px 9px;border:1px solid var(--line-2);border-radius:8px;margin-bottom:6px">
+      ${ml(b.label,`setBlock(${di},${bi},this.value,'%L%')`,{ph:t('progBlockLabel'),style:'width:100%;font-weight:600;padding:5px 9px;border:1px solid var(--line-2);border-radius:8px;margin-bottom:6px'})}
       ${(b.items||[]).map((it,ii)=>`<div class="frow" style="margin:4px 0">
         <input value="${escapeHtml(it.time||'')}" placeholder="${t('progTime')}" onchange="setItem(${di},${bi},${ii},'time',this.value)" style="width:96px">
-        <input value="${escapeHtml(tx(it.text))}" onchange="setItem(${di},${bi},${ii},'text',this.value)" style="flex:1">
+        ${ml(it.text,`setItem(${di},${bi},${ii},'text',this.value,'%L%')`,{style:'flex:1'})}
         <button class="btn sm" onclick="delItem(${di},${bi},${ii})">✕</button></div>`).join('')}
       <button class="btn sm" onclick="addItem(${di},${bi})">${t('progAddItem')}</button></div>`).join('')}
     <button class="btn sm" onclick="addBlock(${di})">${t('progAddBlock')}</button></div>`).join('');
   v.innerHTML=`<div class="toolbar"><button class="btn acc" onclick="addDay()">+ ${t('progDay')}</button>
-    <span class="langnote">${t('editingIn')} <b>${S.lang.toUpperCase()}</b></span>
+    <label class="chk"><input type="checkbox" ${progAllLangs?'checked':''}
+      onchange="setProgAllLangs(this.checked)"> ${t('allLangs')}</label>
+    ${progAllLangs?'':`<span class="langnote">${t('editingIn')} <b>${S.lang.toUpperCase()}</b></span>`}
     <span class="muted" style="font-size:12.5px">${t('vdesc_program')}</span></div>${metaBlock}${days}`;
 }
-function setMeta(k,val){S.meta[k]=mx(S.meta[k],val);api.saveMeta();}
+function setMeta(k,val,lang){S.meta[k]=mx(S.meta[k],val,lang);api.saveMeta();}
 function setPageBase(val){S.pageBase=val.trim().replace(/\/+$/,'');api.savePageBase();}
-function setDay(di,k,val){S.program[di][k]=mx(S.program[di][k],val);api.saveProgram();}
-function setBlock(di,bi,val){const b=S.program[di].blocks[bi];b.label=mx(b.label,val);api.saveProgram();}
-function setItem(di,bi,ii,k,val){const it=S.program[di].blocks[bi].items[ii];
-  it[k]= k==='time' ? val : mx(it[k],val);   // vaqt hamma tilda bir xil
+function setDay(di,k,val,lang){S.program[di][k]=mx(S.program[di][k],val,lang);api.saveProgram();}
+function setBlock(di,bi,val,lang){const b=S.program[di].blocks[bi];b.label=mx(b.label,val,lang);api.saveProgram();}
+function setItem(di,bi,ii,k,val,lang){const it=S.program[di].blocks[bi].items[ii];
+  it[k]= k==='time' ? val : mx(it[k],val,lang);   // vaqt hamma tilda bir xil
   api.saveProgram();}
-function addDay(){S.program.push({date:"",dow:"",title:{uz:"Yangi kun",ru:"Новый день",en:"New day"},subtitle:"",blocks:[{label:"",items:[{time:"",}]}]});api.saveProgram();renderProgram(VW());}
+function addDay(){progAllLangs=true;S.program.push({date:"",dow:"",title:{uz:"Yangi kun",ru:"Новый день",en:"New day"},subtitle:"",blocks:[{label:"",items:[{time:"",}]}]});api.saveProgram();renderProgram(VW());}
 function delDay(di){if(!confirm('?'))return;S.program.splice(di,1);api.saveProgram();renderProgram(VW());}
-function addBlock(di){S.program[di].blocks.push({label:"",items:[{time:"",}]});api.saveProgram();renderProgram(VW());}
-function addItem(di,bi){S.program[di].blocks[bi].items.push({time:"",});api.saveProgram();renderProgram(VW());}
+function addBlock(di){progAllLangs=true;S.program[di].blocks.push({label:"",items:[{time:"",}]});api.saveProgram();renderProgram(VW());}
+function addItem(di,bi){progAllLangs=true;S.program[di].blocks[bi].items.push({time:"",});api.saveProgram();renderProgram(VW());}
 function delItem(di,bi,ii){S.program[di].blocks[bi].items.splice(ii,1);api.saveProgram();renderProgram(VW());}
 
 /* ===== checkin ===== */

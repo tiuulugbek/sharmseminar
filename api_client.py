@@ -139,3 +139,18 @@ def scoped_recipients(telegram_id, scope, value=None):
     if value not in (None, ""):
         params["value"] = str(value)
     return _request("GET", "/api/bot/recipients", params=params).get("recipients", [])
+
+
+# ------------------------------------------------- Telegram guruh nazorati
+def group_seen(chat_id, telegram_id, *, username="", full_name="", status="member", source="?"):
+    """Guruhda ko'rilgan odamni yozib qo'yadi."""
+    return _request("POST", "/api/bot/group/seen", payload={
+        "chat_id": str(chat_id), "telegram_id": str(telegram_id),
+        "username": username, "full_name": full_name,
+        "status": status, "source": source,
+    })
+
+
+def group_audit(chat_id):
+    """Bot ko'rgan a'zolar: ro'yxatda borlar va yo'qlar."""
+    return _request("GET", "/api/bot/group/audit", params={"chat_id": str(chat_id)})

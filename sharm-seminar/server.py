@@ -105,6 +105,10 @@ def init_db():
         msg_id INTEGER, pid TEXT, telegram_id TEXT, telegram_msg_id TEXT,
         status TEXT DEFAULT 'pending', PRIMARY KEY(msg_id, pid));
     CREATE INDEX IF NOT EXISTS ix_msg_targets_msg ON msg_targets(msg_id);
+    CREATE TABLE IF NOT EXISTS group_members(
+        chat_id TEXT, telegram_id TEXT, username TEXT, full_name TEXT,
+        status TEXT, source TEXT, first_seen TEXT, last_seen TEXT,
+        PRIMARY KEY(chat_id, telegram_id));
     """)
     # Idempotent migrations: existing databases keep all rows and values.
     cols = [r["name"] for r in con.execute("PRAGMA table_info(participants)").fetchall()]
@@ -1232,6 +1236,73 @@ def bot_reply():
            "parent_excerpt": (parent["text"] or "")[:160]}
     con.close()
     return jsonify(out)
+
+
+# ─────────────────────── Telegram guruh a'zolarini nazorat ───────────────────
+# Telegram Bot API guruh a'zolarini ro'yxatlash imkonini bermaydi: faqat
+# umumiy son, adminlar va bitta odamni tekshirish mumkin.  Shuning uchun bot
+# kuzatgan hamma narsani (kirdi/chiqdi hodisalari va guruhda yozganlar) shu
+# jadvalga yig'ib boradi va faqat o'zi ko'rgan odamlar bo'yicha qaror qiladi.
+IN_GROUP = {"creator", "administrator", "member", "restricted"}
+
+
+@app.post("/api/bot/group/seen")
+@bot_auth
+def bot_group_seen():
+    """Guruhda ko'rilgan odamni yozib qo'yadi (kirdi, yozdi yoki chiqdi)."""
+    d = request.get_json(silent=True) or {}
+    tid = str(d.get("telegram_id") or "").strip()
+    chat = str(d.get("chat_id") or "").strip()
+    if not tid or not chat:
+        return jsonify(error="chat_id and telegram_id are required"), 400
+    con = db()
+    con.execute(
+        "INSERT INTO group_members(chat_id,telegram_id,username,full_name,status,source,"
+        "first_seen,last_seen) VALUES(?,?,?,?,?,?,?,?) "
+        "ON CONFLICT(chat_id,telegram_id) DO UPDATE SET "
+        "username=COALESCE(NULLIF(excluded.username,''),group_members.username),"
+        "full_name=COALESCE(NULLIF(excluded.full_name,''),group_members.full_name),"
+        "status=excluded.status, source=excluded.source, last_seen=excluded.last_seen",
+        (chat, tid, str(d.get("username") or ""), str(d.get("full_name") or ""),
+         str(d.get("status") or "member"), str(d.get("source") or "?"), _now(), _now()))
+    con.commit(); con.close()
+    return jsonify(ok=True)
+
+
+@app.get("/api/bot/group/audit")
+@bot_auth
+def bot_group_audit():
+    """Kim ro'yxatda bor, kim yo'q — bot ko'rgan a'zolar bo'yicha."""
+    chat = str(request.args.get("chat_id") or "").strip()
+    con = db()
+    rows = con.execute("SELECT * FROM group_members WHERE chat_id=?", (chat,)).fetchall()
+    by_tid = {str(r["telegram_id"]): r for r in con.execute(
+        "SELECT id,fio,grp,telegram_id FROM participants "
+        "WHERE telegram_id IS NOT NULL AND telegram_id<>''")}
+    known, strangers, left = [], [], 0
+    for r in rows:
+        if r["status"] not in IN_GROUP:
+            left += 1
+            continue
+        person = by_tid.get(str(r["telegram_id"]))
+        entry = {"telegram_id": r["telegram_id"], "username": r["username"],
+                 "full_name": r["full_name"], "status": r["status"],
+                 "first_seen": r["first_seen"], "last_seen": r["last_seen"]}
+        if person:
+            entry.update(id=person["id"], fio=person["fio"], group=person["grp"])
+            known.append(entry)
+        else:
+            strangers.append(entry)
+    admins = {str(x) for x in _admin_ids()} | {str(x) for x in sget(con, "admins", []) or []}
+    verified_total = con.execute(
+        "SELECT COUNT(*) c FROM participants WHERE telegram_id IS NOT NULL "
+        "AND telegram_id<>''").fetchone()["c"]
+    con.close()
+    return jsonify(chat_id=chat, seen=len(rows), left=left,
+                   in_list=sorted(known, key=lambda x: (x.get("group") or 99, x.get("fio") or "")),
+                   not_in_list=[s for s in strangers if s["telegram_id"] not in admins],
+                   admins_skipped=[s for s in strangers if s["telegram_id"] in admins],
+                   verified_participants=verified_total)
 
 
 @app.get("/api/bot/recipients")

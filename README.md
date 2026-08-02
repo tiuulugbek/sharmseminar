@@ -23,6 +23,7 @@ sharm-seminar/
   tools/import_xlsx.py    acoustic2026seminar.xlsx dan import
   tools/set_role.py       panelga kirish rolini belgilash
   tools/translate_content.py  dastur va matnlarni uch tilga o'tkazish
+  tools/unlink_telegram.py    Telegram bog'lanishlarini tozalash
   data/seed_participants.json
   data/seed_groups.json   guruh nomlari (Sazanchik/Meduza/Akula/Delfin/Nemo)
   data/seed_program.json
@@ -199,8 +200,11 @@ bazada uch tilli saqlanadi:
 {"uz": "Kelish kuni", "ru": "День приезда", "en": "Arrival day"}
 ```
 
-Panelda tahrirlash oson: **yuqoridagi UZ/RU/EN tugmasi bilan tilni almashtirasiz
-va o'sha tildagi matnni yozasiz** — boshqa tillar tegilmaydi. «Rejalar» va
+«Rejalar» bo'limidagi **«Uchala tilni birdan»** belgisi har bir maydonni UZ/RU/EN
+uchtasi bilan ochadi — yangi band qo'shganda uchalasini bir joyda yozasiz (yangi
+kun/bo'lim/band qo'shilganda bu rejim o'zi yoqiladi). Belgi olib qo'yilsa, faqat
+**yuqoridagi UZ/RU/EN tugmasi bilan tanlangan til** tahrirlanadi, boshqa tillar
+tegilmaydi. «Rejalar» va
 «Mas'ullar» bo'limlarida qaysi tilda yozayotganingiz alohida yozib turiladi.
 Vaqt (`10:30`) hamma tilda bitta.
 
@@ -276,6 +280,50 @@ Mini-app har so'rovda `Telegram.WebApp.initData` yuboradi; server uni
 `HMAC_SHA256("WebAppData", BOT_TOKEN)` sxemasi bo'yicha tekshiradi va 24 soatdan
 eski imzoni rad etadi. Soxta `telegram_id` bilan check-in qilib bo'lmaydi.
 
+## Telegram guruhini nazorat qilish
+
+**Muhim cheklov:** Telegram Bot API guruh a'zolarini ro'yxatlab bermaydi —
+bot faqat umumiy sonni, adminlarni va bitta odamni tekshira oladi. Shuning
+uchun bot guruhda **ko'rgan** hamma narsani yozib boradi:
+
+- kimdir guruhga kirsa yoki chiqsa (`chat_member` yangilanishi);
+- kimdir guruhda yozsa.
+
+Jim turgan eski a'zolar tasdiqlash chaqiruvidan keyin ko'rinadi.
+
+Admin buyruqlari (botga shaxsiy chatda):
+
+| Buyruq | Vazifasi |
+|---|---|
+| `/guruh_chaqiruv` | Guruhga tasdiqlash chaqiruvini yuboradi — tugma bosilsa bot ochiladi |
+| `/guruh_holat` | Hisobot: guruhda jami nechta, bot nechtasini taniydi, ro'yxatda borlar va yo'qlar |
+| `/guruh_tozala` | Ro'yxatda yo'qlarni guruhdan chiqaradi (tasdiqlashdan keyin) |
+
+Chiqarish uchun botda **«Foydalanuvchilarni bloklash»** huquqi bo'lishi shart:
+guruh sozlamalari → Administratorlar → `@sharmseminarbot` → *Ban users*.
+Huquq bo'lmasa `/guruh_tozala` buni aytadi va hech narsa qilmaydi.
+
+Chiqarish `ban` + darhol `unban` orqali bajariladi — maqsad guruhdan chiqarish,
+umrbod bloklash emas, shuning uchun ro'yxatda ekani aniqlansa odam qaytadan
+kira oladi.
+
+Yangi kelgan odam ro'yxatda bo'lmasa, bot unga shaxsiy xabar yozib pasporti
+bilan tasdiqlashni so'raydi.
+
+## Telegram bog'lanishlarini tozalash
+
+Hamma qaytadan pasport bilan tasdiqlashi kerak bo'lsa:
+
+```bash
+./venv/bin/python sharm-seminar/tools/unlink_telegram.py --dry-run
+./venv/bin/python sharm-seminar/tools/unlink_telegram.py
+```
+
+`telegram_id` va `telegram_username` bo'shatiladi, eski qiymatlar
+`data/telegram_links_backup.json` ga saqlanadi (`--restore` bilan qaytariladi).
+Guruh, xona, rol va **QR token tegilmaydi** — token pasportdan olinadi, ya'ni
+chop etilgan beyjiklar ishlashda davom etadi.
+
 ## Bot buyruqlari
 
 - `/start` — **pasport seriya va raqami** orqali aniqlash (tug'ilgan sana ham
@@ -285,6 +333,7 @@ eski imzoni rad etadi. Soxta `telegram_id` bilan check-in qilib bo'lmaydi.
   taqsimlangani uchun eski foydalanuvchilar uni ko'rmagan.
 - `/menyu` — rol menyusini qayta ochish.
 - `/skaner` — check-in skanerini (mini-app) ochish.
+- `/guruh_chaqiruv` · `/guruh_holat` · `/guruh_tozala` — guruh nazorati (admin).
 - `/royxat` — yangi ishtirokchi/oila a'zosini to'liq ro'yxatga olish.
 - `/yangilash` — mavjud ma'lumotni pasport orqali yangilash.
 - `/bekor` — joriy jarayonni bekor qilish.

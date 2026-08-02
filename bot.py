@@ -12,6 +12,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (
     CallbackQuery,
+    ChatMemberUpdated,
     BufferedInputFile,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -1702,6 +1703,174 @@ async def reply_invalid(message: Message):
     await message.answer("Iltimos, javobni matn, rasm yoki hujjat ko'rinishida yuboring. /bekor")
 
 
+# ═══════════════════════ Telegram guruhini nazorat qilish ════════════════════
+# Telegram Bot API guruh a'zolarini ro'yxatlab bermaydi — faqat umumiy son,
+# adminlar va bitta odamni tekshirish mumkin.  Shuning uchun bot guruhda
+# ko'rgan hamma narsani yozib boradi: kirdi/chiqdi hodisalari va guruhda
+# yozganlar.  Qaror faqat shu ko'rilganlar bo'yicha chiqariladi; jim turgan
+# eski a'zolar tasdiqlash chaqiruvidan keyin o'zi ko'rinadi.
+
+
+def _person_label(user) -> str:
+    name = " ".join(filter(None, [user.first_name, user.last_name])).strip()
+    return name or (f"@{user.username}" if user.username else str(user.id))
+
+
+async def _remember(chat_id, user, status="member", source="?"):
+    if user is None or getattr(user, "is_bot", False):
+        return
+    try:
+        await asyncio.to_thread(
+            api_client.group_seen, chat_id, user.id,
+            username=f"@{user.username}" if user.username else "",
+            full_name=_person_label(user), status=status, source=source)
+    except api_client.ApiError:
+        logger.debug("Guruh a'zosini yozib bo'lmadi: %s", user.id)
+
+
+@dp.chat_member()
+async def on_chat_member(update: ChatMemberUpdated):
+    """Kirgan/chiqqan a'zoni yozib boradi va yangi kelganga yo'l ko'rsatadi."""
+    if str(update.chat.id) != str(config.GROUP_CHAT_ID):
+        return
+    status = getattr(update.new_chat_member.status, "value", update.new_chat_member.status)
+    user = update.new_chat_member.user
+    await _remember(update.chat.id, user, status=status, source="chat_member")
+    if status not in {"member", "administrator", "creator"}:
+        return
+    me = await whoami(user.id)
+    if me.get("role") != "guest":
+        return
+    try:
+        await bot.send_message(
+            user.id,
+            "👋 Salom! Siz <b>Acoustic 2026</b> guruhiga qo'shildingiz.\n\n"
+            "Guruhda qolish uchun ro'yxatdan o'tganingizni tasdiqlang: "
+            "/start bosing va <b>pasport seriya va raqamingizni</b> kiriting.\n"
+            "<i>Tasdiqlamaganlar guruhdan chiqariladi.</i>")
+    except Exception:
+        logger.debug("Yangi a'zoga yozib bo'lmadi (botni ochmagan): %s", user.id)
+
+
+@dp.message(F.chat.id == config.GROUP_CHAT_ID)
+async def on_group_message(message: Message):
+    """Guruhda yozgan odamni belgilab qo'yamiz — bot jim turishda davom etadi."""
+    await _remember(message.chat.id, message.from_user, status="member", source="message")
+    for user in (message.new_chat_members or []):
+        await _remember(message.chat.id, user, status="member", source="joined")
+
+
+def _audit_lines(audit) -> str:
+    inside, outside = audit.get("in_list", []), audit.get("not_in_list", [])
+    lines = ["👥 <b>Guruh holati</b>\n",
+             f"👁 Bot ko'rgan a'zolar: <b>{len(inside) + len(outside)}</b>",
+             f"✅ Ro'yxatda bor va tasdiqlangan: <b>{len(inside)}</b>",
+             f"❌ Ro'yxatda yo'q: <b>{len(outside)}</b>"]
+    if audit.get("admins_skipped"):
+        lines.append(f"🛡 Admin (tegilmaydi): <b>{len(audit['admins_skipped'])}</b>")
+    if outside:
+        lines.append("\n<b>Ro'yxatda yo'qlar:</b>")
+        for s in outside[:40]:
+            who = s.get("full_name") or s.get("username") or s["telegram_id"]
+            lines.append(f"• {who} {s.get('username') or ''} <code>{s['telegram_id']}</code>")
+        if len(outside) > 40:
+            lines.append(f"… va yana {len(outside) - 40} ta")
+    return "\n".join(lines)
+
+
+@dp.message(Command("guruh_holat"), F.chat.type == "private")
+async def cmd_group_status(message: Message):
+    if not _is_admin(message.from_user.id):
+        return
+    try:
+        total = await bot.get_chat_member_count(config.GROUP_CHAT_ID)
+    except Exception:
+        total = None
+    audit = await asyncio.to_thread(api_client.group_audit, config.GROUP_CHAT_ID)
+    text = _audit_lines(audit)
+    if total is not None:
+        seen = len(audit.get("in_list", [])) + len(audit.get("not_in_list", [])) \
+            + len(audit.get("admins_skipped", []))
+        text += (f"\n\n📊 Guruhda jami: <b>{total}</b> · bot taniydi: <b>{seen}</b>"
+                 f" · hali jim: <b>{max(0, total - seen)}</b>")
+        text += ("\n<i>Telegram botga a'zolar ro'yxatini bermaydi — jim turganlar "
+                 "tasdiqlash chaqiruvidan keyin ko'rinadi.</i>")
+    text += "\n\n/guruh_chaqiruv — tasdiqlashga chaqirish\n/guruh_tozala — ro'yxatda yo'qlarni chiqarish"
+    for chunk in [text[i:i + 3500] for i in range(0, len(text), 3500)]:
+        await message.answer(chunk)
+
+
+@dp.message(Command("guruh_chaqiruv"), F.chat.type == "private")
+async def cmd_group_call(message: Message):
+    """Guruhga tasdiqlash chaqiruvini yuboradi."""
+    if not _is_admin(message.from_user.id):
+        return
+    me = await bot.get_me()
+    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(
+        text="✅ Tasdiqlash — botni ochish", url=f"https://t.me/{me.username}?start=guruh")]])
+    try:
+        await bot.send_message(
+            config.GROUP_CHAT_ID,
+            "📋 <b>Ro'yxatni tasdiqlash</b>\n\n"
+            "Hurmatli ishtirokchilar! Guruhda faqat safar ro'yxatidagi odamlar qolishi kerak.\n\n"
+            "Quyidagi tugmani bosing → botda <b>pasport seriya va raqamingizni</b> kiriting. "
+            "Shundan keyin guruhingiz, xonangiz va shaxsiy QR sahifangizni olasiz.\n\n"
+            "<i>Tasdiqlamagan foydalanuvchilar guruhdan chiqariladi.</i>",
+            reply_markup=kb)
+        await message.answer("✅ Chaqiruv guruhga yuborildi.\n\n"
+                             "Odamlar tasdiqlagani sayin /guruh_holat da ko'rinib boradi.")
+    except Exception as exc:
+        await message.answer(f"⚠️ Guruhga yuborib bo'lmadi: <code>{exc}</code>")
+
+
+@dp.message(Command("guruh_tozala"), F.chat.type == "private")
+async def cmd_group_clean(message: Message):
+    if not _is_admin(message.from_user.id):
+        return
+    audit = await asyncio.to_thread(api_client.group_audit, config.GROUP_CHAT_ID)
+    outside = audit.get("not_in_list", [])
+    if not outside:
+        return await message.answer("✅ Bot ko'rgan a'zolar orasida ro'yxatda yo'qlari yo'q.")
+    me = await bot.get_me()
+    rights = await bot.get_chat_member(config.GROUP_CHAT_ID, me.id)
+    if not getattr(rights, "can_restrict_members", False):
+        return await message.answer(
+            "⛔ Botda <b>a'zolarni chiqarish huquqi yo'q</b>.\n\n"
+            "Guruh sozlamalari → Administratorlar → @" + (me.username or "bot") +
+            " → <b>Foydalanuvchilarni bloklash</b> ni yoqing va qaytadan urinib ko'ring.")
+    await message.answer(
+        _audit_lines(audit) + f"\n\n<b>{len(outside)}</b> kishi guruhdan chiqariladi. Davom etamizmi?",
+        reply_markup=_confirm_kb("grpclean:go"))
+
+
+@dp.callback_query(F.data == "grpclean:go")
+async def group_clean_go(call: CallbackQuery):
+    if not _is_admin(call.from_user.id):
+        return await call.answer("Ruxsat yo'q", show_alert=True)
+    await call.answer("Chiqarilmoqda…")
+    await call.message.edit_text("⏳ Guruh tozalanmoqda…")
+    audit = await asyncio.to_thread(api_client.group_audit, config.GROUP_CHAT_ID)
+    removed, failed = 0, []
+    for person in audit.get("not_in_list", []):
+        uid = int(person["telegram_id"])
+        try:
+            await bot.ban_chat_member(config.GROUP_CHAT_ID, uid)
+            # Darhol blokdan chiqaramiz: maqsad chiqarish, umrbod bloklash emas —
+            # ro'yxatda ekani aniqlansa qaytadan kira olsin.
+            await bot.unban_chat_member(config.GROUP_CHAT_ID, uid, only_if_banned=True)
+            await asyncio.to_thread(api_client.group_seen, config.GROUP_CHAT_ID, uid,
+                                    status="kicked", source="cleanup")
+            removed += 1
+        except Exception as exc:
+            failed.append(f"{person.get('full_name') or uid}: {exc}")
+        await asyncio.sleep(0.2)
+    text = (f"🧹 <b>Tozalash yakunlandi</b>\n\n✅ Chiqarildi: <b>{removed}</b>\n"
+            f"⚠️ Chiqarib bo'lmadi: <b>{len(failed)}</b>")
+    if failed:
+        text += "\n\n" + "\n".join(f"• {f}" for f in failed[:10])
+    await call.message.edit_text(text + "\n\n/guruh_holat")
+
+
 # ──────────────────────────── Fallback ────────────────────────────
 # Faqat shaxsiy chatga javob beramiz — guruhda bot jim turadi (admin bo'lsa ham).
 @dp.message(F.chat.type == "private")
@@ -1714,7 +1883,9 @@ async def fallback(message: Message):
 
 async def main():
     logger.info("Bot ishga tushdi")
-    await dp.start_polling(bot)
+    # chat_member yangilanishlari standart holatda kelmaydi — ro'yxatdagi
+    # handlerlarga qarab kerakli turlarni aniq so'raymiz.
+    await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
 
 
 if __name__ == "__main__":

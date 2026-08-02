@@ -24,6 +24,7 @@ sharm-seminar/
   tools/set_role.py       panelga kirish rolini belgilash
   tools/translate_content.py  dastur va matnlarni uch tilga o'tkazish
   tools/unlink_telegram.py    Telegram bog'lanishlarini tozalash
+  tools/seed_checkpoints.py   check-in nuqtalarini dasturga moslash
   data/seed_participants.json
   data/seed_groups.json   guruh nomlari (Sazanchik/Meduza/Akula/Delfin/Nemo)
   data/seed_program.json
@@ -233,6 +234,28 @@ Ikki joyda ham bir xil ishlaydi:
 
 `POST /api/checkin` endi `id` ni ham, QR dan o'qilgan `token` ni ham qabul
 qiladi, shuning uchun bitta skaner ikkala joyda ishlaydi.
+
+### Check-in nuqtalari va ularning tartibi
+
+Nuqtalar seminar dasturiga mos: aeroport → mehmonxona → yahta → **Signia kuni**
+→ **GN ReSound kuni** → **Acoustic kuni** → sayohat → madaniy dastur → qaytish.
+Har birida uch tilli nom va o'sha kunning vaqt oynasi bor.
+
+Boshlang'ich holatga keltirish yoki dasturga moslash:
+
+```bash
+./venv/bin/python sharm-seminar/tools/seed_checkpoints.py --dry-run
+./venv/bin/python sharm-seminar/tools/seed_checkpoints.py
+```
+
+Skript idempotent: mavjud nuqta o'chirilmaydi, uning check-inlariga tegilmaydi,
+qo'lda qo'yilgan nom yoki vaqt oynasi ustidan yozilmaydi — faqat yetishmayotgani
+qo'shiladi va tartib dasturga qarab tuziladi.
+
+**Tartibni panelda o'zgartirasiz:** «Check-in» bo'limida har bir nuqta ustidagi
+`‹ ›` tugmalari bilan suriladi (faqat texnik adminlarga ko'rinadi). Tartib
+ahamiyatli — skaner o'tkazib yuborilgan **oldingi** nuqtalarni shu tartib
+bo'yicha ogohlantiradi. Nuqta chipida tartib raqami va vaqt oynasi ham ko'rinadi.
 
 ### Check-in qoidalari
 

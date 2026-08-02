@@ -158,8 +158,10 @@ async def send_group_invite_to(bot: Bot, user_id: int, full_name: str) -> bool:
     try:
         await bot.send_message(
             user_id,
-            "👥 Siz hali safar guruhiga qo'shilmagansiz. Quyidagi tugma orqali qo'shiling.\n"
-            "<i>Havola faqat siz uchun amal qiladi.</i>",
+            "👥 <b>Safar guruhiga qo'shiling</b>\n\n"
+            "Siz botda ro'yxatdan o'tgansiz, lekin <b>Acoustic 2026</b> guruhida "
+            "hali yo'qsiz. Barcha e'lonlar va o'zgarishlar o'sha yerda bo'ladi.\n\n"
+            "<i>Havola faqat siz uchun amal qiladi va bir marta ishlaydi.</i>",
             reply_markup=markup,
         )
         return True

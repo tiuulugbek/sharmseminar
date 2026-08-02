@@ -384,8 +384,32 @@ Admin buyruqlari (botga shaxsiy chatda):
 | Buyruq | Vazifasi |
 |---|---|
 | `/guruh_chaqiruv` | Guruhga tasdiqlash chaqiruvini yuboradi — tugma bosilsa bot ochiladi |
+| `/guruh_taklif` | Tasdiqlagan, lekin guruhda yo'q odamlarga taklif havolasi |
 | `/guruh_holat` | Hisobot: guruhda jami nechta, bot nechtasini taniydi, ro'yxatda borlar va yo'qlar |
 | `/guruh_tozala` | Ro'yxatda yo'qlarni guruhdan chiqaradi (tasdiqlashdan keyin) |
+
+### Guruhga taklif
+
+Botda tasdiqlagan, lekin Telegram guruhida bo'lmagan odamlarga shaxsiy taklif
+havolasi yuboriladi: admin menyusida **«➕ Guruhga taklif»** yoki `/guruh_taklif`.
+
+1. Bot tasdiqlaganlarning har birini `getChatMember` bilan tekshiradi;
+2. kim guruhda, kim yo'qligini ko'rsatib, ismlari bilan tasdiq so'raydi;
+3. tasdiqlansa — har biriga **faqat o'zi uchun, bir marta** ishlaydigan havola
+   yuboradi (`member_limit=1`).
+
+Botni hech qachon ochmagan yoki bloklagan odamga yozib bo'lmaydi — ular
+hisobotda alohida ko'rsatiladi, ularni qo'ng'iroq bilan chaqirish kerak.
+
+Bu tekshiruv yo'l-yo'lakay `group_members` jadvalini ham to'ldiradi: bot
+boshqa yo'l bilan ko'ra olmaydigan **jim a'zolar** shu orqali hisobga tushadi
+va `/guruh_holat` aniqroq bo'ladi.
+
+Guruh qulflangan bo'lsa, ruxsat berilgan odamning Telegramdagi statusi
+`restricted` bo'ladi — u guruhda hisoblanadi, unga taklif yuborilmaydi.
+
+Botda **«Foydalanuvchilarni taklif qilish»** huquqi bo'lishi kerak; bo'lmasa
+buyruq shuni aytadi va hech narsa yubormaydi.
 
 ### Faqat tasdiqlaganlar yozsin
 
@@ -486,7 +510,7 @@ chop etilgan beyjiklar ishlashda davom etadi.
   taqsimlangani uchun eski foydalanuvchilar uni ko'rmagan.
 - `/menyu` — rol menyusini qayta ochish.
 - `/skaner` — check-in skanerini (mini-app) ochish.
-- `/guruh_chaqiruv` · `/guruh_holat` · `/guruh_qulf` · `/guruh_ochiq` · `/guruh_tozala` — guruh nazorati (admin).
+- `/guruh_chaqiruv` · `/guruh_taklif` · `/guruh_holat` · `/guruh_qulf` · `/guruh_ochiq` · `/guruh_tozala` — guruh nazorati (admin).
 - `/tasdiqlanmaganlar` — kim hali tasdiqlamagan (admin va guruh mas'uli).
 - `/royxat` — yangi ishtirokchi/oila a'zosini to'liq ro'yxatga olish.
 - `/yangilash` — mavjud ma'lumotni pasport orqali yangilash.

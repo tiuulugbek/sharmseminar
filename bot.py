@@ -1948,6 +1948,94 @@ async def cmd_group_call(message: Message):
         await message.answer(f"⚠️ Guruhga yuborib bo'lmadi: <code>{exc}</code>")
 
 
+async def _group_gap():
+    """Botda tasdiqlagan, lekin guruhda yo'q odamlar.
+
+    Yo'l-yo'lakay har bir tekshirilgan odamning holati `group_members` ga
+    yoziladi — bot boshqa yo'l bilan ko'ra olmaydigan jim a'zolar ham shu
+    tariqa hisobga tushadi.
+    """
+    people = [p for p in await asyncio.to_thread(api_client.recipients)
+              if str(p.get("telegram_id") or "").lstrip("-").isdigit()]
+    inside, outside = [], []
+    for person in people:
+        uid = int(person["telegram_id"])
+        try:
+            member = await bot.get_chat_member(config.GROUP_CHAT_ID, uid)
+            status = getattr(member.status, "value", member.status)
+            # Guruh qulflanganda ruxsat berilgan odam `restricted` bo'ladi —
+            # u guruhda, faqat yozish huquqi alohida boshqariladi.
+            here = (status in broadcast.IN_GROUP_STATUSES
+                    or (status == "restricted" and getattr(member, "is_member", False)))
+        except Exception:
+            status, here = "left", False
+        (inside if here else outside).append(person)
+        try:
+            await asyncio.to_thread(api_client.group_seen, config.GROUP_CHAT_ID, uid,
+                                    full_name=person.get("fio") or "",
+                                    status=status, source="lookup")
+        except api_client.ApiError:
+            pass
+        await asyncio.sleep(0.05)
+    return inside, outside
+
+
+@dp.message(Command("guruh_taklif"), F.chat.type == "private")
+@dp.message(StateFilter(None), F.chat.type == "private", F.text == messaging.BTN_INVITE)
+async def cmd_group_invite(message: Message, state: FSMContext):
+    """Guruhga qo'shilmagan tasdiqlanganlarga shaxsiy taklif havolasi."""
+    await state.clear()
+    if not _is_admin(message.from_user.id):
+        me = await whoami(message.from_user.id)
+        return await show_menu(message.from_user.id, me, "⛔ Bu bo'lim faqat adminlar uchun.")
+    me = await bot.get_me()
+    rights = await bot.get_chat_member(config.GROUP_CHAT_ID, me.id)
+    if not getattr(rights, "can_invite_users", False):
+        return await message.answer(
+            "⛔ Botda <b>taklif havolasi yaratish</b> huquqi yo'q.\n"
+            "Guruh sozlamalari → Administratorlar → @" + (me.username or "bot") +
+            " → <b>Foydalanuvchilarni taklif qilish</b> ni yoqing.")
+
+    await message.answer("⏳ Kim guruhda yo'qligi tekshirilmoqda…")
+    inside, outside = await _group_gap()
+    if not outside:
+        return await message.answer(
+            f"✅ Tasdiqlaganlarning hammasi guruhda ({len(inside)} kishi).")
+    names = "\n".join(f"• {p['fio']}" for p in outside[:30])
+    more = f"\n… va yana {len(outside) - 30} ta" if len(outside) > 30 else ""
+    await message.answer(
+        "➕ <b>Guruhga taklif</b>\n\n"
+        f"✅ Guruhda: <b>{len(inside)}</b>\n"
+        f"📨 Guruhda yo'q: <b>{len(outside)}</b>\n\n{names}{more}\n\n"
+        "Har biriga <b>faqat o'zi uchun</b> amal qiladigan havola yuboriladi. "
+        "Davom etamizmi?",
+        reply_markup=_confirm_kb("grpinv:go"))
+
+
+@dp.callback_query(F.data == "grpinv:go")
+async def group_invite_go(call: CallbackQuery):
+    if not _is_admin(call.from_user.id):
+        return await call.answer("Ruxsat yo'q", show_alert=True)
+    await call.answer("Yuborilmoqda…")
+    await call.message.edit_text("⏳ Takliflar yuborilmoqda…")
+    _, outside = await _group_gap()
+    sent, failed = 0, []
+    for person in outside:
+        ok = await broadcast.send_group_invite_to(bot, int(person["telegram_id"]),
+                                                  person.get("fio") or "")
+        if ok:
+            sent += 1
+        else:
+            failed.append(person.get("fio") or person["telegram_id"])
+        await asyncio.sleep(broadcast.SEND_DELAY)
+    text = (f"➕ <b>Takliflar yuborildi</b>\n\n📨 Yuborildi: <b>{sent}</b>\n"
+            f"⚠️ Yetmadi: <b>{len(failed)}</b>")
+    if failed:
+        text += ("\n\n<i>Botni bloklagan yoki hech qachon ochmaganlar:</i>\n"
+                 + "\n".join(f"• {f}" for f in failed[:15]))
+    await call.message.edit_text(text + "\n\n/guruh_holat")
+
+
 @dp.message(Command("guruh_qulf"), F.chat.type == "private")
 async def cmd_group_lock(message: Message):
     """Guruhni yopadi: faqat tasdiqlaganlar yoza oladi."""

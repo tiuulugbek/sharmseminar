@@ -44,6 +44,7 @@ BTN_ROSTER  = "👥 Guruhim ro'yxati"
 BTN_ATT     = "📊 Kim keldi / kim yo'q"
 BTN_ASK     = "✍️ Rahbarimga savol"
 BTN_PAGE    = "📄 Mening sahifam"
+BTN_PENDING = "⏳ Tasdiqlanmaganlar"
 
 
 def scan_inline_kb() -> InlineKeyboardMarkup:
@@ -63,11 +64,11 @@ def role_menu(role: str) -> ReplyKeyboardMarkup:
     if role == "admin":
         rows = [[KeyboardButton(text=BTN_ALL), KeyboardButton(text=BTN_GROUP)],
                 [KeyboardButton(text=BTN_ONE), KeyboardButton(text=BTN_STATS)],
-                [KeyboardButton(text=BTN_SCAN)]]
+                [KeyboardButton(text=BTN_SCAN), KeyboardButton(text=BTN_PENDING)]]
     elif role == "leader":
         rows = [[KeyboardButton(text=BTN_MYGROUP), KeyboardButton(text=BTN_ROSTER)],
                 [KeyboardButton(text=BTN_SCAN), KeyboardButton(text=BTN_ATT)],
-                [KeyboardButton(text=BTN_PAGE)]]
+                [KeyboardButton(text=BTN_PENDING), KeyboardButton(text=BTN_PAGE)]]
     else:
         rows = [[KeyboardButton(text=BTN_ASK)], [KeyboardButton(text=BTN_PAGE)]]
     return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)

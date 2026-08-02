@@ -1645,15 +1645,63 @@ async def menu_stats(message: Message):
         return await show_menu(message.from_user.id, me, "⛔ Bu bo'lim faqat adminlar uchun.")
     s = await asyncio.to_thread(api_client.stats)
     groups = await asyncio.to_thread(api_client.groups)
+    done, total = s["telegram"], s["total"]
+    percent = round(done * 100 / total) if total else 0
+    bar = "█" * (percent // 10) + "░" * (10 - percent // 10)
     lines = ["📊 <b>Umumiy statistika</b>\n",
-             f"👤 Jami: <b>{s['total']}</b>",
-             f"✉️ Telegram ID bor: <b>{s['telegram']}</b> · yo'q: <b>{s['no_telegram']}</b>\n",
-             "<b>Guruhlar</b>"]
+             f"👤 Jami ro'yxatda: <b>{total}</b>",
+             f"✅ Botda tasdiqlagan: <b>{done}</b> · ⏳ hali yo'q: <b>{s['no_telegram']}</b>",
+             f"<code>{bar}</code> {percent}%\n",
+             "<b>Guruhlar — tasdiqlagan / jami</b>"]
     for g in groups:
         leader = (g.get("leader") or {}).get("fio") or "mas'ul belgilanmagan"
-        lines.append(f"• {g['id']}-guruh · {g.get('name') or '—'} — {g['total']} kishi, "
+        lines.append(f"• {g['id']}-guruh · {g.get('name') or '—'} — "
+                     f"<b>{g['with_telegram']}/{g['total']}</b> tasdiqlagan, "
                      f"keldi {g['checked_in']} · 👑 {leader}")
+    lines.append("\n/tasdiqlanmaganlar — kim hali tasdiqlamagan\n/guruh_holat — guruh nazorati")
     await message.answer("\n".join(lines))
+
+
+@dp.message(Command("tasdiqlanmaganlar"), F.chat.type == "private")
+@dp.message(StateFilter(None), F.chat.type == "private", F.text == messaging.BTN_PENDING)
+async def cmd_pending(message: Message, state: FSMContext):
+    """Kim hali botda tasdiqlamagan — guruh bo'yicha ro'yxat.
+
+    Admin hammasini, guruh mas'uli faqat o'z guruhini ko'radi.  Bu odamlar bilan
+    bevosita bog'lanib bo'lmaydi (Telegramlari hali noma'lum), shuning uchun
+    ro'yxat telefon raqami bilan chiqadi — qo'ng'iroq qilib chaqirish uchun.
+    """
+    await state.clear()
+    me = await whoami(message.from_user.id)
+    if me.get("role") not in {"admin", "leader"}:
+        return await show_menu(message.from_user.id, me,
+                               "⛔ Bu bo'lim faqat admin va guruh mas'ullari uchun.")
+    try:
+        groups = await asyncio.to_thread(api_client.groups)
+    except api_client.ApiError:
+        return await message.answer("⚠️ Ma'lumotni olib bo'lmadi.")
+    if me["role"] == "leader":
+        groups = [g for g in groups if g["id"] == me.get("group")]
+
+    lines, waiting = ["⏳ <b>Hali tasdiqlamaganlar</b>\n"], 0
+    for g in groups:
+        data = await asyncio.to_thread(api_client.group_members, g["id"])
+        pending = [m for m in data["members"] if not m.get("telegram_id")]
+        waiting += len(pending)
+        lines.append(f"\n<b>{g['id']}-guruh · {g.get('name') or '—'}</b> "
+                     f"({len(pending)} ta kutilmoqda)")
+        for m in pending:
+            phone = f" · {m['phone']}" if m.get("phone") else ""
+            lines.append(f"• {m['fio']}{phone}")
+        if not pending:
+            lines.append("✅ hammasi tasdiqlagan")
+    if not waiting:
+        lines = ["✅ <b>Hamma tasdiqlagan.</b>"]
+    else:
+        lines.append(f"\nJami kutilmoqda: <b>{waiting}</b>")
+    text = "\n".join(lines)
+    for chunk in [text[i:i + 3500] for i in range(0, len(text), 3500)]:
+        await message.answer(chunk)
 
 
 # ── Xabar matnini qabul qilish va yuborish ──

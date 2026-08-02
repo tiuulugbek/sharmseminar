@@ -244,6 +244,8 @@ Botdagi rol `/api/bot/whoami` orqali aniqlanadi: `ADMIN_IDS` dagi Telegram ID �
 | Guruh rahbari | 📢 Guruhimga xabar · 👥 Guruhim ro'yxati · 📷 QR skanlash (check-in) · 📊 Kim keldi / kim yo'q |
 | A'zo | ✍️ Rahbarimga savol · 📄 Mening sahifam |
 
+Admin va guruh mas'ulida `⏳ Tasdiqlanmaganlar` tugmasi ham bor.
+
 ## Ikki tomonlama xabar tizimi
 
 Qoida: **javob har doim xabar kimdan kelgan bo'lsa, o'shanga qaytadi**, va hammasi
@@ -279,6 +281,30 @@ ishtirokchini check-in qila oladi (standart: faqat o'z guruhini).
 Mini-app har so'rovda `Telegram.WebApp.initData` yuboradi; server uni
 `HMAC_SHA256("WebAppData", BOT_TOKEN)` sxemasi bo'yicha tekshiradi va 24 soatdan
 eski imzoni rad etadi. Soxta `telegram_id` bilan check-in qilib bo'lmaydi.
+
+## Tasdiqlash jarayoni (ish tartibi)
+
+Guruhdagi odamlarni tekshirib, faqat ro'yxatdagilarni qoldirish tartibi:
+
+1. **Bog'lanishlarni tozalash** (bir marta) — `tools/unlink_telegram.py`, shunda
+   hamma noldan pasport bilan tasdiqlaydi.
+2. **`/guruh_chaqiruv`** — bot guruhga tugmali chaqiruv yuboradi.
+3. **Odamlar `/start` bosib pasport seriya va raqamini kiritadi.** Bot darrov
+   guruhini, mas'ulini, xonasini va shaxsiy QR sahifasini qaytaradi. Shu daqiqada
+   `telegram_id` bog'lanadi va odam «tasdiqlangan» hisoblanadi.
+4. **`📊 Umumiy statistika`** — necha foiz tasdiqlagani, guruh bo'yicha
+   `tasdiqlagan/jami`.
+5. **`⏳ Tasdiqlanmaganlar`** — kim qolgani, guruh bo'yicha, telefon raqami bilan.
+   Guruh mas'uli o'z guruhinikini ko'radi va qo'ng'iroq qilib chaqiradi.
+6. **`/guruh_holat`** — guruhda jami nechta, bot nechtasini taniydi, ro'yxatda
+   bor/yo'q.
+7. **`/guruh_tozala`** — ro'yxatda yo'qlarni chiqarish (oxirida, tasdiqlash
+   muddati tugagach).
+
+Guruhlar allaqachon bazada taqsimlangan, shuning uchun «guruhlarga ajratish»
+alohida qadam emas: odam tasdiqlanishi bilan o'z guruhini biladi, guruh mas'uli
+uni ro'yxatida ko'radi, mas'ul unga xabar yoza oladi va QR bilan check-in qiladi.
+Guruhni panelda o'zgartirsangiz, odamga botdan xabar boradi.
 
 ## Telegram guruhini nazorat qilish
 

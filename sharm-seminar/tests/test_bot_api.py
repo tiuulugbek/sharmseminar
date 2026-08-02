@@ -1,3 +1,4 @@
+import datetime
 import hashlib
 import hmac
 import importlib.util
@@ -193,6 +194,79 @@ class BotApiTest(unittest.TestCase):
         con.commit(); con.close()
         self.assertEqual(self.post("/api/bot/checkin", {
             "token": other["token"], "checkpoint": "seminar", "by_telegram_id": "9001"}).status_code, 200)
+
+    def set_checkpoints(self, checkpoints):
+        self.sql("UPDATE settings SET value=? WHERE key='checkpoints'",
+                 json.dumps(checkpoints, ensure_ascii=False))
+
+    def scan(self, token, checkpoint, by="555", **extra):
+        return self.post("/api/bot/checkin",
+                         dict({"token": token, "checkpoint": checkpoint,
+                               "by_telegram_id": by}, **extra))
+
+    def test_the_same_person_is_only_recorded_once_per_checkpoint(self):
+        _, member, _ = self.build_group()
+        first = self.scan(member["token"], "seminar").get_json()
+        self.assertEqual(first["status"], "ok")
+
+        again = self.scan(member["token"], "seminar").get_json()
+        self.assertEqual(again["status"], "already")
+        self.assertEqual(again["ts"], first["ts"])   # vaqt qayta yozilmaydi
+        self.assertEqual(self.one("SELECT COUNT(*) FROM checkins WHERE pid=?", member["id"])[0], 1)
+
+        # Admin ataylab qayta yozmoqchi bo'lsa — force bilan mumkin.
+        forced = self.scan(member["token"], "seminar", force=True).get_json()
+        self.assertEqual(forced["status"], "ok")
+
+    def test_a_checkpoint_only_accepts_scans_inside_its_time_window(self):
+        _, member, _ = self.build_group()
+        now = server._event_now().replace(tzinfo=None)
+        fmt = "%Y-%m-%dT%H:%M"
+        self.set_checkpoints([
+            {"key": "aeroport", "label": "Aeroport"},
+            {"key": "past", "label": "Mehmonxona",
+             "ends_at": (now - datetime.timedelta(days=1)).strftime(fmt)},
+            {"key": "future", "label": "Yahta",
+             "starts_at": (now + datetime.timedelta(days=1)).strftime(fmt)},
+        ])
+        self.assertEqual(self.scan(member["token"], "past").get_json()["status"], "closed")
+        self.assertEqual(self.scan(member["token"], "future").get_json()["status"], "not_open")
+        self.assertEqual(self.one("SELECT COUNT(*) FROM checkins WHERE pid=?", member["id"])[0], 0)
+
+        # Vaqti kelmagan nuqtani admin force bilan ocha oladi.
+        self.assertEqual(self.scan(member["token"], "future", force=True).get_json()["status"], "ok")
+
+    def test_skipping_an_earlier_checkpoint_warns_but_never_blocks(self):
+        _, member, _ = self.build_group()
+        self.set_checkpoints([{"key": "aeroport", "label": "Aeroport"},
+                              {"key": "mehmonxona", "label": "Mehmonxona"},
+                              {"key": "yahta", "label": "Yahta"}])
+        # Aeroport va mehmonxonasiz to'g'ridan-to'g'ri yahtada belgilanadi.
+        body = self.scan(member["token"], "yahta").get_json()
+        self.assertEqual(body["status"], "ok")
+        self.assertEqual([w["key"] for w in body["warnings"]], ["aeroport", "mehmonxona"])
+        # O'tkazib yuborilgani o'tkazib yuborilganicha qoladi.
+        self.assertEqual(sorted(body["checkins"]), ["yahta"])
+
+        later = self.scan(member["token"], "mehmonxona").get_json()
+        self.assertEqual(later["status"], "ok")
+        self.assertEqual([w["key"] for w in later["warnings"]], ["aeroport"])
+
+    def test_checkin_timestamps_use_event_time_not_server_time(self):
+        _, member, _ = self.build_group()
+        self.sql("INSERT INTO settings(key,value) VALUES('tz_offset','9') "
+                 "ON CONFLICT(key) DO UPDATE SET value='9'")
+        stamped = self.scan(member["token"], "seminar").get_json()["ts"]
+        expected = (datetime.datetime.now(datetime.timezone.utc)
+                    + datetime.timedelta(hours=9)).strftime("%H:%M")
+        self.assertEqual(stamped, expected)
+
+    def test_unchecking_clears_the_mark_so_it_can_be_scanned_again(self):
+        _, member, _ = self.build_group()
+        self.scan(member["token"], "seminar")
+        self.assertEqual(self.scan(member["token"], "seminar",
+                                   on=False).get_json()["status"], "removed")
+        self.assertEqual(self.scan(member["token"], "seminar").get_json()["status"], "ok")
 
     # -------------------------------------------------------------- messaging
     def send(self, telegram_id, scope, text, value=None):

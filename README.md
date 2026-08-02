@@ -223,6 +223,7 @@ ishga tushirilsa hech narsa o'zgarmaydi.
 
 ## Check-in — kamera bilan
 
+
 Ikki joyda ham bir xil ishlaydi:
 
 - **Panelda:** «Check-in» bo'limi → **«📷 Kamera bilan skanlash»**. Kamera QR ni
@@ -232,6 +233,35 @@ Ikki joyda ham bir xil ishlaydi:
 
 `POST /api/checkin` endi `id` ni ham, QR dan o'qilgan `token` ni ham qabul
 qiladi, shuning uchun bitta skaner ikkala joyda ishlaydi.
+
+### Check-in qoidalari
+
+Skanerlangan zahoti katta rangli javob chiqadi (ovoz + vibratsiya bilan):
+
+| Holat | Ko'rinish | Ma'nosi |
+|---|---|---|
+| `ok` | 🟢 **Ro'yxatga olindi** | belgilandi, vaqti yozildi |
+| `already` | 🟠 **Allaqachon ro'yxatda** | ilgari belgilangan, vaqti **qayta yozilmaydi** |
+| `not_open` | 🔵 **Vaqti hali kelmagan** | nuqta oynasi hali ochilmagan |
+| `closed` | 🔵 **Vaqti tugagan** | nuqta oynasi yopilgan |
+| `not_found` / `forbidden` | 🔴 | QR ro'yxatda yo'q yoki begona guruh |
+
+**Bir odam — bir marta.** Ikkinchi skan hech narsa yozmaydi, faqat qachon
+belgilangani ko'rsatiladi. Adminlar `force` bilan qayta yoza oladi, panelda
+belgini olib tashlab qayta belgilash ham mumkin.
+
+**Vaqt oynasi.** Har bir nuqtaga «Check-in» bo'limida boshlanish va tugash
+vaqti qo'yiladi (bo'sh qoldirilsa nuqta har doim ochiq). Oynadan tashqarida
+skaner ishlamaydi — yahtaga chiqish kuni kelmasdan turib uni belgilab bo'lmaydi.
+
+**Ketma-ketlik — ogohlantirish, to'siq emas.** Kimdir aeroportda belgilanmay
+qolsa, yahtada bemalol belgilanadi; skanerda «⚠️ O'tkazib yuborilgan: Aeroport»
+deb yozilib turadi. O'tkazib yuborilgani o'tkazib yuborilganicha qoladi —
+haqiqatan bormagan odam keyingi nuqtada belgilanaveradi.
+
+**Vaqt mintaqasi.** Barcha vaqtlar tadbir vaqtida (Misr, UTC+3) hisoblanadi va
+yoziladi, server qayerda turganidan qat'i nazar. Boshqa mintaqa kerak bo'lsa
+`settings.tz_offset` ni o'zgartiring.
 
 ## Bot rollari
 

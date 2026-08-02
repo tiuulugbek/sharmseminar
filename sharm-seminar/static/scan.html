@@ -31,12 +31,26 @@ video{width:100%;border-radius:12px;background:#000;display:block;aspect-ratio:1
 .row{display:flex;gap:8px}
 .row input{flex:1;padding:12px;border:1px solid var(--line);border-radius:10px;font-size:15px;font-weight:600}
 .row .btn{width:auto;margin:0;padding:12px 18px}
-.res{border-radius:12px;padding:13px 14px;margin-bottom:12px;font-size:14px;font-weight:600;
+/* Katta natija banneri — skanerlagan odam bir qarashda ko'rsin */
+.big{border-radius:16px;padding:18px 16px;margin-bottom:12px;text-align:center;color:#fff;
+     animation:pop .28s cubic-bezier(.2,.9,.3,1.2)}
+@keyframes pop{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.big{animation:none}}
+.big .st{font-size:13px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;opacity:.92}
+.big .nm{font-size:22px;font-weight:900;line-height:1.15;margin:6px 0 3px}
+.big .sub{font-size:13px;font-weight:600;opacity:.92}
+.big .warn{margin-top:10px;background:rgba(255,255,255,.2);border-radius:9px;padding:7px 10px;
+     font-size:12px;font-weight:700}
+.big.ok{background:linear-gradient(135deg,#12B886,#0B7A5A)}
+.big.dup{background:linear-gradient(135deg,#F0A81A,#D2820A)}
+.big.wait{background:linear-gradient(135deg,#5B7CFA,#3B4FC4)}
+.big.err{background:linear-gradient(135deg,#E03131,#A81E1E)}
+.res{border-radius:12px;padding:11px 13px;margin-bottom:8px;font-size:13px;font-weight:600;
      border-left:4px solid var(--muted);background:#fff;border:1px solid var(--line)}
 .res.ok{border-left-color:var(--ok)}
 .res.err{border-left-color:var(--err)}
-.res b{display:block;font-size:16px;font-weight:800;margin-bottom:2px}
-.res .sub{color:var(--muted);font-weight:600;font-size:12.5px}
+.res b{display:block;font-size:14px;font-weight:800;margin-bottom:2px}
+.res .sub{color:var(--muted);font-weight:600;font-size:12px}
 .hint{color:var(--muted);font-size:12.5px;margin-top:8px}
 .hidden{display:none}
 </style>
@@ -106,16 +120,70 @@ async function api(path, body) {
   return {status: r.status, data};
 }
 
-function result(ok, title, sub) {
-  const box = document.createElement('div');
-  box.className = 'res ' + (ok ? 'ok' : 'err');
-  box.innerHTML = '<b></b><span class="sub"></span>';
-  box.querySelector('b').textContent = title;
-  box.querySelector('.sub').textContent = sub || '';
-  $('results').prepend(box);
-  while ($('results').children.length > 6) $('results').lastChild.remove();
-  if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred(ok ? 'success' : 'error');
+/* Har bir skandan keyin katta, bir qarashda o'qiladigan javob: vibratsiya
+   yetarli emas — nima bo'lgani yozilib turishi kerak. */
+const STATUS = {
+  ok:        {cls:'ok',   st:"Ro'yxatga olindi",       tone:[880, 1320]},
+  already:   {cls:'dup',  st:"Allaqachon ro'yxatda",   tone:[520]},
+  not_open:  {cls:'wait', st:"Vaqti hali kelmagan",    tone:[440]},
+  closed:    {cls:'wait', st:"Vaqti tugagan",          tone:[440]},
+  not_found: {cls:'err',  st:"Topilmadi",              tone:[300, 220]},
+  forbidden: {cls:'err',  st:"Ruxsat yo'q",            tone:[300, 220]},
+};
+
+let audio = null;
+function beep(freqs) {
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    freqs.forEach((f, i) => {
+      const osc = audio.createOscillator(), gain = audio.createGain();
+      osc.frequency.value = f; osc.type = 'sine';
+      gain.gain.setValueAtTime(0.001, audio.currentTime);
+      const at = audio.currentTime + i * 0.11;
+      gain.gain.exponentialRampToValueAtTime(0.25, at + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, at + 0.1);
+      osc.connect(gain); gain.connect(audio.destination);
+      osc.start(at); osc.stop(at + 0.11);
+    });
+  } catch (e) {}
 }
+
+function banner(status, name, sub, warnings) {
+  const meta = STATUS[status] || STATUS.forbidden;
+  const box = document.createElement('div');
+  box.className = 'big ' + meta.cls;
+  box.innerHTML = '<div class="st"></div><div class="nm"></div><div class="sub"></div>';
+  box.querySelector('.st').textContent = meta.st;
+  box.querySelector('.nm').textContent = name || '';
+  box.querySelector('.sub').textContent = sub || '';
+  if (warnings && warnings.length) {
+    const w = document.createElement('div');
+    w.className = 'warn';
+    w.textContent = "⚠️ O'tkazib yuborilgan: " + warnings.join(', ');
+    box.appendChild(w);
+  }
+  const list = $('results');
+  list.prepend(box);
+  // Oldingi banner kichik satrga aylanadi — oxirgisi doim eng tepada, katta.
+  list.querySelectorAll('.big').forEach((el, i) => { if (i > 0) shrink(el); });
+  while (list.children.length > 6) list.lastChild.remove();
+  beep(meta.tone);
+  if (tg && tg.HapticFeedback)
+    tg.HapticFeedback.notificationOccurred(status === 'ok' ? 'success'
+      : status === 'already' ? 'warning' : 'error');
+}
+
+function shrink(el) {
+  const st = el.querySelector('.st').textContent;
+  const nm = el.querySelector('.nm').textContent;
+  const sub = el.querySelector('.sub').textContent;
+  el.className = 'res ' + (el.classList.contains('ok') ? 'ok' : 'err');
+  el.innerHTML = '<b></b><span class="sub"></span>';
+  el.querySelector('b').textContent = nm || st;
+  el.querySelector('.sub').textContent = [st, sub].filter(Boolean).join(' · ');
+}
+
+function label(v) { return (v && typeof v === 'object') ? (v.uz || v.ru || v.en || '') : (v || ''); }
 
 function renderCheckpoints(list) {
   $('cps').innerHTML = '';
@@ -132,21 +200,25 @@ function renderCheckpoints(list) {
 async function submit(token) {
   if (!token) return;
   const now = Date.now();
-  if (token === lastToken && now - lastAt < 2500) return;  // one QR, one check-in
+  if (token === lastToken && now - lastAt < 2500) return;  // bitta QR — bitta urinish
   lastToken = token; lastAt = now;
   const {status, data} = await api('/api/webapp/checkin', {token, checkpoint});
-  if (status === 200) {
-    const p = data.participant || {};
-    result(true, '✅ ' + (p.fio || token),
-      [p.id, p.group_name || (p.group ? 'Guruh ' + p.group : ''), data.checkpoint, data.ts]
-        .filter(Boolean).join(' · '));
-  } else if (status === 404) {
-    result(false, '❌ Topilmadi', token);
-  } else if (status === 403) {
-    result(false, '⛔ Ruxsat yo\'q', data.reason || 'bu ishtirokchini belgilay olmaysiz');
-  } else {
-    result(false, '⚠️ Xato', data.error || ('HTTP ' + status));
-  }
+  const p = data.participant || {};
+  const warnings = (data.warnings || []).map(w => label(w.label));
+  const where = [p.group_name || (p.group ? 'Guruh ' + p.group : ''),
+                 p.room ? 'xona ' + p.room : ''].filter(Boolean).join(' · ');
+
+  if (status === 404)  return banner('not_found', token, 'Bu QR ro\'yxatda yo\'q');
+  if (status === 403)  return banner('forbidden', p.fio || '',
+                                     data.reason || 'bu ishtirokchini belgilay olmaysiz');
+  if (status !== 200)  return banner('forbidden', '', data.error || ('HTTP ' + status));
+
+  const st = data.status || 'ok';
+  if (st === 'ok')       return banner('ok', p.fio, [where, data.ts].filter(Boolean).join(' · '), warnings);
+  if (st === 'already')  return banner('already', p.fio, (data.ts || '') + ' da belgilangan · ' + where);
+  if (st === 'not_open') return banner('not_open', p.fio, (data.detail || '') + ' dan boshlanadi');
+  if (st === 'closed')   return banner('closed', p.fio, (data.detail || '') + ' da tugagan');
+  banner('forbidden', p.fio || '', st);
 }
 
 /* Telegram's own scanner is nicer when available; getUserMedia is the fallback

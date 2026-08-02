@@ -312,6 +312,103 @@ def _bot_participant(r):
     }
 
 
+# ═══════════════════════ Check-in: bir marta va o'z vaqtida ═══════════════════
+# Tadbir Misrda (UTC+3) o'tadi, server esa boshqa mintaqada bo'lishi mumkin.
+# Vaqt oynalari va yozilgan soat tadbir vaqtida hisoblanadi.
+DEFAULT_TZ_OFFSET = 3
+
+
+def _event_now(con=None):
+    close_after = con is None
+    con = con or db()
+    try:
+        offset = sget(con, "tz_offset", DEFAULT_TZ_OFFSET)
+    finally:
+        if close_after:
+            con.close()
+    try:
+        offset = float(offset)
+    except (TypeError, ValueError):
+        offset = DEFAULT_TZ_OFFSET
+    return datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=offset)
+
+
+def _parse_when(value):
+    """`YYYY-MM-DDTHH:MM` (tadbir vaqti) -> naive datetime, aks holda None."""
+    text = str(value or "").strip().replace(" ", "T")
+    if not text:
+        return None
+    for fmt in ("%Y-%m-%dT%H:%M", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
+        try:
+            return datetime.datetime.strptime(text, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def checkin_decision(con, row, cp_key, force=False):
+    """Bu odamni shu nuqtada belgilash mumkinmi?
+
+    Qaytadi ``{status, detail, ts, warnings}``:
+
+    ``already``   — allaqachon belgilangan, ikkinchi marta yozilmaydi;
+    ``not_open``  — nuqta vaqti hali kelmagan;
+    ``closed``    — nuqta vaqti o'tib ketgan;
+    ``ok``        — belgilash mumkin.
+
+    Oldingi nuqtalarni o'tkazib yuborish **taqiqlanmaydi**: odam aeroportda
+    belgilanmagan bo'lsa ham yahtada belgilanaveradi, o'tkazib yuborilgani
+    shunchaki ogohlantirish sifatida qaytadi.
+    """
+    cps = sget(con, "checkpoints", DEFAULT_CHECKPOINTS)
+    order = {c["key"]: i for i, c in enumerate(cps)}
+    if cp_key not in order:
+        return {"status": "unknown_checkpoint", "warnings": []}
+
+    marks = {r["checkpoint"]: r["ts"] for r in
+             con.execute("SELECT checkpoint,ts FROM checkins WHERE pid=?", (row["id"],))}
+    if cp_key in marks and not force:
+        return {"status": "already", "ts": marks[cp_key], "warnings": []}
+
+    cp = cps[order[cp_key]]
+    now = _event_now(con).replace(tzinfo=None)
+    if not force:
+        starts, ends = _parse_when(cp.get("starts_at")), _parse_when(cp.get("ends_at"))
+        if starts and now < starts:
+            return {"status": "not_open", "detail": starts.strftime("%d.%m %H:%M"), "warnings": []}
+        if ends and now > ends:
+            return {"status": "closed", "detail": ends.strftime("%d.%m %H:%M"), "warnings": []}
+
+    missed = [{"key": c["key"], "label": c.get("label")}
+              for c in cps[:order[cp_key]] if c["key"] not in marks]
+    return {"status": "ok", "warnings": missed}
+
+
+def _record_checkin(con, pid, cp_key):
+    ts = _event_now(con).strftime("%H:%M")
+    con.execute("INSERT INTO checkins(pid,checkpoint,ts) VALUES(?,?,?) "
+                "ON CONFLICT(pid,checkpoint) DO UPDATE SET ts=excluded.ts", (pid, cp_key, ts))
+    return ts
+
+
+def _checkin_payload(con, row, cp_key, decision, ts):
+    marks = {r["checkpoint"]: r["ts"] for r in
+             con.execute("SELECT checkpoint,ts FROM checkins WHERE pid=?", (row["id"],))}
+    return {
+        "ok": decision["status"] == "ok",
+        "status": decision["status"],
+        "detail": decision.get("detail"),
+        "ts": ts or decision.get("ts"),
+        "checkpoint": cp_key,
+        "warnings": decision.get("warnings", []),
+        "checkins": marks,
+        "participant": {"id": row["id"], "fio": row["fio"], "group": row["grp"],
+                        "group_name": _group_names(con).get(str(row["grp"])),
+                        "room": row["room"], "xona_turi": row["xona_turi"],
+                        "leader": bool(row["leader"])},
+    }
+
+
 def _resolve(con, key):
     """Look a participant up by ``ACO-xxx`` id **or** by QR token."""
     key = str(key or "").strip()
@@ -731,27 +828,32 @@ def checkin():
     target = _resolve(con, d.get("id") or d.get("token"))
     if not target:
         con.close()
-        return jsonify(error="participant_not_found"), 404
+        return jsonify(error="participant_not_found", status="not_found"), 404
     pid = target["id"]
     user = request.panel_user
     if user["rank"] < ROLE_RANK["manager"]:
         # Guruh mas'uli faqat o'z guruhini belgilaydi.
         if not user["group"] or target["grp"] != user["group"]:
             con.close()
-            return jsonify(error="forbidden"), 403
-    if on:
-        ts = datetime.datetime.now().strftime("%H:%M")
-        con.execute("INSERT INTO checkins(pid,checkpoint,ts) VALUES(?,?,?) "
-                    "ON CONFLICT(pid,checkpoint) DO UPDATE SET ts=excluded.ts", (pid, cp, ts))
-    else:
-        ts = None
+            return jsonify(error="forbidden", status="forbidden"), 403
+    if not on:
         con.execute("DELETE FROM checkins WHERE pid=? AND checkpoint=?", (pid, cp))
+        con.commit()
+        out = _checkin_payload(con, target, cp, {"status": "removed"}, None)
+        con.close()
+        return jsonify(out)
+
+    force = bool(d.get("force")) and user["rank"] >= ROLE_RANK["admin"]
+    decision = checkin_decision(con, target, cp, force=force)
+    if decision["status"] == "unknown_checkpoint":
+        con.close()
+        return jsonify(error="unknown_checkpoint", status="unknown_checkpoint"), 400
+    ts = _record_checkin(con, pid, cp) if decision["status"] == "ok" else None
     con.commit()
-    name = _group_names(con).get(str(target["grp"])) if target["grp"] else None
+    out = _checkin_payload(con, target, cp, decision, ts)
+    out["id"] = pid
     con.close()
-    return jsonify(ok=True, ts=ts, id=pid,
-                   participant={"id": pid, "fio": target["fio"], "group": target["grp"],
-                                "group_name": name, "room": target["room"]})
+    return jsonify(out)
 
 
 @app.post("/api/checkpoints")
@@ -1031,31 +1133,27 @@ def bot_checkin():
     row = _resolve(con, d.get("token") or d.get("id"))
     if not row:
         con.close()
-        return jsonify(error="participant_not_found"), 404
+        return jsonify(error="participant_not_found", status="not_found"), 404
     if not _may_checkin(con, actor, row):
         con.close()
-        return jsonify(error="forbidden", role=actor["role"]), 403
+        return jsonify(error="forbidden", status="forbidden", role=actor["role"]), 403
     cp = str(d.get("checkpoint") or "").strip()
-    known = {c["key"] for c in sget(con, "checkpoints", DEFAULT_CHECKPOINTS)}
-    if cp not in known:
-        con.close()
-        return jsonify(error="unknown_checkpoint", checkpoints=sorted(known)), 400
     on = d.get("on", True)
-    if on:
-        ts = datetime.datetime.now().strftime("%H:%M")
-        con.execute("INSERT INTO checkins(pid,checkpoint,ts) VALUES(?,?,?) "
-                    "ON CONFLICT(pid,checkpoint) DO UPDATE SET ts=excluded.ts",
-                    (row["id"], cp, ts))
-    else:
-        ts = None
+    if not on:
         con.execute("DELETE FROM checkins WHERE pid=? AND checkpoint=?", (row["id"], cp))
+        con.commit()
+        out = _checkin_payload(con, row, cp, {"status": "removed"}, None)
+        con.close()
+        return jsonify(out)
+
+    force = bool(d.get("force")) and actor["role"] == "admin"
+    decision = checkin_decision(con, row, cp, force=force)
+    if decision["status"] == "unknown_checkpoint":
+        con.close()
+        return jsonify(error="unknown_checkpoint", status="unknown_checkpoint"), 400
+    ts = _record_checkin(con, row["id"], cp) if decision["status"] == "ok" else None
     con.commit()
-    marks = {r["checkpoint"]: r["ts"] for r in
-             con.execute("SELECT checkpoint,ts FROM checkins WHERE pid=?", (row["id"],))}
-    out = {"ok": True, "ts": ts, "checkpoint": cp, "checkins": marks,
-           "participant": {"id": row["id"], "fio": row["fio"], "group": row["grp"],
-                           "group_name": _group_names(con).get(str(row["grp"])),
-                           "room": row["room"], "xona_turi": row["xona_turi"]}}
+    out = _checkin_payload(con, row, cp, decision, ts)
     con.close()
     return jsonify(out)
 
@@ -1462,36 +1560,28 @@ def webapp_checkin():
     """
     user = webapp_user()
     if not user:
-        return jsonify(error="invalid_init_data"), 401
+        return jsonify(error="invalid_init_data", status="invalid_init_data"), 401
     d = request.get_json(silent=True) or {}
     con = db()
     actor = _whoami(con, user.get("id"))
     row = _resolve(con, d.get("token") or d.get("id"))
     if not row:
         con.close()
-        return jsonify(error="participant_not_found"), 404
+        return jsonify(error="participant_not_found", status="not_found"), 404
     if not _may_checkin(con, actor, row):
         con.close()
-        return jsonify(error="forbidden", role=actor["role"],
+        return jsonify(error="forbidden", status="forbidden", role=actor["role"],
                        reason="boshqa guruh a'zosi" if actor["role"] == "leader"
                        else "ruxsat yo'q"), 403
     cp = str(d.get("checkpoint") or "").strip()
-    known = {c["key"] for c in sget(con, "checkpoints", DEFAULT_CHECKPOINTS)}
-    if cp not in known:
+    force = bool(d.get("force")) and actor["role"] == "admin"
+    decision = checkin_decision(con, row, cp, force=force)
+    if decision["status"] == "unknown_checkpoint":
         con.close()
-        return jsonify(error="unknown_checkpoint"), 400
-    ts = datetime.datetime.now().strftime("%H:%M")
-    con.execute("INSERT INTO checkins(pid,checkpoint,ts) VALUES(?,?,?) "
-                "ON CONFLICT(pid,checkpoint) DO UPDATE SET ts=excluded.ts",
-                (row["id"], cp, ts))
+        return jsonify(error="unknown_checkpoint", status="unknown_checkpoint"), 400
+    ts = _record_checkin(con, row["id"], cp) if decision["status"] == "ok" else None
     con.commit()
-    marks = {r["checkpoint"]: r["ts"] for r in
-             con.execute("SELECT checkpoint,ts FROM checkins WHERE pid=?", (row["id"],))}
-    out = {"ok": True, "ts": ts, "checkpoint": cp, "checkins": marks,
-           "participant": {"id": row["id"], "fio": row["fio"], "group": row["grp"],
-                           "group_name": _group_names(con).get(str(row["grp"])),
-                           "room": row["room"], "xona_turi": row["xona_turi"],
-                           "leader": bool(row["leader"])}}
+    out = _checkin_payload(con, row, cp, decision, ts)
     con.close()
     return jsonify(out)
 

@@ -200,9 +200,19 @@ tbody tr:hover{background:#FAFAFE}
 /* ===== kamera skaneri ===== */
 .camwrap video{width:100%;max-width:340px;border-radius:12px;background:#000;display:block;
   aspect-ratio:1/1;object-fit:cover;margin:0 auto}
-.camhit{display:flex;align-items:center;gap:8px;margin-top:8px;padding:9px 12px;border-radius:10px;
-  font-size:13px;font-weight:600;background:#EAFBF3;color:#0B7A5A}
-.camhit.bad{background:#FFECEC;color:#B00000}
+.cambig{border-radius:14px;padding:15px 14px;margin-top:10px;text-align:center;color:#fff;
+  animation:campop .26s cubic-bezier(.2,.9,.3,1.2)}
+@keyframes campop{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.cambig{animation:none}}
+.cambig .st{font-size:12px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;opacity:.92}
+.cambig .nm{font-size:20px;font-weight:900;line-height:1.15;margin:5px 0 2px}
+.cambig .sb{font-size:12.5px;font-weight:600;opacity:.92}
+.cambig .wr{margin-top:9px;background:rgba(255,255,255,.2);border-radius:8px;padding:6px 9px;
+  font-size:11.5px;font-weight:700}
+.cambig.ok{background:linear-gradient(135deg,#12B886,#0B7A5A)}
+.cambig.dup{background:linear-gradient(135deg,#F0A81A,#D2820A)}
+.cambig.wait{background:linear-gradient(135deg,#5B7CFA,#3B4FC4)}
+.cambig.err{background:linear-gradient(135deg,#E03131,#A81E1E)}
 /* ===== QR gridi ===== */
 .qrgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:14px}
 .qrcard{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;text-align:center}
@@ -272,7 +282,7 @@ const T = {
   langCol:"Til",editingIn:"Tahrirlanayotgan til:",allLangs:"Uchala tilni birdan",langAuto:"Avto",langHint:"Ishtirokchi QR ni skanlaganda sahifa shu tilda ochiladi",
   camScan:"📷 Kamera bilan skanlash",camStop:"⏹ To'xtatish",
   camHint:"Beyjik QR ini ramkaga tuting — topilishi bilan belgilanadi",
-  camErr:"Kameraga ruxsat berilmadi",
+  camErr:"Kameraga ruxsat berilmadi",camOk:"Ro'yxatga olindi",camAlready2:"Allaqachon ro'yxatda",camWait:"Vaqti mos emas",camErr2:"Xato",camAlready:"da belgilangan",camNotOpen:"dan boshlanadi",camClosed:"da tugagan",camMissed:"O'tkazib yuborilgan",cpFrom:"Boshlanishi",cpTo:"Tugashi",cpWindow:"Vaqt oynasi — bo'sh qoldirilsa har doim ochiq",
   roomNo:"Xona №",scanPh:"QR / ID kiriting (ACO-001) va Enter",checkedIn:"belgilangan",notYet:"belgilanmagan",
   saved:"Saqlandi",distDone:"Guruhlarga taqsimlandi",cleared:"Guruhlar tozalandi",notFound:"Topilmadi",
   pos:"belgilandi",neg:"bekor qilindi",
@@ -301,7 +311,7 @@ const T = {
   langCol:"Язык",editingIn:"Язык редактирования:",allLangs:"Все три языка сразу",langAuto:"Авто",langHint:"На этом языке откроется страница при сканировании QR",
   camScan:"📷 Сканировать камерой",camStop:"⏹ Остановить",
   camHint:"Наведите камеру на QR бейджа — отметка произойдёт сразу",
-  camErr:"Доступ к камере не разрешён",
+  camErr:"Доступ к камере не разрешён",camOk:"Отмечен",camAlready2:"Уже отмечен",camWait:"Не то время",camErr2:"Ошибка",camAlready:"уже отмечен",camNotOpen:"откроется",camClosed:"закрыто в",camMissed:"Пропущено",cpFrom:"Начало",cpTo:"Конец",cpWindow:"Временное окно — пусто значит всегда открыто",
   roomNo:"Номер",scanPh:"Введите QR / ID (ACO-001) и Enter",checkedIn:"отмечено",notYet:"не отмечено",
   saved:"Сохранено",distDone:"Распределено по группам",cleared:"Группы очищены",notFound:"Не найдено",
   pos:"отмечен",neg:"снята отметка",
@@ -330,7 +340,7 @@ const T = {
   langCol:"Language",editingIn:"Editing in:",allLangs:"All three languages",langAuto:"Auto",langHint:"The page opens in this language when the QR is scanned",
   camScan:"📷 Scan with camera",camStop:"⏹ Stop",
   camHint:"Point the camera at the badge QR — it checks in as soon as it reads",
-  camErr:"Camera permission denied",
+  camErr:"Camera permission denied",camOk:"Checked in",camAlready2:"Already checked in",camWait:"Wrong time",camErr2:"Error",camAlready:"already marked",camNotOpen:"opens at",camClosed:"closed at",camMissed:"Missed",cpFrom:"Opens",cpTo:"Closes",cpWindow:"Time window — leave empty to keep it always open",
   roomNo:"Room no.",scanPh:"Enter QR / ID (ACO-001) and press Enter",checkedIn:"checked in",notYet:"not yet",
   saved:"Saved",distDone:"Distributed into groups",cleared:"Groups cleared",notFound:"Nothing found",
   pos:"checked in",neg:"cleared",
@@ -407,7 +417,7 @@ const api={
    try{const r=await fetch('/api/checkin',{method:'POST',headers:H,body:JSON.stringify({id,checkpoint:cp,on})});
      if(r.status===401){showGate();return null;}
      if(r.status===403){toast(t('noRight'));return null;}
-     const j=await r.json();return j.ts;}catch(e){return on?nowHM():null;} },
+     return await r.json();}catch(e){return {status:on?'ok':'removed',ts:on?nowHM():null};} },
  async saveCheckpoints(){ return this._post('/api/checkpoints',{checkpoints:S.checkpoints}); },
  async saveProgram(){ return this._post('/api/program',S.program); },
  async saveRoles(){ return this._post('/api/roles',S.roles); },
@@ -666,6 +676,14 @@ function renderCheckin(v){
       <input id="scan" placeholder="${t('scanPh')}" autocomplete="off" style="flex:1;min-width:200px;padding:11px 14px;border:1px solid var(--line-2);border-radius:10px;font-weight:600">
       <button class="btn pri" id="camBtn" onclick="toggleCam()">${t('camScan')}</button>
       <div class="search"><span class="mag">⌕</span><input id="ciq" placeholder="${t('search')}" value="${ciSearch}"></div></div>
+    ${can('admin')?`<div class="card" style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+      <div class="frow" style="margin:0"><label>${t('cpFrom')}</label>
+        <input type="datetime-local" value="${escapeHtml(activeCPObj().starts_at||'')}"
+          onchange="setCPWindow('starts_at',this.value)"></div>
+      <div class="frow" style="margin:0"><label>${t('cpTo')}</label>
+        <input type="datetime-local" value="${escapeHtml(activeCPObj().ends_at||'')}"
+          onchange="setCPWindow('ends_at',this.value)"></div>
+      <span class="muted" style="font-size:12px">${t('cpWindow')}</span></div>`:''}
     <div class="card camwrap" id="camwrap" style="display:none">
       <video id="camvid" playsinline muted></video>
       <div class="muted" id="camhint" style="font-size:12.5px;margin-top:9px">${t('camHint')}</div>
@@ -689,7 +707,14 @@ function lookupScan(value){
       || (digits?P().find(x=>x.id.replace(/[^0-9]/g,'')===digits):null)
       || null;
 }
-function setCP(k){activeCP=k;renderCheckin(document.getElementById('view'));}
+function setCP(k){if(camOn)stopCam();activeCP=k;renderCheckin(document.getElementById('view'));}
+const activeCPObj=()=>CPS().find(c=>c.key===activeCP)||{};
+// Nuqta vaqt oynasi: bo'sh qoldirilsa nuqta har doim ochiq.
+function setCPWindow(field,val){
+  const c=activeCPObj(); if(!c.key)return;
+  if(val)c[field]=val; else delete c[field];
+  api.saveCheckpoints();toast(t('saved'));
+}
 function fillCI(){const cil=document.getElementById('cil');if(!cil)return;
   const q=ciSearch.trim().toLowerCase();const map=S.checkins[activeCP]||{};
   const list=P().filter(p=>!q||p.fio.toLowerCase().includes(q)||p.id.toLowerCase().includes(q)).slice(0,80);
@@ -702,9 +727,14 @@ function fillCI(){const cil=document.getElementById('cil');if(!cil)return;
       <button class="btn sm ${on?'':'pri'}" onclick="doCheck('${p.id}',${!on})">${on?t('notYet'):'✓ '+t('checkedIn')}</button></div>`;
   }).join('')||`<div class="empty" style="padding:26px;text-align:center">${t('notFound')}</div>`;
 }
-async function doCheck(id,on){const ts=await api.checkin(id,activeCP,on);const map=S.checkins[activeCP]=S.checkins[activeCP]||{};
-  if(on){map[id]=ts||nowHM();toast(find(id).fio+' — '+cpName(activeCP)+': '+t('pos'));}
-  else{delete map[id];toast(find(id).fio+' — '+t('neg'));}
+async function doCheck(id,on){
+  const res=await api.checkin(id,activeCP,on); if(!res)return;
+  const map=S.checkins[activeCP]=S.checkins[activeCP]||{};
+  if(!on){delete map[id];toast(find(id).fio+' — '+t('neg'));}
+  else if(res.status==='already'){map[id]=res.ts;toast(find(id).fio+' — '+res.ts+' '+t('camAlready'));}
+  else if(res.status==='not_open'){toast(find(id).fio+' — '+(res.detail||'')+' '+t('camNotOpen'));}
+  else if(res.status==='closed'){toast(find(id).fio+' — '+(res.detail||'')+' '+t('camClosed'));}
+  else{map[id]=res.ts||nowHM();toast(find(id).fio+' — '+cpName(activeCP)+': '+t('pos'));}
   if(camOn)fillCI(); else renderCheckin(document.getElementById('view'));}
 function setRoom(id,val){find(id).room=val;api.patch(id,{room:val});toast(t('saved'));}
 // Ishtirokchining asosiy tili: QR skanlanganda sahifa shu tilda ochiladi.
@@ -758,23 +788,63 @@ function stopCam(){
 
 async function camHit(raw){
   const now=Date.now();
-  if(raw===camLast&&now-camLastAt<2500)return;   // bitta QR — bitta belgilash
+  if(raw===camLast&&now-camLastAt<2500)return;   // bitta QR — bitta urinish
   camLast=raw; camLastAt=now;
   const p=lookupScan(raw);
-  if(!p)return camNote(t('notFound')+': '+String(raw).slice(-24),false);
-  const already=(S.checkins[activeCP]||{})[p.id];
-  if(already)return camNote(p.fio+' — '+t('checkedIn')+' '+already,true);
-  await doCheck(p.id,true);
-  camNote('✓ '+p.fio+' — '+cpName(activeCP),true);
+  if(!p)return camBanner('err',t('notFound'),String(raw).slice(-24));
+  const res=await api.checkin(p.id,activeCP,true);
+  if(!res)return;                                 // 401/403 — api qatlami aytdi
+  const st=res.status||'ok';
+  const warn=(res.warnings||[]).map(w=>tx(w.label)).filter(Boolean);
+  const where=[p.group?t('grp')+' '+p.group:'',p.room?t('roomNo')+' '+p.room:''].filter(Boolean).join(' · ');
+  if(st==='ok'){
+    const map=S.checkins[activeCP]=S.checkins[activeCP]||{};
+    map[p.id]=res.ts||nowHM(); fillCI();
+    camBanner('ok',p.fio,[cpName(activeCP),where,res.ts].filter(Boolean).join(' · '),warn);
+  }else if(st==='already'){
+    camBanner('dup',p.fio,`${res.ts||''} ${t('camAlready')}`);
+  }else if(st==='not_open'){
+    camBanner('wait',p.fio,`${res.detail||''} ${t('camNotOpen')}`);
+  }else if(st==='closed'){
+    camBanner('wait',p.fio,`${res.detail||''} ${t('camClosed')}`);
+  }else{
+    camBanner('err',p.fio,st);
+  }
 }
 
-function camNote(text,ok){
+const CAM_TITLE={ok:'camOk',dup:'camAlready2',wait:'camWait',err:'camErr2'};
+function camBanner(kind,name,sub,warnings){
   const box=document.getElementById('camlog'); if(!box)return;
-  const line=document.createElement('div');
-  line.className='camhit'+(ok?'':' bad');
-  line.textContent=text;
-  box.prepend(line);
+  const el=document.createElement('div');
+  el.className='cambig '+kind;
+  el.innerHTML='<div class="st"></div><div class="nm"></div><div class="sb"></div>';
+  el.querySelector('.st').textContent=t(CAM_TITLE[kind]||'camErr2');
+  el.querySelector('.nm').textContent=name||'';
+  el.querySelector('.sb').textContent=sub||'';
+  if(warnings&&warnings.length){
+    const w=document.createElement('div'); w.className='wr';
+    w.textContent='⚠️ '+t('camMissed')+': '+warnings.join(', ');
+    el.appendChild(w);
+  }
+  box.prepend(el);
   while(box.children.length>4)box.lastChild.remove();
+  camBeep(kind==='ok');
+}
+
+let camAudio=null;
+function camBeep(good){
+  try{
+    camAudio=camAudio||new (window.AudioContext||window.webkitAudioContext)();
+    (good?[880,1320]:[440]).forEach((f,i)=>{
+      const o=camAudio.createOscillator(),g=camAudio.createGain();
+      o.frequency.value=f;o.type='sine';
+      const at=camAudio.currentTime+i*0.11;
+      g.gain.setValueAtTime(0.001,camAudio.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.22,at+0.01);
+      g.gain.exponentialRampToValueAtTime(0.001,at+0.1);
+      o.connect(g);g.connect(camAudio.destination);o.start(at);o.stop(at+0.11);
+    });
+  }catch(e){}
 }
 
 /* ===== QR KODLAR ===== */

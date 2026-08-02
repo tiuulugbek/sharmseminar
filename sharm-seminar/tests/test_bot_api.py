@@ -157,6 +157,22 @@ class BotApiTest(unittest.TestCase):
         return self.client.get(f"/api/bot/whoami?telegram_id={telegram_id}",
                                headers=self.headers).get_json()
 
+    def test_panel_role_carries_into_the_bot(self):
+        """Rollar bitta joyda — bazada — boshqariladi, .env bilan bo'linmaydi."""
+        leader, member, other = self.build_group()
+        self.assertEqual(self.whoami("9001")["role"], "leader")
+
+        # Rahbar botda ham barcha guruh bilan ishlaydi.
+        self.sql("UPDATE participants SET panel_role='manager' WHERE id=?", leader["id"])
+        self.assertEqual(self.whoami("9001")["role"], "admin")
+
+        self.sql("UPDATE participants SET panel_role='admin' WHERE id=?", member["id"])
+        self.assertEqual(self.whoami("9100")["role"], "admin")
+
+        # Pastga tushirilsa ham darhol kuchga kiradi.
+        self.sql("UPDATE participants SET panel_role=NULL WHERE id=?", member["id"])
+        self.assertEqual(self.whoami("9100")["role"], "member")
+
     def test_whoami_ranks_admin_over_leader_over_member(self):
         leader, member, _ = self.build_group()
         self.assertEqual(self.whoami("555")["role"], "admin")

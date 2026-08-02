@@ -145,6 +145,15 @@ Rol qanday aniqlanadi (yuqoridan pastga):
 4. `participants.leader=1` → `leader`;
 5. aks holda → `member`.
 
+⚠️ `ADMIN_IDS` va `PANEL_ADMIN_IDS` **eng ustun** turadi: u yerdagi odam
+`set_role.py` bilan qanday rol berilganidan qat'i nazar to'liq admin bo'lib
+qolaveradi. Shuning uchun `.env` da faqat haqiqiy texnik adminlar tursin,
+qolgan hamma rol bazadan (`tools/set_role.py`) beriladi.
+
+**Panel roli botga ham o'tadi:** `admin` va `manager` botda ham hamma guruh
+bilan ishlaydi, ya'ni rollar bitta joyda boshqariladi va `.env` bilan bo'linib
+ketmaydi.
+
 Rol berish:
 
 ```bash

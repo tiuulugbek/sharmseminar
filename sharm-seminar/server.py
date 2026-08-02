@@ -442,7 +442,12 @@ def _whoami(con, telegram_id):
     row = con.execute("SELECT * FROM participants WHERE telegram_id=? AND telegram_id<>''",
                       (tid,)).fetchone() if tid else None
     admins = _admin_ids() | {str(x) for x in sget(con, "admins", []) or []}
+    # Panel roli botga ham o'tadi, shunda rollar bitta joyda (bazada) boshqariladi:
+    # `admin` va `manager` botda ham hamma guruh bilan ishlaydi.
+    panel = panel_role(con, row) if row else None
     if tid and tid in admins:
+        role = "admin"
+    elif panel in ("admin", "manager"):
         role = "admin"
     elif row and row["leader"]:
         role = "leader"

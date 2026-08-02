@@ -154,3 +154,11 @@ def group_seen(chat_id, telegram_id, *, username="", full_name="", status="membe
 def group_audit(chat_id):
     """Bot ko'rgan a'zolar: ro'yxatda borlar va yo'qlar."""
     return _request("GET", "/api/bot/group/audit", params={"chat_id": str(chat_id)})
+
+
+def get_setting(key):
+    return _request("GET", f"/api/bot/setting/{key}").get("value")
+
+
+def set_setting(key, value):
+    return _request("POST", f"/api/bot/setting/{key}", payload={"value": value})

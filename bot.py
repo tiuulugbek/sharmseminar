@@ -13,6 +13,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (
     CallbackQuery,
     ChatMemberUpdated,
+    ChatPermissions,
     BufferedInputFile,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -366,6 +367,9 @@ async def _do_join(user_id: int, full_name: str, idx: int, username: str = ""):
 
     await bot.send_message(user_id, f"✅ <b>Topildi:</b> {full_name}\nRo'yxatdan o'tganingiz tasdiqlandi.")
     pid = (participant or {}).get("id") or str(idx)
+    # Guruh qulflangan bo'lsa, tasdiqlangan odamga yozish ruxsati shu yerda ochiladi.
+    if await allow_talking(user_id):
+        await bot.send_message(user_id, "💬 Endi safar guruhida yozishingiz mumkin.")
     await send_group_card(user_id, pid)
     await send_personal_page(user_id, pid)
 
@@ -1759,6 +1763,60 @@ async def reply_invalid(message: Message):
 # eski a'zolar tasdiqlash chaqiruvidan keyin o'zi ko'rinadi.
 
 
+# Guruhni "faqat tasdiqlaganlar yozadi" holatiga qo'yish.
+# Telegramda shaxsiy cheklov guruhning umumiy sozlamasidan ustun turadi, shuning
+# uchun umumiy sozlamani yopib, tasdiqlagan har bir odamga alohida ruxsat
+# beramiz — bu botning a'zolarni ro'yxatlab ololmasligini ham chetlab o'tadi.
+#
+# Guruhning o'z sozlamasi qanday bo'lsa, shundayligicha saqlanadi: qulflashdan
+# oldin nusxasi olinadi va ruxsat qaytarilganda aynan o'sha tiklanadi.
+PERM_FIELDS = [f for f in ChatPermissions.model_fields]
+
+MUTE = ChatPermissions(**{f: False for f in PERM_FIELDS})
+
+# Nusxa olinmagan bo'lsa ishlatiladigan zaxira: faqat matn.
+FALLBACK_TALK = ChatPermissions(can_send_messages=True)
+
+
+def _perms_to_dict(perms) -> dict:
+    return {f: getattr(perms, f, None) for f in PERM_FIELDS}
+
+
+async def saved_permissions() -> ChatPermissions:
+    """Qulflashdan oldingi guruh sozlamasi."""
+    try:
+        stored = await asyncio.to_thread(api_client.get_setting, "group_permissions")
+    except api_client.ApiError:
+        stored = None
+    if not stored:
+        return FALLBACK_TALK
+    return ChatPermissions(**{k: v for k, v in stored.items() if k in PERM_FIELDS})
+
+
+async def allow_talking(telegram_id) -> bool:
+    """Tasdiqlagan odamga guruhda yozish ruxsatini qaytaradi.
+
+    Guruh qulflanmagan bo'lsa hech narsa qilmaydi — bekorga cheklov qo'ymaslik
+    uchun.
+    """
+    if not config.GROUP_CHAT_ID:
+        return False
+    try:
+        locked = await asyncio.to_thread(api_client.get_setting, "group_locked")
+    except api_client.ApiError:
+        locked = None
+    if not locked:
+        return False
+    try:
+        await bot.restrict_chat_member(config.GROUP_CHAT_ID, int(telegram_id),
+                                       permissions=await saved_permissions())
+        return True
+    except Exception as exc:
+        # Guruhda bo'lmasa yoki admin bo'lsa — normal holat, jimgina o'tamiz.
+        logger.debug("Yozish ruxsatini berib bo'lmadi (%s): %s", telegram_id, exc)
+        return False
+
+
 def _person_label(user) -> str:
     name = " ".join(filter(None, [user.first_name, user.last_name])).strip()
     return name or (f"@{user.username}" if user.username else str(user.id))
@@ -1793,9 +1851,9 @@ async def on_chat_member(update: ChatMemberUpdated):
         await bot.send_message(
             user.id,
             "👋 Salom! Siz <b>Acoustic 2026</b> guruhiga qo'shildingiz.\n\n"
-            "Guruhda qolish uchun ro'yxatdan o'tganingizni tasdiqlang: "
+            "Guruhda yozish uchun ro'yxatdan o'tganingizni tasdiqlang: "
             "/start bosing va <b>pasport seriya va raqamingizni</b> kiriting.\n"
-            "<i>Tasdiqlamaganlar guruhdan chiqariladi.</i>")
+            "<i>Tasdiqlamaganlar guruhda yoza olmaydi va keyinchalik chiqariladi.</i>")
     except Exception:
         logger.debug("Yangi a'zoga yozib bo'lmadi (botni ochmagan): %s", user.id)
 
@@ -1858,7 +1916,10 @@ async def cmd_group_status(message: Message):
                  f" · hali jim: <b>{max(0, total - seen)}</b>")
         text += ("\n<i>Telegram botga a'zolar ro'yxatini bermaydi — jim turganlar "
                  "tasdiqlash chaqiruvidan keyin ko'rinadi.</i>")
-    text += "\n\n/guruh_chaqiruv — tasdiqlashga chaqirish\n/guruh_tozala — ro'yxatda yo'qlarni chiqarish"
+    text += ("\n\n/guruh_chaqiruv — tasdiqlashga chaqirish"
+             "\n/guruh_qulf — faqat tasdiqlaganlar yozsin"
+             "\n/guruh_ochiq — qulfni olib tashlash"
+             "\n/guruh_tozala — ro'yxatda yo'qlarni chiqarish")
     for chunk in [text[i:i + 3500] for i in range(0, len(text), 3500)]:
         await message.answer(chunk)
 
@@ -1877,13 +1938,69 @@ async def cmd_group_call(message: Message):
             "📋 <b>Ro'yxatni tasdiqlash</b>\n\n"
             "Hurmatli ishtirokchilar! Guruhda faqat safar ro'yxatidagi odamlar qolishi kerak.\n\n"
             "Quyidagi tugmani bosing → botda <b>pasport seriya va raqamingizni</b> kiriting. "
-            "Shundan keyin guruhingiz, xonangiz va shaxsiy QR sahifangizni olasiz.\n\n"
-            "<i>Tasdiqlamagan foydalanuvchilar guruhdan chiqariladi.</i>",
+            "Shundan keyin guruhingiz, xonangiz va shaxsiy QR sahifangizni olasiz, "
+            "hamda <b>guruhda yozish imkoniyati ochiladi</b>.\n\n"
+            "<i>Tasdiqlamaganlar guruhda yoza olmaydi va keyinchalik chiqariladi.</i>",
             reply_markup=kb)
         await message.answer("✅ Chaqiruv guruhga yuborildi.\n\n"
                              "Odamlar tasdiqlagani sayin /guruh_holat da ko'rinib boradi.")
     except Exception as exc:
         await message.answer(f"⚠️ Guruhga yuborib bo'lmadi: <code>{exc}</code>")
+
+
+@dp.message(Command("guruh_qulf"), F.chat.type == "private")
+async def cmd_group_lock(message: Message):
+    """Guruhni yopadi: faqat tasdiqlaganlar yoza oladi."""
+    if not _is_admin(message.from_user.id):
+        return
+    me = await bot.get_me()
+    rights = await bot.get_chat_member(config.GROUP_CHAT_ID, me.id)
+    if not getattr(rights, "can_restrict_members", False):
+        return await message.answer(
+            "⛔ Botda <b>foydalanuvchilarni bloklash</b> huquqi yo'q — qulflay olmayman.")
+
+    # Avval guruhning hozirgi sozlamasini saqlab qo'yamiz, keyin yopamiz —
+    # ruxsat qaytarilganda aynan shu holat tiklanadi.
+    try:
+        chat = await bot.get_chat(config.GROUP_CHAT_ID)
+        if chat.permissions:
+            await asyncio.to_thread(api_client.set_setting, "group_permissions",
+                                    _perms_to_dict(chat.permissions))
+        await bot.set_chat_permissions(config.GROUP_CHAT_ID, permissions=MUTE)
+        await asyncio.to_thread(api_client.set_setting, "group_locked", True)
+    except Exception as exc:
+        return await message.answer(f"⚠️ Qulflab bo'lmadi: <code>{exc}</code>")
+
+    await message.answer("🔒 Guruh yopildi. Tasdiqlaganlarga ruxsat qaytarilmoqda…")
+    verified = [p for p in await asyncio.to_thread(api_client.recipients) if p.get("telegram_id")]
+    opened = 0
+    for person in verified:
+        if await allow_talking(person["telegram_id"]):
+            opened += 1
+        await asyncio.sleep(0.1)
+    await message.answer(
+        "🔒 <b>Guruh qulflandi</b>\n\n"
+        f"✅ Yozish ruxsati berilgan (tasdiqlaganlar): <b>{opened}</b>\n"
+        "🔇 Qolganlar tasdiqlamaguncha yoza olmaydi.\n\n"
+        "<i>Adminlarga cheklov tegmaydi. Har kim /start bosib pasportini "
+        "kiritishi bilan ruxsat o'zi ochiladi — guruhning avvalgi sozlamasi "
+        "qanday bo'lsa, shundayligicha qaytariladi.</i>\n\n"
+        "/guruh_ochiq — qulfni butunlay olib tashlash")
+
+
+@dp.message(Command("guruh_ochiq"), F.chat.type == "private")
+async def cmd_group_unlock(message: Message):
+    """Qulfni bekor qiladi: guruh avvalgi holatiga qaytadi."""
+    if not _is_admin(message.from_user.id):
+        return
+    try:
+        await bot.set_chat_permissions(config.GROUP_CHAT_ID,
+                                       permissions=await saved_permissions())
+        await asyncio.to_thread(api_client.set_setting, "group_locked", False)
+        await message.answer("🔓 <b>Qulf olib tashlandi</b> — guruh avvalgi "
+                             "sozlamasiga qaytdi, hamma yoza oladi.")
+    except Exception as exc:
+        await message.answer(f"⚠️ Ochib bo'lmadi: <code>{exc}</code>")
 
 
 @dp.message(Command("guruh_tozala"), F.chat.type == "private")

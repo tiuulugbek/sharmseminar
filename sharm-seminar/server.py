@@ -1269,6 +1269,32 @@ def bot_group_seen():
     return jsonify(ok=True)
 
 
+# Bot saqlab qo'yishi mumkin bo'lgan sozlamalar — boshqasiga tegmaydi.
+BOT_SETTING_KEYS = {"group_permissions", "group_locked"}
+
+
+@app.get("/api/bot/setting/<key>")
+@bot_auth
+def bot_get_setting(key):
+    if key not in BOT_SETTING_KEYS:
+        return jsonify(error="unknown_key"), 400
+    con = db()
+    value = sget(con, key)
+    con.close()
+    return jsonify(key=key, value=value)
+
+
+@app.post("/api/bot/setting/<key>")
+@bot_auth
+def bot_set_setting(key):
+    if key not in BOT_SETTING_KEYS:
+        return jsonify(error="unknown_key"), 400
+    con = db()
+    sset(con, key, (request.get_json(silent=True) or {}).get("value"))
+    con.commit(); con.close()
+    return jsonify(ok=True)
+
+
 @app.get("/api/bot/group/audit")
 @bot_auth
 def bot_group_audit():

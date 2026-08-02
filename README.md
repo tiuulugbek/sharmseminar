@@ -298,7 +298,9 @@ Guruhdagi odamlarni tekshirib, faqat ro'yxatdagilarni qoldirish tartibi:
    Guruh mas'uli o'z guruhinikini ko'radi va qo'ng'iroq qilib chaqiradi.
 6. **`/guruh_holat`** — guruhda jami nechta, bot nechtasini taniydi, ro'yxatda
    bor/yo'q.
-7. **`/guruh_tozala`** — ro'yxatda yo'qlarni chiqarish (oxirida, tasdiqlash
+7. **`/guruh_qulf`** — guruhni yopish: tasdiqlamaganlar yoza olmaydi.
+   Odam tasdiqlashi bilan ruxsat o'zi ochiladi.
+8. **`/guruh_tozala`** — ro'yxatda yo'qlarni chiqarish (oxirida, tasdiqlash
    muddati tugagach).
 
 Guruhlar allaqachon bazada taqsimlangan, shuning uchun «guruhlarga ajratish»
@@ -331,6 +333,29 @@ Admin buyruqlari (botga shaxsiy chatda):
 | `/guruh_chaqiruv` | Guruhga tasdiqlash chaqiruvini yuboradi — tugma bosilsa bot ochiladi |
 | `/guruh_holat` | Hisobot: guruhda jami nechta, bot nechtasini taniydi, ro'yxatda borlar va yo'qlar |
 | `/guruh_tozala` | Ro'yxatda yo'qlarni guruhdan chiqaradi (tasdiqlashdan keyin) |
+
+### Faqat tasdiqlaganlar yozsin
+
+Telegramda **shaxsiy cheklov guruhning umumiy sozlamasidan ustun turadi**. Shu
+qoidadan foydalanamiz: guruh butunlay yozish-taqiqli qilinadi, tasdiqlagan har
+bir odamga esa alohida ruxsat beriladi. Bu botning a'zolarni ro'yxatlab
+ololmasligini ham chetlab o'tadi — kimni tanimasa, o'sha jim qoladi.
+
+| Buyruq | Vazifasi |
+|---|---|
+| `/guruh_qulf` | Guruhni yopadi va tasdiqlaganlarga ruxsatni qaytaradi |
+| `/guruh_ochiq` | Qulfni bekor qiladi, guruh avvalgi holatiga qaytadi |
+
+Qulflashdan **oldin guruhning hozirgi sozlamasi nusxalanadi** va `settings` ga
+saqlanadi; ruxsat qaytarilganda aynan o'sha holat tiklanadi. Ya'ni guruhda
+media yoki taklif qilish yopiq bo'lsa, ochilgandan keyin ham yopiq qoladi —
+bot o'zining sozlamasini majburlamaydi.
+
+Odam `/start` bosib pasportini kiritishi bilan ruxsat **avtomatik** ochiladi va
+unga «Endi safar guruhida yozishingiz mumkin» deb yoziladi. Guruh qulflanmagan
+bo'lsa bot hech kimga cheklov qo'ymaydi.
+
+Adminlarga cheklov tegmaydi — Telegram adminlarni umumiy sozlamadan ozod qiladi.
 
 Chiqarish uchun botda **«Foydalanuvchilarni bloklash»** huquqi bo'lishi shart.
 Buni faqat guruh admini Telegram ilovasidan beradi — bot o'ziga huquq qo'sha
@@ -371,7 +396,8 @@ chop etilgan beyjiklar ishlashda davom etadi.
   taqsimlangani uchun eski foydalanuvchilar uni ko'rmagan.
 - `/menyu` — rol menyusini qayta ochish.
 - `/skaner` — check-in skanerini (mini-app) ochish.
-- `/guruh_chaqiruv` · `/guruh_holat` · `/guruh_tozala` — guruh nazorati (admin).
+- `/guruh_chaqiruv` · `/guruh_holat` · `/guruh_qulf` · `/guruh_ochiq` · `/guruh_tozala` — guruh nazorati (admin).
+- `/tasdiqlanmaganlar` — kim hali tasdiqlamagan (admin va guruh mas'uli).
 - `/royxat` — yangi ishtirokchi/oila a'zosini to'liq ro'yxatga olish.
 - `/yangilash` — mavjud ma'lumotni pasport orqali yangilash.
 - `/bekor` — joriy jarayonni bekor qilish.

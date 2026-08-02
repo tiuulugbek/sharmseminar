@@ -4,7 +4,7 @@ import logging
 import os
 from datetime import date, datetime
 
-from aiogram import Bot, Dispatcher, F
+from aiogram import BaseMiddleware, Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import Command, CommandStart, StateFilter
@@ -1752,12 +1752,27 @@ async def on_chat_member(update: ChatMemberUpdated):
         logger.debug("Yangi a'zoga yozib bo'lmadi (botni ochmagan): %s", user.id)
 
 
-@dp.message(F.chat.id == config.GROUP_CHAT_ID)
-async def on_group_message(message: Message):
-    """Guruhda yozgan odamni belgilab qo'yamiz — bot jim turishda davom etadi."""
-    await _remember(message.chat.id, message.from_user, status="member", source="message")
-    for user in (message.new_chat_members or []):
-        await _remember(message.chat.id, user, status="member", source="joined")
+class GroupSilence(BaseMiddleware):
+    """Bot guruhda hech qachon javob bermaydi — faqat kuzatadi.
+
+    Bu tekshiruv hamma handlerdan oldin ishlaydi, shuning uchun buyruq bo'ladimi,
+    yarim qolgan ro'yxatdan o'tish oqimi bo'ladimi — guruhda hech biri ishlamaydi.
+    Bot qaysi guruhga qo'shilgan bo'lsa ham jim turadi.
+    """
+
+    async def __call__(self, handler, event, data):
+        chat = getattr(event, "chat", None)
+        if chat is None or chat.type == "private":
+            return await handler(event, data)
+        if str(chat.id) == str(config.GROUP_CHAT_ID):
+            await _remember(chat.id, event.from_user, status="member", source="message")
+            for user in (getattr(event, "new_chat_members", None) or []):
+                await _remember(chat.id, user, status="member", source="joined")
+        return None  # guruhda hech qanday javob yo'q
+
+
+dp.message.outer_middleware(GroupSilence())
+dp.edited_message.outer_middleware(GroupSilence())
 
 
 def _audit_lines(audit) -> str:

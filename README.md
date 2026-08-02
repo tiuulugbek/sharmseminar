@@ -282,6 +282,13 @@ eski imzoni rad etadi. Soxta `telegram_id` bilan check-in qilib bo'lmaydi.
 
 ## Telegram guruhini nazorat qilish
 
+Bot guruhda **hech qachon javob bermaydi**. Buni `GroupSilence` middleware
+kafolatlaydi: u barcha handlerlardan oldin ishlaydi, shuning uchun guruhda
+buyruq yozilsa ham, kimdir yarim qolgan ro'yxatdan o'tish oqimida bo'lsa ham,
+bot indamaydi. Bot qaysi guruh yoki kanalga qo'shilgan bo'lsa ham shunday —
+faqat shaxsiy chatda gapiradi. Seminar guruhida esa jim turib, kim kirgani,
+chiqqani va yozganini yozib boradi.
+
 **Muhim cheklov:** Telegram Bot API guruh a'zolarini ro'yxatlab bermaydi —
 bot faqat umumiy sonni, adminlarni va bitta odamni tekshira oladi. Shuning
 uchun bot guruhda **ko'rgan** hamma narsani yozib boradi:
@@ -299,9 +306,14 @@ Admin buyruqlari (botga shaxsiy chatda):
 | `/guruh_holat` | Hisobot: guruhda jami nechta, bot nechtasini taniydi, ro'yxatda borlar va yo'qlar |
 | `/guruh_tozala` | Ro'yxatda yo'qlarni guruhdan chiqaradi (tasdiqlashdan keyin) |
 
-Chiqarish uchun botda **«Foydalanuvchilarni bloklash»** huquqi bo'lishi shart:
-guruh sozlamalari → Administratorlar → `@sharmseminarbot` → *Ban users*.
-Huquq bo'lmasa `/guruh_tozala` buni aytadi va hech narsa qilmaydi.
+Chiqarish uchun botda **«Foydalanuvchilarni bloklash»** huquqi bo'lishi shart.
+Buni faqat guruh admini Telegram ilovasidan beradi — bot o'ziga huquq qo'sha
+olmaydi (Telegram `can't promote self` deb rad etadi):
+
+> Guruh → nomini bosing → **Administratorlar** → `@sharmseminarbot` →
+> **Foydalanuvchilarni bloklash** (*Ban users*) ni yoqing.
+
+Huquq bo'lmasa `/guruh_tozala` shuni aytadi va hech narsa qilmaydi.
 
 Chiqarish `ban` + darhol `unban` orqali bajariladi — maqsad guruhdan chiqarish,
 umrbod bloklash emas, shuning uchun ro'yxatda ekani aniqlansa odam qaytadan

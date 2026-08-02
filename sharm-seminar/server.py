@@ -715,6 +715,41 @@ def notify_group_change(pid, new_group):
     threading.Thread(target=_telegram_send, args=(chat_id, text), daemon=True).start()
 
 
+ROOM_CHANGED = {
+    "uz": ("🛏 <b>Xonangiz o'zgartirildi</b>\n\n{room}{mates}\n\nShaxsiy sahifangiz va "
+           "QR kodingiz <b>o'zgarmadi</b>."),
+    "ru": ("🛏 <b>Ваш номер изменён</b>\n\n{room}{mates}\n\nВаша личная страница и "
+           "QR-код <b>не изменились</b>."),
+    "en": ("🛏 <b>Your room has changed</b>\n\n{room}{mates}\n\nYour personal page and "
+           "QR code are <b>unchanged</b>."),
+}
+ROOMMATES_LABEL = {"uz": "🤝 Xonadoshlaringiz: ", "ru": "🤝 Ваши соседи: ",
+                   "en": "🤝 Your roommates: "}
+
+
+def notify_room_change(pid):
+    """Xonasi almashgan odamga DM — kim bilan turishini bilib qo'ysin."""
+    con = db()
+    try:
+        row = con.execute("SELECT * FROM participants WHERE id=?", (pid,)).fetchone()
+        if not row or not row["telegram_id"]:
+            return
+        mates = [r["fio"] for r in con.execute(
+            "SELECT fio FROM participants WHERE xona_guruhi=? AND xona_guruhi<>'' AND id<>?",
+            (row["xona_guruhi"] or "", pid))]
+        lang = (row["lang"] or "uz").lower()
+        room = row["room"] or row["xona_guruhi"] or "—"
+        text = ROOM_CHANGED.get(lang, ROOM_CHANGED["uz"]).format(
+            room=f"🛏 <b>{room}</b>" + (f" · {row['xona_turi']}" if row["xona_turi"] else ""),
+            mates=("\n" + ROOMMATES_LABEL.get(lang, ROOMMATES_LABEL["uz"])
+                   + "<b>" + ", ".join(mates) + "</b>") if mates else "")
+        chat_id = row["telegram_id"]
+    finally:
+        con.close()
+    import threading
+    threading.Thread(target=_telegram_send, args=(chat_id, text), daemon=True).start()
+
+
 def _find_by_passport(con, value):
     series, number = _passport(value)
     key = number.lstrip("0") or "0"
@@ -782,15 +817,21 @@ def upd_participant():
         grp = patch.get("group", row["grp"] if row else None)
         if grp:
             con.execute("UPDATE participants SET leader=0 WHERE grp=?", (grp,))
-    before = con.execute("SELECT grp FROM participants WHERE id=?", (pid,)).fetchone()
+    before = con.execute("SELECT grp,xona_guruhi FROM participants WHERE id=?", (pid,)).fetchone()
     m = {"group": "grp", "leader": "leader", "room": "room", "branch": "branch",
-         "telegram": "telegram", "lang": "lang"}
+         "telegram": "telegram", "lang": "lang",
+         "xona_guruhi": "xona_guruhi", "xona_turi": "xona_turi"}
     for k, col in m.items():
         if k in patch:
             v = patch[k]
             if k == "leader": v = 1 if v else 0
             if k == "lang": v = v if v in LANGS else None
+            if k == "xona_guruhi": v = str(v or "").strip().upper()
             con.execute("UPDATE participants SET %s=? WHERE id=?" % col, (v, pid))
+    if "xona_guruhi" in patch:
+        # Eski pasport-asosidagi sheriklik endi to'g'ri kelmaydi — tozalaymiz,
+        # xonadoshlar `xona_guruhi` bo'yicha hisoblanadi.
+        con.execute("UPDATE participants SET roommate_series=NULL WHERE id=?", (pid,))
     if "roles" in patch:
         con.execute("UPDATE participants SET roles=? WHERE id=?",
                     (json.dumps(patch["roles"], ensure_ascii=False), pid))
@@ -798,6 +839,9 @@ def upd_participant():
     moved = "group" in patch and before and before["grp"] != patch["group"] and patch["group"]
     if moved:
         notify_group_change(pid, patch["group"])
+    if "xona_guruhi" in patch and before and \
+            (before["xona_guruhi"] or "") != (patch["xona_guruhi"] or "").strip().upper():
+        notify_room_change(pid)
     return jsonify(ok=True, notified=bool(moved))
 
 

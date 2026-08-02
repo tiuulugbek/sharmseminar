@@ -503,6 +503,31 @@ class BotApiTest(unittest.TestCase):
         self.assertEqual(as_manager.post("/api/checkin", json=outside).status_code, 200)
         self.assertEqual(as_member.post("/api/checkin", json=own).status_code, 403)
 
+    def test_moving_someone_between_rooms_updates_both_sides(self):
+        leader, member, other = self.build_group()
+        admin = self.register("Panel Admin", "0000780")
+        os.environ["PANEL_ADMIN_IDS"] = admin["id"]
+        panel = self.panel(admin["id"])
+        self.sql("UPDATE participants SET xona_guruhi='D07' WHERE id IN (?,?)",
+                 leader["id"], member["id"])
+        self.sql("UPDATE participants SET xona_guruhi='D08', roommate_series='FA9' WHERE id=?",
+                 other["id"])
+
+        # Boshqa blokka ko'chirish: eski xonadosh yolg'iz qoladi, yangisi qo'shiladi.
+        self.assertEqual(panel.post("/api/participant", json={
+            "id": member["id"], "patch": {"xona_guruhi": "d08"}}).status_code, 200)
+        page = self.client.get(f"/api/p/{member['token']}").get_json()
+        self.assertEqual(page["participant"]["xona_guruhi"], "D08")   # bosh harfga keltiriladi
+        self.assertEqual(page["roommates"], ["Other Group"])
+        self.assertEqual(self.client.get(f"/api/p/{leader['token']}").get_json()["roommates"], [])
+
+        # Eski pasport-asosidagi sheriklik tozalanadi, u endi to'g'ri kelmaydi.
+        self.assertIsNone(self.one("SELECT roommate_series FROM participants WHERE id=?",
+                                   member["id"])[0])
+        # Guruh mas'uli xona ko'chira olmaydi.
+        self.assertEqual(self.panel(leader["id"]).post("/api/participant", json={
+            "id": member["id"], "patch": {"xona_guruhi": "D07"}}).status_code, 403)
+
     def test_unlinking_frees_a_slot_for_the_real_person(self):
         leader, member, other = self.build_group()
         admin = self.register("Panel Admin", "0000779")

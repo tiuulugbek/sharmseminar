@@ -426,6 +426,28 @@ kira oladi.
 Yangi kelgan odam ro'yxatda bo'lmasa, bot unga shaxsiy xabar yozib pasporti
 bilan tasdiqlashni so'raydi.
 
+### Xonadoshni o'zgartirish
+
+Xonadosh degani — bir xil **xona bloki** (`xona_guruhi`, masalan `D07`) dagi
+odamlar. Uni almashtirish «Ishtirokchilar» bo'limidagi **«Sherik»** ustunidan
+qilinadi:
+
+- ro'yxatda barcha bloklar `D07 (2/2) · Alliyar` ko'rinishida chiqadi — nechta
+  odam bor, sig'imi qancha va kim turibdi;
+- boshqa blokni tanlasangiz odam o'sha xonaga ko'chadi, eski xonadoshi ro'yxati
+  darrov yangilanadi;
+- **`+ yangi xona`** yangi blok ochadi;
+- **`— yakka`** blokdan chiqaradi;
+- to'la xonaga ko'chirmoqchi bo'lsangiz (`2 kishilik` da 2 kishi bor) — tasdiq
+  so'raladi, `⚠` belgisi bilan ko'rsatiladi.
+
+Ko'chirilgan odamga botdan xabar boradi (uning tilida): yangi xonasi, kimlar
+bilan turishi va QR kodi o'zgarmagani. Ishtirokchi sahifasidagi «Xona sherigi»
+qatori ham darrov yangilanadi.
+
+Sig'im xona turidan olinadi: `1 kishilik` → 1, `2 kishilik` → 2, `3 kishilik`
+va `Posh club` → 3. Ustun `manager` va `admin` rollariga ko'rinadi.
+
 ### Noto'g'ri bog'lanishni tuzatish
 
 Kimdir boshqa odamning pasporti bilan ro'yxatdan o'tib qo'ysa (masalan ikkita

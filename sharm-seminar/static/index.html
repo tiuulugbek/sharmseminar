@@ -200,6 +200,7 @@ tbody tr:hover{background:#FAFAFE}
 /* ===== kamera skaneri ===== */
 .camwrap video{width:100%;max-width:340px;border-radius:12px;background:#000;display:block;
   aspect-ratio:1/1;object-fit:cover;margin:0 auto}
+.roomsel{max-width:190px}
 .tgchip{display:inline-block;max-width:110px;overflow:hidden;text-overflow:ellipsis;
   white-space:nowrap;vertical-align:middle;font-size:11.5px;font-weight:600;color:#2E2C6E;
   background:#EEF0FA;border-radius:6px;padding:2px 7px}
@@ -214,7 +215,8 @@ tbody tr:hover{background:#FAFAFE}
 .cambig{border-radius:14px;padding:15px 14px;margin-top:10px;text-align:center;color:#fff;
   animation:campop .26s cubic-bezier(.2,.9,.3,1.2)}
 @keyframes campop{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:none}}
-@media (prefers-reduced-motion:reduce){.tgchip{display:inline-block;max-width:110px;overflow:hidden;text-overflow:ellipsis;
+@media (prefers-reduced-motion:reduce){.roomsel{max-width:190px}
+.tgchip{display:inline-block;max-width:110px;overflow:hidden;text-overflow:ellipsis;
   white-space:nowrap;vertical-align:middle;font-size:11.5px;font-weight:600;color:#2E2C6E;
   background:#EEF0FA;border-radius:6px;padding:2px 7px}
 .tgx{cursor:pointer;color:#C0392B;opacity:.55;margin-left:5px;font-size:12px}
@@ -298,7 +300,7 @@ const T = {
   total:"Jami ishtirokchi",assigned:"Guruhga biriktirilgan",leaders:"Guruh mas'ullari",foreign:"Chet eldan alohida",
   byGroup:"Guruhlar bo'yicha taqsimot",cpProgress:"Check-in holati",search:"Ism yoki ID bo'yicha qidirish…",
   allGroups:"Barcha guruhlar",allRooms:"Barcha xonalar",noGroup:"Guruhsiz",grp:"Guruh",room:"Xona turi",
-  roommate:"Sherik",leaderCol:"Mas'ul",arrival:"Kelish",autoDist:"Avtomatik taqsimlash",clearAll:"Tozalash",
+  roommate:"Sherik",roomAlone:"— yakka",roomNew:"+ yangi xona",roomNewQ:"Yangi xona blokining nomi (masalan D40):",roomFullQ:"%s xonasida allaqachon %n kishi bor. Baribir ko'chirilsinmi?",leaderCol:"Mas'ul",arrival:"Kelish",autoDist:"Avtomatik taqsimlash",clearAll:"Tozalash",
   member:"a'zo",noMembers:"Hali a'zo yo'q",leaderTag:"Guruh mas'uli",noRight:"Buning uchun ruxsatingiz yo'q",
   qrAll:"Hammasini ZIP qilib yuklash",qrWithName:"Ism-familya bilan",
   langCol:"Til",tgCol:"Telegram",tgNone:"tasdiqlamagan",tgUnlink:"Bog'lanishni uzish",tgUnlinkQ:"%s — Telegram bog'lanishi uzilsinmi? Keyin u qaytadan /start bosib tasdiqlashi kerak.",editingIn:"Tahrirlanayotgan til:",allLangs:"Uchala tilni birdan",langAuto:"Avto",langHint:"Ishtirokchi QR ni skanlaganda sahifa shu tilda ochiladi",
@@ -327,7 +329,7 @@ const T = {
   total:"Всего участников",assigned:"Распределено по группам",leaders:"Старосты групп",foreign:"Из-за рубежа отдельно",
   byGroup:"Распределение по группам",cpProgress:"Статус check-in",search:"Поиск по имени или ID…",
   allGroups:"Все группы",allRooms:"Все номера",noGroup:"Без группы",grp:"Группа",room:"Тип номера",
-  roommate:"Сосед",leaderCol:"Староста",arrival:"Прибытие",autoDist:"Распределить автоматически",clearAll:"Очистить",
+  roommate:"Сосед",roomAlone:"— один",roomNew:"+ новый номер",roomNewQ:"Название нового блока (например D40):",roomFullQ:"В номере %s уже %n человек. Всё равно переселить?",leaderCol:"Староста",arrival:"Прибытие",autoDist:"Распределить автоматически",clearAll:"Очистить",
   member:"чел.",noMembers:"Пока нет участников",leaderTag:"Староста группы",noRight:"Недостаточно прав",
   qrAll:"Скачать все в ZIP",qrWithName:"С именем и фамилией",
   langCol:"Язык",tgCol:"Telegram",tgNone:"не подтвердил",tgUnlink:"Отвязать",tgUnlinkQ:"%s — отвязать Telegram? Затем нужно снова подтвердить через /start.",editingIn:"Язык редактирования:",allLangs:"Все три языка сразу",langAuto:"Авто",langHint:"На этом языке откроется страница при сканировании QR",
@@ -356,7 +358,7 @@ const T = {
   total:"Participants in total",assigned:"Assigned to a group",leaders:"Group leaders",foreign:"Arriving separately",
   byGroup:"Distribution by group",cpProgress:"Check-in progress",search:"Search by name or ID…",
   allGroups:"All groups",allRooms:"All room types",noGroup:"No group",grp:"Group",room:"Room type",
-  roommate:"Roommate",leaderCol:"Leader",arrival:"Arrival",autoDist:"Distribute automatically",clearAll:"Clear",
+  roommate:"Roommate",roomAlone:"— alone",roomNew:"+ new room",roomNewQ:"Name of the new room block (e.g. D40):",roomFullQ:"Room %s already holds %n people. Move anyway?",leaderCol:"Leader",arrival:"Arrival",autoDist:"Distribute automatically",clearAll:"Clear",
   member:"members",noMembers:"No members yet",leaderTag:"Group leader",noRight:"You do not have permission for this",
   qrAll:"Download all as ZIP",qrWithName:"With name",
   langCol:"Language",tgCol:"Telegram",tgNone:"not verified",tgUnlink:"Unlink",tgUnlinkQ:"%s — unlink Telegram? They will have to verify again with /start.",editingIn:"Editing in:",allLangs:"All three languages",langAuto:"Auto",langHint:"The page opens in this language when the QR is scanned",
@@ -549,7 +551,7 @@ function fillRows(){const tb=document.getElementById('tb');if(!tb)return;
       <td><b style="font-weight:600">${escapeHtml(p.fio)}</b> <a href="${pageUrl(p.id)}" target="_blank" title="${t('openPage')}" style="text-decoration:none;color:var(--muted);font-size:11px">↗</a>
       <div style="margin-top:2px;display:flex;gap:4px;flex-wrap:wrap;align-items:center"><span class="muted" style="font-size:11px">${p.fuqarolik}</span>${roleChips}</div></td>
       <td><span class="rg" style="background:${RTCOL[p.xona_turi]}">${p.xona_turi}</span></td>
-      <td><span class="muted tnum">${p.xona_guruhi}</span></td><td>${fc}</td>
+      <td>${can('manager')?roomCell(p):`<span class="muted tnum">${escapeHtml(p.xona_guruhi||'')}</span>`}</td><td>${fc}</td>
       <td><select class="gsel" onchange="setGroup('${p.id}',this.value)"><option value="">—</option>
         ${[1,2,3,4,5].map(g=>`<option value="${g}" ${p.group==g?'selected':''}>${t('grp')} ${g}</option>`).join('')}</select></td>
       <td>${p.group?`<button class="star ${p.leader?'on':'off'}" onclick="toggleLeader('${p.id}')">${p.leader?'★':'☆'}</button>`:'<span class="muted">—</span>'}</td>
@@ -786,6 +788,53 @@ async function doCheck(id,on){
   if(camOn)fillCI(); else renderCheckin(document.getElementById('view'));}
 function setRoom(id,val){find(id).room=val;api.patch(id,{room:val});toast(t('saved'));}
 // Ishtirokchining asosiy tili: QR skanlanganda sahifa shu tilda ochiladi.
+/* ===== xona bloklari ===== */
+// Xonadosh degani — bir xil `xona_guruhi` dagi odamlar. Blokni almashtirish
+// xonadoshni almashtirish bilan bir xil.
+function roomBlocks(){
+  const map=new Map();
+  P().forEach(p=>{ if(!p.xona_guruhi)return;
+    if(!map.has(p.xona_guruhi))map.set(p.xona_guruhi,[]);
+    map.get(p.xona_guruhi).push(p); });
+  return map;
+}
+const roomCap=v=>{const s=String(v||'').toLowerCase();
+  return s.includes('3')?3:s.includes('2')?2:s.includes('posh')?3:1;};
+
+function roomCell(p){
+  const blocks=roomBlocks(), keys=[...blocks.keys()].sort();
+  const opts=keys.map(k=>{
+    const mates=blocks.get(k).filter(x=>x.id!==p.id);
+    const cap=roomCap(blocks.get(k)[0].xona_turi);
+    const full=blocks.get(k).length>=cap&&k!==p.xona_guruhi;
+    const who=mates.map(x=>x.fio.split(' ')[0]).join(', ');
+    return `<option value="${k}" ${p.xona_guruhi===k?'selected':''}>${k} (${blocks.get(k).length}/${cap})${who?' · '+escapeHtml(who):''}${full?' ⚠':''}</option>`;
+  }).join('');
+  const mates=(blocks.get(p.xona_guruhi)||[]).filter(x=>x.id!==p.id).map(x=>x.fio).join(', ');
+  return `<select class="gsel roomsel" title="${escapeHtml(mates||t('roomAlone'))}" onchange="setRoomBlock('${p.id}',this.value)">
+      <option value="" ${!p.xona_guruhi?'selected':''}>${t('roomAlone')}</option>
+      ${opts}<option value="__new">${t('roomNew')}</option></select>
+    ${mates?`<div class="muted" style="font-size:10.5px;margin-top:2px">${escapeHtml(mates)}</div>`:''}`;
+}
+
+async function setRoomBlock(id,val){
+  const p=find(id); if(!p)return;
+  if(val==='__new'){
+    val=(prompt(t('roomNewQ'),'')||'').trim().toUpperCase();
+    if(!val){fillRows();return;}
+  }
+  const blocks=roomBlocks(), target=blocks.get(val)||[];
+  if(val&&target.length){
+    const cap=roomCap(target[0].xona_turi);
+    if(target.length>=cap&&!target.some(x=>x.id===id)&&
+       !confirm(t('roomFullQ').replace('%s',val).replace('%n',cap)))return fillRows();
+  }
+  const ok=await api.patch(id,{xona_guruhi:val});
+  if(ok===false)return fillRows();
+  p.xona_guruhi=val;
+  fillRows();toast(t('saved'));
+}
+
 // Noto'g'ri odam ro'yxatdan o'tkazib qo'yilsa — bog'lanishni uzamiz, keyin
 // haqiqiy egasi botda /start bosib o'zi tasdiqlaydi.
 async function unlinkTg(id){

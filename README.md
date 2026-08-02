@@ -426,6 +426,21 @@ kira oladi.
 Yangi kelgan odam ro'yxatda bo'lmasa, bot unga shaxsiy xabar yozib pasporti
 bilan tasdiqlashni so'raydi.
 
+### Noto'g'ri bog'lanishni tuzatish
+
+Kimdir boshqa odamning pasporti bilan ro'yxatdan o'tib qo'ysa (masalan ikkita
+Telegram akkaunti bo'lgan odam o'zinikidan tashqari yana bittasini kiritsa),
+panelda **«Ishtirokchilar»** bo'limidagi **Telegram** ustunidan tuzatiladi:
+
+- ustunda kim bog'langani ko'rinadi (`@username` yoki `id 123…`);
+- yonidagi **✕** bog'lanishni uzadi;
+- shundan keyin haqiqiy egasi botda `/start` bosib o'z pasporti bilan tasdiqlaydi.
+
+Guruh, xona, rol va **QR token tegilmaydi** — beyjik ishlashda davom etadi.
+Ustun va tugma `manager` va `admin` rollariga ko'rinadi.
+
+Hammasini birdan tozalash kerak bo'lsa — `tools/unlink_telegram.py`.
+
 ## Telegram bog'lanishlarini tozalash
 
 Hamma qaytadan pasport bilan tasdiqlashi kerak bo'lsa:

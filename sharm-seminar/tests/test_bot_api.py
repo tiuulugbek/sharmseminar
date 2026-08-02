@@ -503,6 +503,35 @@ class BotApiTest(unittest.TestCase):
         self.assertEqual(as_manager.post("/api/checkin", json=outside).status_code, 200)
         self.assertEqual(as_member.post("/api/checkin", json=own).status_code, 403)
 
+    def test_unlinking_frees_a_slot_for_the_real_person(self):
+        leader, member, other = self.build_group()
+        admin = self.register("Panel Admin", "0000779")
+        os.environ["PANEL_ADMIN_IDS"] = admin["id"]
+        panel = self.panel(admin["id"])
+
+        # Noto'g'ri odam ro'yxatdan o'tkazib qo'ygan: 9100 aslida boshqasi edi.
+        self.assertEqual(self.whoami("9100")["id"], member["id"])
+        response = panel.post("/api/participant/unlink", json={"id": member["id"]})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["was"]["telegram_id"], "9100")
+        self.assertEqual(self.whoami("9100")["role"], "guest")
+
+        # Guruh, xona va QR token joyida qoladi — beyjik ishlashda davom etadi.
+        row = self.one("SELECT grp,token FROM participants WHERE id=?", member["id"])
+        self.assertEqual(row, (1, member["token"]))
+
+        # Endi haqiqiy egasi o'zini bog'lay oladi.
+        self.assertEqual(self.post("/api/bot/link", {
+            "id": member["id"], "telegram_id": "9300"}).status_code, 200)
+        self.assertEqual(self.whoami("9300")["id"], member["id"])
+
+        # Guruh mas'uli va oddiy ishtirokchi buni qila olmaydi.
+        for pid in (leader["id"], other["id"]):
+            self.assertEqual(self.panel(pid).post(
+                "/api/participant/unlink", json={"id": member["id"]}).status_code, 403)
+        self.assertEqual(self.client.post(
+            "/api/participant/unlink", json={"id": member["id"]}).status_code, 401)
+
     def test_participant_page_and_scanner_stay_public(self):
         person = self.register("Public Person", "0000888")
         self.assertEqual(self.client.get(f"/api/p/{person['token']}").status_code, 200)

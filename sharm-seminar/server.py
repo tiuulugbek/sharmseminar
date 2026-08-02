@@ -801,6 +801,29 @@ def upd_participant():
     return jsonify(ok=True, notified=bool(moved))
 
 
+@app.post("/api/participant/unlink")
+@panel_auth("manager")
+def unlink_participant():
+    """Bitta ishtirokchining Telegram bog'lanishini uzadi.
+
+    Noto'g'ri odam ro'yxatdan o'tkazib qo'yilganda kerak bo'ladi: bog'lanish
+    o'chgach, haqiqiy egasi botda /start bosib o'zi tasdiqlaydi.  Guruh, xona,
+    rol va QR token tegilmaydi.
+    """
+    pid = str((request.get_json(silent=True) or {}).get("id") or "").strip()
+    con = db()
+    row = con.execute("SELECT * FROM participants WHERE id=?", (pid,)).fetchone()
+    if not row:
+        con.close()
+        return jsonify(error="participant_not_found"), 404
+    was = {"telegram_id": row["telegram_id"], "telegram_username": row["telegram_username"]}
+    con.execute("UPDATE participants SET telegram_id=NULL, telegram_username=NULL, "
+                "registered_at=NULL WHERE id=?", (pid,))
+    con.commit(); con.close()
+    app.logger.info("Telegram bog'lanishi uzildi: %s (%s)", pid, was)
+    return jsonify(ok=True, id=pid, was=was)
+
+
 @app.post("/api/participants/bulk")
 @panel_auth("manager")
 def bulk_participants():

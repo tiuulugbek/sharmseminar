@@ -200,6 +200,11 @@ tbody tr:hover{background:#FAFAFE}
 /* ===== kamera skaneri ===== */
 .camwrap video{width:100%;max-width:340px;border-radius:12px;background:#000;display:block;
   aspect-ratio:1/1;object-fit:cover;margin:0 auto}
+.tgchip{display:inline-block;max-width:110px;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;vertical-align:middle;font-size:11.5px;font-weight:600;color:#2E2C6E;
+  background:#EEF0FA;border-radius:6px;padding:2px 7px}
+.tgx{cursor:pointer;color:#C0392B;opacity:.55;margin-left:5px;font-size:12px}
+.tgx:hover{opacity:1}
 .cpnum{position:absolute;top:5px;left:8px;font-size:10px;font-weight:900;opacity:.5}
 .cpord{position:absolute;top:3px;right:5px;display:flex;gap:2px}
 .cpord b{cursor:pointer;font-size:13px;line-height:1;padding:2px 4px;border-radius:5px;opacity:.55}
@@ -209,7 +214,12 @@ tbody tr:hover{background:#FAFAFE}
 .cambig{border-radius:14px;padding:15px 14px;margin-top:10px;text-align:center;color:#fff;
   animation:campop .26s cubic-bezier(.2,.9,.3,1.2)}
 @keyframes campop{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:none}}
-@media (prefers-reduced-motion:reduce){.cpnum{position:absolute;top:5px;left:8px;font-size:10px;font-weight:900;opacity:.5}
+@media (prefers-reduced-motion:reduce){.tgchip{display:inline-block;max-width:110px;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;vertical-align:middle;font-size:11.5px;font-weight:600;color:#2E2C6E;
+  background:#EEF0FA;border-radius:6px;padding:2px 7px}
+.tgx{cursor:pointer;color:#C0392B;opacity:.55;margin-left:5px;font-size:12px}
+.tgx:hover{opacity:1}
+.cpnum{position:absolute;top:5px;left:8px;font-size:10px;font-weight:900;opacity:.5}
 .cpord{position:absolute;top:3px;right:5px;display:flex;gap:2px}
 .cpord b{cursor:pointer;font-size:13px;line-height:1;padding:2px 4px;border-radius:5px;opacity:.55}
 .cpord b:hover{opacity:1;background:rgba(0,0,0,.07)}
@@ -291,7 +301,7 @@ const T = {
   roommate:"Sherik",leaderCol:"Mas'ul",arrival:"Kelish",autoDist:"Avtomatik taqsimlash",clearAll:"Tozalash",
   member:"a'zo",noMembers:"Hali a'zo yo'q",leaderTag:"Guruh mas'uli",noRight:"Buning uchun ruxsatingiz yo'q",
   qrAll:"Hammasini ZIP qilib yuklash",qrWithName:"Ism-familya bilan",
-  langCol:"Til",editingIn:"Tahrirlanayotgan til:",allLangs:"Uchala tilni birdan",langAuto:"Avto",langHint:"Ishtirokchi QR ni skanlaganda sahifa shu tilda ochiladi",
+  langCol:"Til",tgCol:"Telegram",tgNone:"tasdiqlamagan",tgUnlink:"Bog'lanishni uzish",tgUnlinkQ:"%s — Telegram bog'lanishi uzilsinmi? Keyin u qaytadan /start bosib tasdiqlashi kerak.",editingIn:"Tahrirlanayotgan til:",allLangs:"Uchala tilni birdan",langAuto:"Avto",langHint:"Ishtirokchi QR ni skanlaganda sahifa shu tilda ochiladi",
   camScan:"📷 Kamera bilan skanlash",camStop:"⏹ To'xtatish",
   camHint:"Beyjik QR ini ramkaga tuting — topilishi bilan belgilanadi",
   camErr:"Kameraga ruxsat berilmadi",camOk:"Ro'yxatga olindi",camAlready2:"Allaqachon ro'yxatda",camWait:"Vaqti mos emas",camErr2:"Xato",camAlready:"da belgilangan",camNotOpen:"dan boshlanadi",camClosed:"da tugagan",camMissed:"O'tkazib yuborilgan",cpFrom:"Boshlanishi",cpUp:"Chapga",cpDown:"O'ngga",cpOrderHint:"Nuqtalar tartibi — ‹ › bilan suriladi. Skaner oldingi nuqtalar o'tkazib yuborilganini shu tartib bo'yicha ogohlantiradi.",cpTo:"Tugashi",cpWindow:"Vaqt oynasi — bo'sh qoldirilsa har doim ochiq",
@@ -320,7 +330,7 @@ const T = {
   roommate:"Сосед",leaderCol:"Староста",arrival:"Прибытие",autoDist:"Распределить автоматически",clearAll:"Очистить",
   member:"чел.",noMembers:"Пока нет участников",leaderTag:"Староста группы",noRight:"Недостаточно прав",
   qrAll:"Скачать все в ZIP",qrWithName:"С именем и фамилией",
-  langCol:"Язык",editingIn:"Язык редактирования:",allLangs:"Все три языка сразу",langAuto:"Авто",langHint:"На этом языке откроется страница при сканировании QR",
+  langCol:"Язык",tgCol:"Telegram",tgNone:"не подтвердил",tgUnlink:"Отвязать",tgUnlinkQ:"%s — отвязать Telegram? Затем нужно снова подтвердить через /start.",editingIn:"Язык редактирования:",allLangs:"Все три языка сразу",langAuto:"Авто",langHint:"На этом языке откроется страница при сканировании QR",
   camScan:"📷 Сканировать камерой",camStop:"⏹ Остановить",
   camHint:"Наведите камеру на QR бейджа — отметка произойдёт сразу",
   camErr:"Доступ к камере не разрешён",camOk:"Отмечен",camAlready2:"Уже отмечен",camWait:"Не то время",camErr2:"Ошибка",camAlready:"уже отмечен",camNotOpen:"откроется",camClosed:"закрыто в",camMissed:"Пропущено",cpFrom:"Начало",cpUp:"Влево",cpDown:"Вправо",cpOrderHint:"Порядок точек — меняется стрелками ‹ ›. Пропущенные предыдущие точки сканер показывает по этому порядку.",cpTo:"Конец",cpWindow:"Временное окно — пусто значит всегда открыто",
@@ -349,7 +359,7 @@ const T = {
   roommate:"Roommate",leaderCol:"Leader",arrival:"Arrival",autoDist:"Distribute automatically",clearAll:"Clear",
   member:"members",noMembers:"No members yet",leaderTag:"Group leader",noRight:"You do not have permission for this",
   qrAll:"Download all as ZIP",qrWithName:"With name",
-  langCol:"Language",editingIn:"Editing in:",allLangs:"All three languages",langAuto:"Auto",langHint:"The page opens in this language when the QR is scanned",
+  langCol:"Language",tgCol:"Telegram",tgNone:"not verified",tgUnlink:"Unlink",tgUnlinkQ:"%s — unlink Telegram? They will have to verify again with /start.",editingIn:"Editing in:",allLangs:"All three languages",langAuto:"Auto",langHint:"The page opens in this language when the QR is scanned",
   camScan:"📷 Scan with camera",camStop:"⏹ Stop",
   camHint:"Point the camera at the badge QR — it checks in as soon as it reads",
   camErr:"Camera permission denied",camOk:"Checked in",camAlready2:"Already checked in",camWait:"Wrong time",camErr2:"Error",camAlready:"already marked",camNotOpen:"opens at",camClosed:"closed at",camMissed:"Missed",cpFrom:"Opens",cpUp:"Left",cpDown:"Right",cpOrderHint:"Checkpoint order — move with ‹ ›. The scanner warns about skipped earlier checkpoints in this order.",cpTo:"Closes",cpWindow:"Time window — leave empty to keep it always open",
@@ -516,7 +526,8 @@ function renderParts(v){
     <div class="tablewrap"><table><thead><tr>
       <th>ID</th><th>F.I.O.</th><th>${t('room')}</th><th>${t('roommate')}</th><th>${t('arrival')}</th>
       <th style="width:96px">${t('grp')}</th><th style="width:70px">${t('leaderCol')}</th>
-      <th style="width:86px" title="${t('langHint')}">${t('langCol')}</th></tr></thead><tbody id="tb"></tbody></table></div>`;
+      <th style="width:86px" title="${t('langHint')}">${t('langCol')}</th>
+      ${can('manager')?`<th style="width:150px">${t('tgCol')}</th>`:''}</tr></thead><tbody id="tb"></tbody></table></div>`;
   document.getElementById('q').oninput=e=>{fSearch=e.target.value;fillRows();};
   document.getElementById('fg').onchange=e=>{fGroup=e.target.value;fillRows();};
   document.getElementById('fr').onchange=e=>{fRoom=e.target.value;fillRows();};
@@ -544,8 +555,12 @@ function fillRows(){const tb=document.getElementById('tb');if(!tb)return;
       <td>${p.group?`<button class="star ${p.leader?'on':'off'}" onclick="toggleLeader('${p.id}')">${p.leader?'★':'☆'}</button>`:'<span class="muted">—</span>'}</td>
       <td><select class="gsel" onchange="setPartLang('${p.id}',this.value)" title="${t('langHint')}">
         <option value="" ${!p.lang?'selected':''}>${t('langAuto')}</option>
-        ${UI_LANGS.map(l=>`<option value="${l}" ${p.lang===l?'selected':''}>${l.toUpperCase()}</option>`).join('')}</select></td></tr>`;
-  }).join('')||`<tr><td colspan="8" class="muted" style="padding:30px;text-align:center">${t('notFound')}</td></tr>`;
+        ${UI_LANGS.map(l=>`<option value="${l}" ${p.lang===l?'selected':''}>${l.toUpperCase()}</option>`).join('')}</select></td>
+      ${can('manager')?`<td>${p.telegram_id
+        ? `<span class="tgchip" title="${escapeHtml(String(p.telegram_id))}">${escapeHtml(p.telegram_username||('id '+p.telegram_id))}</span>
+           <b class="tgx" title="${t('tgUnlink')}" onclick="unlinkTg('${p.id}')">✕</b>`
+        : `<span class="muted" style="font-size:11.5px">${t('tgNone')}</span>`}</td>`:''}</tr>`;
+  }).join('')||`<tr><td colspan="9" class="muted" style="padding:30px;text-align:center">${t('notFound')}</td></tr>`;
 }
 function setGroup(id,g){const p=find(id);p.group=g?+g:null;if(!p.group)p.leader=false;
   api.patch(id,{group:p.group,leader:p.leader});toast(t('saved'));if(VIEW==='parts')fillRows();}
@@ -771,6 +786,16 @@ async function doCheck(id,on){
   if(camOn)fillCI(); else renderCheckin(document.getElementById('view'));}
 function setRoom(id,val){find(id).room=val;api.patch(id,{room:val});toast(t('saved'));}
 // Ishtirokchining asosiy tili: QR skanlanganda sahifa shu tilda ochiladi.
+// Noto'g'ri odam ro'yxatdan o'tkazib qo'yilsa — bog'lanishni uzamiz, keyin
+// haqiqiy egasi botda /start bosib o'zi tasdiqlaydi.
+async function unlinkTg(id){
+  const p=find(id); if(!p)return;
+  if(!confirm(t('tgUnlinkQ').replace('%s',p.fio)))return;
+  const ok=await api._post('/api/participant/unlink',{id});
+  if(ok===false)return;
+  p.telegram_id=null;p.telegram_username=null;
+  fillRows();toast(t('saved'));
+}
 function setPartLang(id,val){find(id).lang=val||null;api.patch(id,{lang:val||null});toast(t('saved'));}
 function addCP(){const label=prompt(t('cpAddQ'));if(!label)return;
   const icon=prompt(t('cpIconQ'),'📍')||'📍';

@@ -822,6 +822,12 @@ def upd_participant():
         grp = patch.get("group", row["grp"] if row else None)
         if grp:
             con.execute("UPDATE participants SET leader=0 WHERE grp=?", (grp,))
+    # Guruh va guruh mas'uli — faqat texnik admin o'zgartiradi. Bir marta
+    # to'g'rilangan taqsimot tasodifan aralashib ketmasligi kerak.
+    if request.panel_user["rank"] < ROLE_RANK["admin"] and ({"group", "leader"} & set(patch)):
+        con.close()
+        return jsonify(error="forbidden", field="group",
+                       detail="guruhni faqat admin o'zgartira oladi"), 403
     before = con.execute("SELECT grp,xona_guruhi FROM participants WHERE id=?", (pid,)).fetchone()
     m = {"group": "grp", "leader": "leader", "room": "room", "branch": "branch",
          "telegram": "telegram", "lang": "lang",
@@ -874,8 +880,13 @@ def unlink_participant():
 
 
 @app.post("/api/participants/bulk")
-@panel_auth("manager")
+@panel_auth("admin")
 def bulk_participants():
+    """Ko'p ishtirokchining guruhini birdan o'zgartirish — faqat admin.
+
+    Bu yerdan avtomatik taqsimlash va tozalash o'tadi, ya'ni bir harakat bilan
+    butun taqsimotni almashtirib yuborishi mumkin.
+    """
     moved = []
     for it in request.get_json(force=True).get("items", []):
         con = db()

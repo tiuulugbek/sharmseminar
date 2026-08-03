@@ -191,6 +191,12 @@ tbody tr:hover{background:#FAFAFE}
 .whoami b{color:#211F52;font-weight:700}
 .whoami .out{border:1px solid #E7E8F0;background:#fff;border-radius:8px;padding:6px 10px;
   font-weight:700;cursor:pointer;color:#7A7990}
+.movers{display:flex;gap:1px;align-items:center}
+.movers b{cursor:pointer;font-size:13px;line-height:1;padding:5px 6px;border-radius:6px;
+  color:var(--muted);opacity:.7}
+.movers b:hover{opacity:1;background:#EEF0FA;color:var(--indigo)}
+.movers b.off{opacity:.18;pointer-events:none}
+.movers b.del{color:#C0392B}
 .mlbox{display:flex;flex-direction:column;gap:4px;flex:1;min-width:0}
 .mlbox>span+input{margin-bottom:2px}
 .mltag{font-size:9.5px;font-weight:800;letter-spacing:.1em;color:var(--muted);margin-top:2px}
@@ -300,7 +306,7 @@ const T = {
   total:"Jami ishtirokchi",assigned:"Guruhga biriktirilgan",leaders:"Guruh mas'ullari",foreign:"Chet eldan alohida",
   byGroup:"Guruhlar bo'yicha taqsimot",cpProgress:"Check-in holati",search:"Ism yoki ID bo'yicha qidirish…",
   allGroups:"Barcha guruhlar",allRooms:"Barcha xonalar",noGroup:"Guruhsiz",grp:"Guruh",room:"Xona turi",
-  roommate:"Sherik",roomAlone:"— yakka",roomNew:"+ yangi xona",roomNewQ:"Yangi xona blokining nomi (masalan D40):",roomFullQ:"%s xonasida allaqachon %n kishi bor. Baribir ko'chirilsinmi?",leaderCol:"Mas'ul",arrival:"Kelish",autoDist:"Avtomatik taqsimlash",clearAll:"Tozalash",
+  roommate:"Sherik",roomAlone:"— yakka",roomNew:"+ yangi xona",roomNewQ:"Yangi xona blokining nomi (masalan D40):",roomFullQ:"%s xonasida allaqachon %n kishi bor. Baribir ko'chirilsinmi?",leaderCol:"Mas'ul",arrival:"Kelish",autoDist:"Avtomatik taqsimlash",autoDistQ:"Barcha %n ishtirokchi guruhlarga QAYTA taqsimlanadi — hozirgi taqsimot yo'qoladi. Davom etamizmi?",clearAllQ:"Hamma guruh biriktirmalari va guruh mas'ullari o'chiriladi. Ishonchingiz komilmi?",grpLocked:"Guruhlarni faqat texnik admin o'zgartiradi",clearAll:"Tozalash",
   member:"a'zo",noMembers:"Hali a'zo yo'q",leaderTag:"Guruh mas'uli",noRight:"Buning uchun ruxsatingiz yo'q",
   qrAll:"Hammasini ZIP qilib yuklash",qrWithName:"Ism-familya bilan",
   langCol:"Til",tgCol:"Telegram",tgNone:"tasdiqlamagan",tgUnlink:"Bog'lanishni uzish",tgUnlinkQ:"%s — Telegram bog'lanishi uzilsinmi? Keyin u qaytadan /start bosib tasdiqlashi kerak.",editingIn:"Tahrirlanayotgan til:",allLangs:"Uchala tilni birdan",langAuto:"Avto",langHint:"Ishtirokchi QR ni skanlaganda sahifa shu tilda ochiladi",
@@ -319,7 +325,7 @@ const T = {
   cpDelQ:"Nuqtani o'chirasizmi? Belgilangan check-inlar ham o'chadi.",
   addRole:"+ Yangi mas'uliyat",roleLabel:"Nomi",roleColor:"Rang",delRole:"O'chirish",assign:"Biriktirish",
   noRole:"Mas'ul yo'q",assignedTo:"Biriktirilgan",pickRole:"Mas'uliyatni tanlang",
-  progDay:"Kun",progAddItem:"+ Band",progAddBlock:"+ Bo'lim",progTime:"Vaqt",progText:"Matn",progBlockLabel:"Bo'lim nomi",
+  progDay:"Kun",progAddItem:"+ Band",progAddFirst:"↑ Boshiga",moveUp:"Yuqoriga",moveDown:"Pastga",progDelDayQ:"Shu kun butunlay o'chirilsinmi?",progDelBlockQ:"Shu bo'lim va uning bandlari o'chirilsinmi?",progAddBlock:"+ Bo'lim",progTime:"Vaqt",progText:"Matn",progBlockLabel:"Bo'lim nomi",
   eventMeta:"Tadbir ma'lumoti",metaTitle:"Sarlavha",metaSub:"Kichik sarlavha",metaDates:"Sanalar",metaLoc:"Manzil",
   pageBase:"Sahifa manzili (domen)",roleTag:"Mas'ul",openPage:"Sahifani ochish",
   qrHint:"QR skanlanganda ishtirokchining shaxsiy sahifasi ochiladi. Kod ichida pasportdan olingan maxfiy token turadi — pasport raqami ko'rinmaydi."},
@@ -329,7 +335,7 @@ const T = {
   total:"Всего участников",assigned:"Распределено по группам",leaders:"Старосты групп",foreign:"Из-за рубежа отдельно",
   byGroup:"Распределение по группам",cpProgress:"Статус check-in",search:"Поиск по имени или ID…",
   allGroups:"Все группы",allRooms:"Все номера",noGroup:"Без группы",grp:"Группа",room:"Тип номера",
-  roommate:"Сосед",roomAlone:"— один",roomNew:"+ новый номер",roomNewQ:"Название нового блока (например D40):",roomFullQ:"В номере %s уже %n человек. Всё равно переселить?",leaderCol:"Староста",arrival:"Прибытие",autoDist:"Распределить автоматически",clearAll:"Очистить",
+  roommate:"Сосед",roomAlone:"— один",roomNew:"+ новый номер",roomNewQ:"Название нового блока (например D40):",roomFullQ:"В номере %s уже %n человек. Всё равно переселить?",leaderCol:"Староста",arrival:"Прибытие",autoDist:"Распределить автоматически",autoDistQ:"Все %n участников будут ПЕРЕраспределены — текущее распределение исчезнет. Продолжить?",clearAllQ:"Все группы и старосты будут удалены. Вы уверены?",grpLocked:"Группы меняет только тех. админ",clearAll:"Очистить",
   member:"чел.",noMembers:"Пока нет участников",leaderTag:"Староста группы",noRight:"Недостаточно прав",
   qrAll:"Скачать все в ZIP",qrWithName:"С именем и фамилией",
   langCol:"Язык",tgCol:"Telegram",tgNone:"не подтвердил",tgUnlink:"Отвязать",tgUnlinkQ:"%s — отвязать Telegram? Затем нужно снова подтвердить через /start.",editingIn:"Язык редактирования:",allLangs:"Все три языка сразу",langAuto:"Авто",langHint:"На этом языке откроется страница при сканировании QR",
@@ -348,7 +354,7 @@ const T = {
   cpDelQ:"Удалить точку? Отметки check-in тоже удалятся.",
   addRole:"+ Новая ответственность",roleLabel:"Название",roleColor:"Цвет",delRole:"Удалить",assign:"Назначить",
   noRole:"Нет ответственного",assignedTo:"Назначено",pickRole:"Выберите ответственность",
-  progDay:"День",progAddItem:"+ Пункт",progAddBlock:"+ Блок",progTime:"Время",progText:"Текст",progBlockLabel:"Название блока",
+  progDay:"День",progAddItem:"+ Пункт",progAddFirst:"↑ В начало",moveUp:"Вверх",moveDown:"Вниз",progDelDayQ:"Удалить этот день целиком?",progDelBlockQ:"Удалить этот блок и его пункты?",progAddBlock:"+ Блок",progTime:"Время",progText:"Текст",progBlockLabel:"Название блока",
   eventMeta:"Данные мероприятия",metaTitle:"Заголовок",metaSub:"Подзаголовок",metaDates:"Даты",metaLoc:"Место",
   pageBase:"Адрес страницы (домен)",roleTag:"Ответ.",openPage:"Открыть страницу",
   qrHint:"При сканировании QR открывается личная страница участника. Внутри кода — секретный токен, номер паспорта не виден."},
@@ -358,7 +364,7 @@ const T = {
   total:"Participants in total",assigned:"Assigned to a group",leaders:"Group leaders",foreign:"Arriving separately",
   byGroup:"Distribution by group",cpProgress:"Check-in progress",search:"Search by name or ID…",
   allGroups:"All groups",allRooms:"All room types",noGroup:"No group",grp:"Group",room:"Room type",
-  roommate:"Roommate",roomAlone:"— alone",roomNew:"+ new room",roomNewQ:"Name of the new room block (e.g. D40):",roomFullQ:"Room %s already holds %n people. Move anyway?",leaderCol:"Leader",arrival:"Arrival",autoDist:"Distribute automatically",clearAll:"Clear",
+  roommate:"Roommate",roomAlone:"— alone",roomNew:"+ new room",roomNewQ:"Name of the new room block (e.g. D40):",roomFullQ:"Room %s already holds %n people. Move anyway?",leaderCol:"Leader",arrival:"Arrival",autoDist:"Distribute automatically",autoDistQ:"All %n participants will be REdistributed — the current arrangement is lost. Continue?",clearAllQ:"Every group assignment and group leader will be cleared. Are you sure?",grpLocked:"Only a technical admin can change groups",clearAll:"Clear",
   member:"members",noMembers:"No members yet",leaderTag:"Group leader",noRight:"You do not have permission for this",
   qrAll:"Download all as ZIP",qrWithName:"With name",
   langCol:"Language",tgCol:"Telegram",tgNone:"not verified",tgUnlink:"Unlink",tgUnlinkQ:"%s — unlink Telegram? They will have to verify again with /start.",editingIn:"Editing in:",allLangs:"All three languages",langAuto:"Auto",langHint:"The page opens in this language when the QR is scanned",
@@ -377,7 +383,7 @@ const T = {
   cpDelQ:"Delete this checkpoint? Its check-ins will be removed too.",
   addRole:"+ New responsibility",roleLabel:"Name",roleColor:"Colour",delRole:"Delete",assign:"Assign",
   noRole:"No one assigned",assignedTo:"Assigned",pickRole:"Pick a responsibility",
-  progDay:"Day",progAddItem:"+ Item",progAddBlock:"+ Block",progTime:"Time",progText:"Text",progBlockLabel:"Block name",
+  progDay:"Day",progAddItem:"+ Item",progAddFirst:"↑ To the top",moveUp:"Up",moveDown:"Down",progDelDayQ:"Delete this whole day?",progDelBlockQ:"Delete this block and its items?",progAddBlock:"+ Block",progTime:"Time",progText:"Text",progBlockLabel:"Block name",
   eventMeta:"Event details",metaTitle:"Title",metaSub:"Subtitle",metaDates:"Dates",metaLoc:"Location",
   pageBase:"Page address (domain)",roleTag:"Resp.",openPage:"Open page",
   qrHint:"Scanning the QR opens the participant's personal page. The code carries a secret token derived from the passport — the passport number is never shown."}
@@ -552,9 +558,13 @@ function fillRows(){const tb=document.getElementById('tb');if(!tb)return;
       <div style="margin-top:2px;display:flex;gap:4px;flex-wrap:wrap;align-items:center"><span class="muted" style="font-size:11px">${p.fuqarolik}</span>${roleChips}</div></td>
       <td><span class="rg" style="background:${RTCOL[p.xona_turi]}">${p.xona_turi}</span></td>
       <td>${can('manager')?roomCell(p):`<span class="muted tnum">${escapeHtml(p.xona_guruhi||'')}</span>`}</td><td>${fc}</td>
-      <td><select class="gsel" onchange="setGroup('${p.id}',this.value)"><option value="">—</option>
-        ${[1,2,3,4,5].map(g=>`<option value="${g}" ${p.group==g?'selected':''}>${t('grp')} ${g}</option>`).join('')}</select></td>
-      <td>${p.group?`<button class="star ${p.leader?'on':'off'}" onclick="toggleLeader('${p.id}')">${p.leader?'★':'☆'}</button>`:'<span class="muted">—</span>'}</td>
+      <td>${can('admin')?`<select class="gsel" onchange="setGroup('${p.id}',this.value)"><option value="">—</option>
+        ${[1,2,3,4,5].map(g=>`<option value="${g}" ${p.group==g?'selected':''}>${t('grp')} ${g}</option>`).join('')}</select>`
+        :`<span class="chip" style="background:#EEF0FA;color:#2E2C6E">${p.group?t('grp')+' '+p.group:'—'}</span>`}</td>
+      <td>${p.group?(can('admin')
+        ? `<button class="star ${p.leader?'on':'off'}" onclick="toggleLeader('${p.id}')">${p.leader?'★':'☆'}</button>`
+        : `<span class="star ${p.leader?'on':'off'}" style="cursor:default">${p.leader?'★':'☆'}</span>`)
+        :'<span class="muted">—</span>'}</td>
       <td><select class="gsel" onchange="setPartLang('${p.id}',this.value)" title="${t('langHint')}">
         <option value="" ${!p.lang?'selected':''}>${t('langAuto')}</option>
         ${UI_LANGS.map(l=>`<option value="${l}" ${p.lang===l?'selected':''}>${l.toUpperCase()}</option>`).join('')}</select></td>
@@ -581,18 +591,29 @@ function renderGroups(){
       <span class="muted tnum" style="font-size:11px">${p.xona_guruhi}</span></div>`).join(''):`<div class="empty">${t('noMembers')}</div>`;
     return `<div class="card grp"><div class="hd" style="background:${GCOL[g]}"><div class="t">${t('grp')} ${g}</div><div class="c">${mem.length} ${t('member')}</div></div><div class="bd">${body}</div></div>`;
   }).join('');
-  return `<div class="toolbar"><button class="btn acc" onclick="autoDist()">✦ ${t('autoDist')}</button>
-    <button class="btn" onclick="clearGroups()">${t('clearAll')}</button>
+  const tools=can('admin')
+    ? `<button class="btn acc" onclick="autoDist()">✦ ${t('autoDist')}</button>
+       <button class="btn" style="color:#C0392B;border-color:#F3C6C0" onclick="clearGroups()">${t('clearAll')}</button>`
+    : `<span class="langnote">🔒 ${t('grpLocked')}</span>`;
+  return `<div class="toolbar">${tools}
     <span class="muted" style="font-size:12.5px">${t('vdesc_groups')}</span></div><div class="grp-grid">${cards}</div>`;
 }
+// Butun taqsimotni almashtiradi — shuning uchun aniq tasdiq so'raladi.
 function autoDist(){
+  if(!confirm(t('autoDistQ').replace('%n',P().length)))return;
   const byRoom={};P().forEach(p=>{(byRoom[p.xona_guruhi]=byRoom[p.xona_guruhi]||[]).push(p);});
   const rooms=Object.values(byRoom).sort((a,b)=>b.length-a.length);const counts=[0,0,0,0,0];
   rooms.forEach(room=>{let mi=0;for(let i=1;i<5;i++)if(counts[i]<counts[mi])mi=i;
-    room.forEach(p=>{p.group=mi+1;p.leader=false;});counts[mi]+=room.length;});
+    room.forEach(p=>{p.group=mi+1;});counts[mi]+=room.length;});
+  // Mas'ul o'z guruhida qolsin; boshqa guruhga tushib qolgani mas'ullikdan chiqadi.
+  const kept=new Set();
+  P().forEach(p=>{ if(!p.leader)return;
+    if(kept.has(p.group))p.leader=false; else kept.add(p.group); });
   api.bulk(P().map(p=>({id:p.id,group:p.group,leader:p.leader})));toast(t('distDone'));render();
 }
-function clearGroups(){P().forEach(p=>{p.group=null;p.leader=false;});
+function clearGroups(){
+  if(!confirm(t('clearAllQ')))return;
+  P().forEach(p=>{p.group=null;p.leader=false;});
   api.bulk(P().map(p=>({id:p.id,group:null,leader:false})));toast(t('cleared'));render();}
 
 /* ===== roles / responsibilities ===== */
@@ -663,16 +684,32 @@ function renderProgram(v){
       ${ml(d.date,`setDay(${di},'date',this.value,'%L%')`,{style:'width:96px;font-weight:700'})}
       ${ml(d.dow,`setDay(${di},'dow',this.value,'%L%')`,{style:'width:110px'})}
       ${ml(d.title,`setDay(${di},'title',this.value,'%L%')`,{style:'flex:1;font-weight:700'})}
+      <span class="movers">
+        <b onclick="moveDay(${di},-1)" title="${t('moveUp')}" ${di===0?'class="off"':''}>↑</b>
+        <b onclick="moveDay(${di},1)" title="${t('moveDown')}" ${di===(S.program||[]).length-1?'class="off"':''}>↓</b></span>
       <button class="btn sm" style="color:#C0392B;border-color:#F3C6C0" onclick="delDay(${di})">🗑</button></div>
     ${(d.blocks||[]).map((b,bi)=>`<div style="margin:8px 0;padding-left:12px;border-left:3px solid var(--line-2)">
-      ${ml(b.label,`setBlock(${di},${bi},this.value,'%L%')`,{ph:t('progBlockLabel'),style:'width:100%;font-weight:600;padding:5px 9px;border:1px solid var(--line-2);border-radius:8px;margin-bottom:6px'})}
+      <div class="frow" style="margin-bottom:6px">
+        ${ml(b.label,`setBlock(${di},${bi},this.value,'%L%')`,{ph:t('progBlockLabel'),style:'flex:1;font-weight:600;padding:5px 9px;border:1px solid var(--line-2);border-radius:8px'})}
+        <span class="movers">
+          <b onclick="moveBlock(${di},${bi},-1)" title="${t('moveUp')}" ${bi===0?'class="off"':''}>↑</b>
+          <b onclick="moveBlock(${di},${bi},1)" title="${t('moveDown')}" ${bi===(d.blocks||[]).length-1?'class="off"':''}>↓</b>
+          <b onclick="delBlock(${di},${bi})" title="${t('cpDel')}" class="del">🗑</b></span></div>
       ${(b.items||[]).map((it,ii)=>`<div class="frow" style="margin:4px 0">
         <input value="${escapeHtml(it.time||'')}" placeholder="${t('progTime')}" onchange="setItem(${di},${bi},${ii},'time',this.value)" style="width:96px">
         ${ml(it.text,`setItem(${di},${bi},${ii},'text',this.value,'%L%')`,{style:'flex:1'})}
-        <button class="btn sm" onclick="delItem(${di},${bi},${ii})">✕</button></div>`).join('')}
-      <button class="btn sm" onclick="addItem(${di},${bi})">${t('progAddItem')}</button></div>`).join('')}
-    <button class="btn sm" onclick="addBlock(${di})">${t('progAddBlock')}</button></div>`).join('');
-  v.innerHTML=`<div class="toolbar"><button class="btn acc" onclick="addDay()">+ ${t('progDay')}</button>
+        <span class="movers">
+          <b onclick="moveItem(${di},${bi},${ii},-1)" title="${t('moveUp')}" ${ii===0?'class="off"':''}>↑</b>
+          <b onclick="moveItem(${di},${bi},${ii},1)" title="${t('moveDown')}" ${ii===(b.items||[]).length-1?'class="off"':''}>↓</b>
+          <b onclick="delItem(${di},${bi},${ii})" class="del">✕</b></span></div>`).join('')}
+      <div style="display:flex;gap:6px">
+        <button class="btn sm" onclick="addItem(${di},${bi},0)">${t('progAddFirst')}</button>
+        <button class="btn sm" onclick="addItem(${di},${bi})">${t('progAddItem')}</button></div></div>`).join('')}
+    <div style="display:flex;gap:6px;margin-top:6px">
+      <button class="btn sm" onclick="addBlock(${di},0)">${t('progAddFirst')}</button>
+      <button class="btn sm" onclick="addBlock(${di})">${t('progAddBlock')}</button></div></div>`).join('');
+  v.innerHTML=`<div class="toolbar"><button class="btn acc" onclick="addDay(0)">↑ ${t('progDay')}</button>
+    <button class="btn acc" onclick="addDay()">+ ${t('progDay')}</button>
     <label class="chk"><input type="checkbox" ${progAllLangs?'checked':''}
       onchange="setProgAllLangs(this.checked)"> ${t('allLangs')}</label>
     ${progAllLangs?'':`<span class="langnote">${t('editingIn')} <b>${S.lang.toUpperCase()}</b></span>`}
@@ -685,10 +722,36 @@ function setBlock(di,bi,val,lang){const b=S.program[di].blocks[bi];b.label=mx(b.
 function setItem(di,bi,ii,k,val,lang){const it=S.program[di].blocks[bi].items[ii];
   it[k]= k==='time' ? val : mx(it[k],val,lang);   // vaqt hamma tilda bir xil
   api.saveProgram();}
-function addDay(){progAllLangs=true;S.program.push({date:"",dow:"",title:{uz:"Yangi kun",ru:"Новый день",en:"New day"},subtitle:"",blocks:[{label:"",items:[{time:"",}]}]});api.saveProgram();renderProgram(VW());}
-function delDay(di){if(!confirm('?'))return;S.program.splice(di,1);api.saveProgram();renderProgram(VW());}
-function addBlock(di){progAllLangs=true;S.program[di].blocks.push({label:"",items:[{time:"",}]});api.saveProgram();renderProgram(VW());}
-function addItem(di,bi){progAllLangs=true;S.program[di].blocks[bi].items.push({time:"",});api.saveProgram();renderProgram(VW());}
+// `at` berilsa o'sha o'ringa, aks holda oxiriga qo'shiladi — shunda yangi
+// bandni boshiga ham, oxiriga ham qo'yish mumkin.
+function insertAt(list,item,at){
+  if(at===undefined||at===null||at<0||at>list.length)list.push(item);
+  else list.splice(at,0,item);
+}
+function newDay(){return {date:"",dow:"",title:{uz:"Yangi kun",ru:"Новый день",en:"New day"},
+  subtitle:"",blocks:[{label:"",items:[{time:"",}]}]};}
+
+function addDay(at){progAllLangs=true;insertAt(S.program,newDay(),at);
+  api.saveProgram();renderProgram(VW());}
+function delDay(di){if(!confirm(t('progDelDayQ')))return;S.program.splice(di,1);
+  api.saveProgram();renderProgram(VW());}
+function addBlock(di,at){progAllLangs=true;
+  insertAt(S.program[di].blocks,{label:"",items:[{time:"",}]},at);
+  api.saveProgram();renderProgram(VW());}
+function delBlock(di,bi){if(!confirm(t('progDelBlockQ')))return;
+  S.program[di].blocks.splice(bi,1);api.saveProgram();renderProgram(VW());}
+function addItem(di,bi,at){progAllLangs=true;
+  insertAt(S.program[di].blocks[bi].items,{time:"",},at);
+  api.saveProgram();renderProgram(VW());}
+
+/* Tepa-past siljitish — kun, bo'lim va bandlar uchun bir xil. */
+function swap(list,i,j){
+  if(i<0||j<0||i>=list.length||j>=list.length)return false;
+  [list[i],list[j]]=[list[j],list[i]];return true;
+}
+function moveDay(di,d){ if(swap(S.program,di,di+d)){api.saveProgram();renderProgram(VW());} }
+function moveBlock(di,bi,d){ if(swap(S.program[di].blocks,bi,bi+d)){api.saveProgram();renderProgram(VW());} }
+function moveItem(di,bi,ii,d){ if(swap(S.program[di].blocks[bi].items,ii,ii+d)){api.saveProgram();renderProgram(VW());} }
 function delItem(di,bi,ii){S.program[di].blocks[bi].items.splice(ii,1);api.saveProgram();renderProgram(VW());}
 
 /* ===== checkin ===== */

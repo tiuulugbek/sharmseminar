@@ -130,7 +130,7 @@ bazadan qayta o'qiladi, ya'ni rolni o'zgartirsangiz darhol kuchga kiradi.
 |---|---|
 | `member` — ishtirokchi | faqat **o'zi** haqidagi ma'lumot (xonasi, guruhi, mas'uliyati) + dastur |
 | `leader` — guruh mas'uli | **o'z guruhi** ro'yxati, QR kodlari va check-in (faqat o'z guruhini) |
-| `manager` — rahbar | **barcha guruhlar**, ishtirokchilarni tahrirlash, check-in, pasport ma'lumoti |
+| `manager` — rahbar | **barcha guruhlar**, xona va til tahriri, check-in, pasport ma'lumoti |
 | `admin` — texnik admin | hammasi: sozlamalar, dastur, mas'uliyatlar, guruh nomlari |
 
 Pasport ma'lumoti (seriya, raqam, tug'ilgan sana, telefon, Telegram) faqat
@@ -200,6 +200,17 @@ Har bir ishtirokchining asosiy tili panelning «Ishtirokchilar» bo'limidagi
 **«Til»** ustunidan qo'yiladi (`Avto` = brauzer tili bo'yicha). Chet eldan
 kelgan mehmonga `EN` yoki `RU` qo'ysangiz, u beyjik QR ini skanlaganda sahifa
 o'sha tilda ochiladi.
+
+### Dastur tartibini o'zgartirish
+
+Kun, bo'lim va bandlarning har birida **↑ ↓** tugmalari bor — istalgan joyga
+suriladi. Qo'shish ham ikki tomondan:
+
+- **«↑ Kun»** / **«+ Kun»** — dasturning boshiga yoki oxiriga;
+- har bo'lim va band ostida **«↑ Boshiga»** va **«+ Band»**.
+
+Ya'ni «GN ReSound kuni» ni ro'yxatning boshiga qo'yish uchun uni qo'shib, ↑
+bilan surasiz — yoki darrov boshiga qo'shasiz.
 
 ### Dastur va matnlarni uch tilda kiritish
 
@@ -458,6 +469,17 @@ kira oladi.
 
 Yangi kelgan odam ro'yxatda bo'lmasa, bot unga shaxsiy xabar yozib pasporti
 bilan tasdiqlashni so'raydi.
+
+### Guruh taqsimotini himoyalash
+
+Guruh (`group`) va guruh mas'uli (`leader`) maydonlarini **faqat `admin`**
+o'zgartira oladi — panelda ham, API da ham. Rahbar (`manager`) ishtirokchining
+xonasi, tili va check-inini boshqaradi, lekin guruhiga tegolmaydi.
+
+«Guruhlar» bo'limidagi **«Avtomatik taqsimlash»** va **«Tozalash»** ham faqat
+adminga ko'rinadi va endi aniq tasdiq so'raydi — bitta bosishda butun
+taqsimotni almashtirib yuboradigan tugmalar edi. Avtomatik taqsimlash endi
+guruh mas'ullarini ham o'chirmaydi: mas'ul o'z guruhida qoladi.
 
 ### Xonadoshni o'zgartirish
 

@@ -519,6 +519,31 @@ class BotApiTest(unittest.TestCase):
         self.assertEqual(as_manager.post("/api/checkin", json=outside).status_code, 200)
         self.assertEqual(as_member.post("/api/checkin", json=own).status_code, 403)
 
+    def test_only_an_admin_may_change_groups(self):
+        """Taqsimot bir marta to'g'rilangach, tasodifan aralashib ketmasin."""
+        leader, member, other = self.build_group()
+        admin = self.register("Panel Admin", "0000781")
+        os.environ["PANEL_ADMIN_IDS"] = admin["id"]
+        self.sql("UPDATE participants SET panel_role='manager' WHERE id=?", other["id"])
+        as_admin, as_manager = self.panel(admin["id"]), self.panel(other["id"])
+
+        self.assertEqual(as_admin.post("/api/participant", json={
+            "id": member["id"], "patch": {"group": 3}}).status_code, 200)
+        for field in ({"group": 4}, {"leader": True}):
+            response = as_manager.post("/api/participant", json={"id": member["id"], "patch": field})
+            self.assertEqual(response.status_code, 403, field)
+        self.assertEqual(self.one("SELECT grp FROM participants WHERE id=?", member["id"])[0], 3)
+
+        # Xona va til rahbarga ochiq qoladi — cheklov faqat guruhga.
+        self.assertEqual(as_manager.post("/api/participant", json={
+            "id": member["id"], "patch": {"room": "214", "lang": "en"}}).status_code, 200)
+
+        # Ommaviy qayta taqsimlash ham faqat admin qo'lida.
+        items = {"items": [{"id": member["id"], "group": 5}]}
+        self.assertEqual(as_manager.post("/api/participants/bulk", json=items).status_code, 403)
+        self.assertEqual(as_admin.post("/api/participants/bulk", json=items).status_code, 200)
+        self.assertEqual(self.one("SELECT grp FROM participants WHERE id=?", member["id"])[0], 5)
+
     def test_moving_someone_between_rooms_updates_both_sides(self):
         leader, member, other = self.build_group()
         admin = self.register("Panel Admin", "0000780")

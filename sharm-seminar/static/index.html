@@ -191,6 +191,15 @@ tbody tr:hover{background:#FAFAFE}
 .whoami b{color:#211F52;font-weight:700}
 .whoami .out{border:1px solid #E7E8F0;background:#fff;border-radius:8px;padding:6px 10px;
   font-weight:700;cursor:pointer;color:#7A7990}
+.draftbar{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:800;
+  display:flex;align-items:center;gap:10px;background:#211F52;color:#fff;border-radius:999px;
+  padding:9px 12px 9px 18px;box-shadow:0 12px 34px rgba(20,18,60,.34);animation:draftin .22s ease}
+@keyframes draftin{from{opacity:0;transform:translate(-50%,12px)}to{opacity:1;transform:translate(-50%,0)}}
+.draftbar .cnt{font-size:13px;font-weight:700;white-space:nowrap}
+.draftbar .btn{padding:7px 13px;font-size:13px}
+@media(max-width:520px){.draftbar{left:12px;right:12px;transform:none;justify-content:space-between;
+  border-radius:14px;padding:10px 12px}
+  @keyframes draftin{from{opacity:0}to{opacity:1}}}
 .movers{display:flex;gap:1px;align-items:center}
 .movers b{cursor:pointer;font-size:13px;line-height:1;padding:5px 6px;border-radius:6px;
   color:var(--muted);opacity:.7}
@@ -306,7 +315,7 @@ const T = {
   total:"Jami ishtirokchi",assigned:"Guruhga biriktirilgan",leaders:"Guruh mas'ullari",foreign:"Chet eldan alohida",
   byGroup:"Guruhlar bo'yicha taqsimot",cpProgress:"Check-in holati",search:"Ism yoki ID bo'yicha qidirish…",
   allGroups:"Barcha guruhlar",allRooms:"Barcha xonalar",noGroup:"Guruhsiz",grp:"Guruh",room:"Xona turi",
-  roommate:"Sherik",roomAlone:"— yakka",roomNew:"+ yangi xona",roomNewQ:"Yangi xona blokining nomi (masalan D40):",roomFullQ:"%s xonasida allaqachon %n kishi bor. Baribir ko'chirilsinmi?",leaderCol:"Mas'ul",arrival:"Kelish",autoDist:"Avtomatik taqsimlash",autoDistQ:"Barcha %n ishtirokchi guruhlarga QAYTA taqsimlanadi — hozirgi taqsimot yo'qoladi. Davom etamizmi?",clearAllQ:"Hamma guruh biriktirmalari va guruh mas'ullari o'chiriladi. Ishonchingiz komilmi?",grpLocked:"Guruhlarni faqat texnik admin o'zgartiradi",clearAll:"Tozalash",
+  roommate:"Sherik",roomAlone:"— yakka",roomNew:"+ yangi xona",roomNewQ:"Yangi xona blokining nomi (masalan D40):",roomFullQ:"%s xonasida allaqachon %n kishi bor. Baribir ko'chirilsinmi?",leaderCol:"Mas'ul",arrival:"Kelish",autoDist:"Avtomatik taqsimlash",draftPending:"%n ta saqlanmagan o'zgarish",draftSave:"Saqlash",draftCancel:"Bekor qilish",draftSaved:"%n ta o'zgarish saqlandi",autoDistQ:"Barcha %n ishtirokchi guruhlarga QAYTA taqsimlanadi — hozirgi taqsimot yo'qoladi. Davom etamizmi?",clearAllQ:"Hamma guruh biriktirmalari va guruh mas'ullari o'chiriladi. Ishonchingiz komilmi?",grpLocked:"Guruhlarni faqat texnik admin o'zgartiradi",clearAll:"Tozalash",
   member:"a'zo",noMembers:"Hali a'zo yo'q",leaderTag:"Guruh mas'uli",noRight:"Buning uchun ruxsatingiz yo'q",
   qrAll:"Hammasini ZIP qilib yuklash",qrWithName:"Ism-familya bilan",
   langCol:"Til",tgCol:"Telegram",tgNone:"tasdiqlamagan",tgUnlink:"Bog'lanishni uzish",tgUnlinkQ:"%s — Telegram bog'lanishi uzilsinmi? Keyin u qaytadan /start bosib tasdiqlashi kerak.",editingIn:"Tahrirlanayotgan til:",allLangs:"Uchala tilni birdan",langAuto:"Avto",langHint:"Ishtirokchi QR ni skanlaganda sahifa shu tilda ochiladi",
@@ -335,7 +344,7 @@ const T = {
   total:"Всего участников",assigned:"Распределено по группам",leaders:"Старосты групп",foreign:"Из-за рубежа отдельно",
   byGroup:"Распределение по группам",cpProgress:"Статус check-in",search:"Поиск по имени или ID…",
   allGroups:"Все группы",allRooms:"Все номера",noGroup:"Без группы",grp:"Группа",room:"Тип номера",
-  roommate:"Сосед",roomAlone:"— один",roomNew:"+ новый номер",roomNewQ:"Название нового блока (например D40):",roomFullQ:"В номере %s уже %n человек. Всё равно переселить?",leaderCol:"Староста",arrival:"Прибытие",autoDist:"Распределить автоматически",autoDistQ:"Все %n участников будут ПЕРЕраспределены — текущее распределение исчезнет. Продолжить?",clearAllQ:"Все группы и старосты будут удалены. Вы уверены?",grpLocked:"Группы меняет только тех. админ",clearAll:"Очистить",
+  roommate:"Сосед",roomAlone:"— один",roomNew:"+ новый номер",roomNewQ:"Название нового блока (например D40):",roomFullQ:"В номере %s уже %n человек. Всё равно переселить?",leaderCol:"Староста",arrival:"Прибытие",autoDist:"Распределить автоматически",draftPending:"%n несохранённых изменений",draftSave:"Сохранить",draftCancel:"Отменить",draftSaved:"Сохранено изменений: %n",autoDistQ:"Все %n участников будут ПЕРЕраспределены — текущее распределение исчезнет. Продолжить?",clearAllQ:"Все группы и старосты будут удалены. Вы уверены?",grpLocked:"Группы меняет только тех. админ",clearAll:"Очистить",
   member:"чел.",noMembers:"Пока нет участников",leaderTag:"Староста группы",noRight:"Недостаточно прав",
   qrAll:"Скачать все в ZIP",qrWithName:"С именем и фамилией",
   langCol:"Язык",tgCol:"Telegram",tgNone:"не подтвердил",tgUnlink:"Отвязать",tgUnlinkQ:"%s — отвязать Telegram? Затем нужно снова подтвердить через /start.",editingIn:"Язык редактирования:",allLangs:"Все три языка сразу",langAuto:"Авто",langHint:"На этом языке откроется страница при сканировании QR",
@@ -364,7 +373,7 @@ const T = {
   total:"Participants in total",assigned:"Assigned to a group",leaders:"Group leaders",foreign:"Arriving separately",
   byGroup:"Distribution by group",cpProgress:"Check-in progress",search:"Search by name or ID…",
   allGroups:"All groups",allRooms:"All room types",noGroup:"No group",grp:"Group",room:"Room type",
-  roommate:"Roommate",roomAlone:"— alone",roomNew:"+ new room",roomNewQ:"Name of the new room block (e.g. D40):",roomFullQ:"Room %s already holds %n people. Move anyway?",leaderCol:"Leader",arrival:"Arrival",autoDist:"Distribute automatically",autoDistQ:"All %n participants will be REdistributed — the current arrangement is lost. Continue?",clearAllQ:"Every group assignment and group leader will be cleared. Are you sure?",grpLocked:"Only a technical admin can change groups",clearAll:"Clear",
+  roommate:"Roommate",roomAlone:"— alone",roomNew:"+ new room",roomNewQ:"Name of the new room block (e.g. D40):",roomFullQ:"Room %s already holds %n people. Move anyway?",leaderCol:"Leader",arrival:"Arrival",autoDist:"Distribute automatically",draftPending:"%n unsaved changes",draftSave:"Save",draftCancel:"Discard",draftSaved:"%n changes saved",autoDistQ:"All %n participants will be REdistributed — the current arrangement is lost. Continue?",clearAllQ:"Every group assignment and group leader will be cleared. Are you sure?",grpLocked:"Only a technical admin can change groups",clearAll:"Clear",
   member:"members",noMembers:"No members yet",leaderTag:"Group leader",noRight:"You do not have permission for this",
   qrAll:"Download all as ZIP",qrWithName:"With name",
   langCol:"Language",tgCol:"Telegram",tgNone:"not verified",tgUnlink:"Unlink",tgUnlinkQ:"%s — unlink Telegram? They will have to verify again with /start.",editingIn:"Editing in:",allLangs:"All three languages",langAuto:"Auto",langHint:"The page opens in this language when the QR is scanned",
@@ -574,12 +583,71 @@ function fillRows(){const tb=document.getElementById('tb');if(!tb)return;
         : `<span class="muted" style="font-size:11.5px">${t('tgNone')}</span>`}</td>`:''}</tr>`;
   }).join('')||`<tr><td colspan="9" class="muted" style="padding:30px;text-align:center">${t('notFound')}</td></tr>`;
 }
-function setGroup(id,g){const p=find(id);p.group=g?+g:null;if(!p.group)p.leader=false;
-  api.patch(id,{group:p.group,leader:p.leader});toast(t('saved'));if(VIEW==='parts')fillRows();}
-function toggleLeader(id){const p=find(id);if(!p.group)return;
-  if(!p.leader)P().forEach(x=>{if(x.group===p.group)x.leader=false;});
-  p.leader=!p.leader;api.patch(id,{leader:p.leader,group:p.group});toast(t('saved'));
-  if(VIEW==='parts')fillRows();else if(VIEW==='groups')render();}
+/* ===== guruh taqsimoti: qoralama va saqlash ===== */
+// Guruhni sozlash bir necha harakatdan iborat, har biri darrov saqlansa
+// yarim tayyor holat bazaga tushib qoladi va odamlarga ortiqcha xabar boradi.
+// Shuning uchun o'zgarishlar yig'iladi va "Saqlash" bosilganda birdan yoziladi.
+const draftNew=new Map();   // id -> {group, leader}  (yangi qiymat)
+const draftOld=new Map();   // id -> {group, leader}  (bekor qilish uchun)
+
+function draftRemember(p){
+  if(!draftOld.has(p.id))draftOld.set(p.id,{group:p.group,leader:p.leader});
+}
+function draftMark(p){
+  draftRemember(p);
+  const was=draftOld.get(p.id);
+  if(was.group===p.group&&!!was.leader===!!p.leader){draftNew.delete(p.id);draftOld.delete(p.id);}
+  else draftNew.set(p.id,{group:p.group,leader:p.leader});
+}
+const draftDirty=()=>draftNew.size;
+
+function setGroup(id,g){
+  const p=find(id); draftRemember(p);
+  p.group=g?+g:null; if(!p.group)p.leader=false;
+  draftMark(p); afterDraft();
+}
+function toggleLeader(id){
+  const p=find(id); if(!p.group)return;
+  if(!p.leader)P().forEach(x=>{ if(x.group===p.group&&x.leader){draftRemember(x);x.leader=false;draftMark(x);} });
+  draftRemember(p); p.leader=!p.leader; draftMark(p);
+  afterDraft();
+}
+
+function afterDraft(){
+  renderDraftBar();
+  if(VIEW==='parts')fillRows(); else if(VIEW==='groups')render();
+}
+
+function renderDraftBar(){
+  let bar=document.getElementById('draftbar');
+  if(!draftDirty()){ if(bar)bar.remove(); return; }
+  if(!bar){
+    bar=document.createElement('div'); bar.id='draftbar'; bar.className='draftbar';
+    document.body.appendChild(bar);
+  }
+  bar.innerHTML=`<span class="cnt">${t('draftPending').replace('%n',draftDirty())}</span>
+    <button class="btn" onclick="draftCancel()">${t('draftCancel')}</button>
+    <button class="btn pri" onclick="draftSave()">💾 ${t('draftSave')}</button>`;
+}
+
+async function draftSave(){
+  const items=[...draftNew.entries()].map(([id,v])=>({id,group:v.group,leader:v.leader}));
+  if(!items.length)return;
+  const ok=await api.bulk(items);
+  if(ok===false)return;                       // 401/403 — api qatlami aytdi
+  draftNew.clear(); draftOld.clear();
+  renderDraftBar(); render();
+  toast(t('draftSaved').replace('%n',items.length));
+}
+
+function draftCancel(){
+  draftOld.forEach((was,id)=>{const p=find(id); if(p){p.group=was.group;p.leader=was.leader;}});
+  draftNew.clear(); draftOld.clear();
+  renderDraftBar(); render();
+}
+
+// Saqlanmagan o'zgarish bilan sahifani yopib yubormaslik uchun.
+window.addEventListener('beforeunload',e=>{ if(draftDirty()){e.preventDefault();e.returnValue='';} });
 
 /* ===== groups ===== */
 function renderGroups(){
@@ -601,6 +669,7 @@ function renderGroups(){
 // Butun taqsimotni almashtiradi — shuning uchun aniq tasdiq so'raladi.
 function autoDist(){
   if(!confirm(t('autoDistQ').replace('%n',P().length)))return;
+  P().forEach(draftRemember);
   const byRoom={};P().forEach(p=>{(byRoom[p.xona_guruhi]=byRoom[p.xona_guruhi]||[]).push(p);});
   const rooms=Object.values(byRoom).sort((a,b)=>b.length-a.length);const counts=[0,0,0,0,0];
   rooms.forEach(room=>{let mi=0;for(let i=1;i<5;i++)if(counts[i]<counts[mi])mi=i;
@@ -609,12 +678,13 @@ function autoDist(){
   const kept=new Set();
   P().forEach(p=>{ if(!p.leader)return;
     if(kept.has(p.group))p.leader=false; else kept.add(p.group); });
-  api.bulk(P().map(p=>({id:p.id,group:p.group,leader:p.leader})));toast(t('distDone'));render();
+  P().forEach(draftMark);
+  afterDraft(); toast(t('distDone'));
 }
 function clearGroups(){
   if(!confirm(t('clearAllQ')))return;
-  P().forEach(p=>{p.group=null;p.leader=false;});
-  api.bulk(P().map(p=>({id:p.id,group:null,leader:false})));toast(t('cleared'));render();}
+  P().forEach(p=>{draftRemember(p);p.group=null;p.leader=false;draftMark(p);});
+  afterDraft(); toast(t('cleared'));}
 
 /* ===== roles / responsibilities ===== */
 const VW=()=>document.getElementById('view');

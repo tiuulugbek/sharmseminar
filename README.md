@@ -470,6 +470,22 @@ kira oladi.
 Yangi kelgan odam ro'yxatda bo'lmasa, bot unga shaxsiy xabar yozib pasporti
 bilan tasdiqlashni so'raydi.
 
+### Guruhlarni saqlash tugmasi
+
+Guruh taqsimoti bir necha harakatdan iborat, shuning uchun har bir o'zgarish
+darrov yozilmaydi — ular **qoralama** sifatida yig'iladi:
+
+- guruh yoki mas'ulni o'zgartirsangiz pastda tasma chiqadi:
+  «**3 ta saqlanmagan o'zgarish** · Bekor qilish · 💾 Saqlash»;
+- **Saqlash** hammasini bitta so'rovda yozadi va guruhi almashganlarga botdan
+  xabar shunda boradi (yarim tayyor holatda ortiqcha xabar ketmaydi);
+- **Bekor qilish** hammasini avvalgi holiga qaytaradi;
+- o'zgartirib, keyin asl qiymatga qaytarsangiz — u hisobga olinmaydi;
+- saqlanmagan o'zgarish bilan sahifani yopmoqchi bo'lsangiz brauzer ogohlantiradi.
+
+«Avtomatik taqsimlash» va «Tozalash» ham shu qoralamaga tushadi: natijani ko'rib,
+keyin saqlaysiz yoki bekor qilasiz. Saqlash — `admin` roli uchun.
+
 ### Guruh taqsimotini himoyalash
 
 Guruh (`group`) va guruh mas'uli (`leader`) maydonlarini **faqat `admin`**

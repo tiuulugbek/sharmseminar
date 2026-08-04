@@ -228,6 +228,19 @@ def ensure_tokens(con):
     return filled
 
 
+@app.after_request
+def no_html_cache(response):
+    """HTML sahifalar keshlanmasin.
+
+    Panel bitta `index.html` ichida yashaydi: brauzer uni keshlab qo'ysa,
+    serverda yangilangan kod foydalanuvchiga umuman yetib bormaydi va u eski
+    tugmalarni ko'rib turadi.  Rasm va kutubxonalar (`/vendor/…`) keshlanaveradi.
+    """
+    if response.mimetype == "text/html":
+        response.headers["Cache-Control"] = "no-cache, must-revalidate, max-age=0"
+    return response
+
+
 @app.before_request
 def ensure_database():
     """Initialize/migrate once per process, including under gunicorn."""
@@ -660,6 +673,15 @@ def auth_logout():
     return response
 
 
+def _build_stamp():
+    """Panel fayli qachon yangilangani — brauzerdagi nusxa eskiligini bilish uchun."""
+    try:
+        mtime = os.path.getmtime(os.path.join(STATIC, "index.html"))
+    except OSError:
+        return "?"
+    return datetime.datetime.fromtimestamp(mtime).strftime("%d.%m %H:%M")
+
+
 @app.get("/api/auth/me")
 def auth_me():
     user = current_session()
@@ -801,7 +823,8 @@ def bootstrap():
     for r in con.execute("SELECT * FROM checkins").fetchall():
         if r["pid"] in visible_ids:
             checkins.setdefault(r["checkpoint"], {})[r["pid"]] = r["ts"]
-    out = {"user": user, "participants": parts, "checkins": checkins,
+    out = {"user": user, "build": _build_stamp(),
+           "participants": parts, "checkins": checkins,
            "checkpoints": cps, "program": sget(con, "program", []),
            "groups": sget(con, "groups", DEFAULT_GROUPS),
            "roles": sget(con, "roles", DEFAULT_ROLES), "meta": sget(con, "meta", DEFAULT_META),

@@ -794,6 +794,7 @@ def _find_by_passport(con, value):
 # Fayllar diskda `data/docs/<ACO-id>/` ostida yotadi, bazada faqat yozuvi.
 # Har bir hujjat bitta odamga tegishli — bot uni faqat egasiga yuboradi.
 DOCS_DIR = os.path.join(BASE_DIR, "data", "docs")
+DOCS_FILES = os.path.join(DOCS_DIR, "_files")
 DOC_KINDS = ("voucher", "ticket", "other")
 MAX_DOC_BYTES = 20 * 1024 * 1024
 
@@ -814,40 +815,46 @@ def guess_kind(file_name):
     return "other"
 
 
-def match_participant(con, file_name):
-    """Fayl nomidan egasini topadi: ACO raqami → pasport → ism.
+def match_participants(con, text):
+    """Matndan (fayl nomi yoki izoh) egalarini topadi.
 
-    Faqat bitta odamga to'g'ri kelsa qaytaradi; shubhali holatda ``None`` —
-    noto'g'ri odamga voucher yuborilgandan ko'ra qo'lda biriktirgan yaxshiroq.
+    Bitta voucherda ikki-uch kishining ismi bo'lishi mumkin, shuning uchun
+    **ro'yxat** qaytadi.  Qidiruv tartibi: ACO raqamlari → pasportlar → ism.
+    Ism bo'yicha faqat to'liq (ism va familya) mos kelgani olinadi, shunda
+    "Siddikov" degan bir so'z uch kishiga tegib ketmaydi.
     """
-    stem = os.path.splitext(os.path.basename(str(file_name or "")))[0]
+    # Matn fayl nomi ham, izoh ham bo'lishi mumkin — kengaytmani (".pdf")
+    # olib tashlaymiz, qolganiga tegmaymiz.
+    stem = re.sub(r"\.[A-Za-z0-9]{1,5}(?=\s|$)", " ", str(text or ""))
     upper = stem.upper()
+    found, seen = [], set()
 
-    found = re.search(r"ACO[-_ ]?(\d{1,4})", upper)
-    if found:
-        pid = f"ACO-{int(found.group(1)):03d}"
+    def add(pid):
+        if pid and pid not in seen:
+            seen.add(pid)
+            found.append(pid)
+
+    for number in re.findall(r"ACO[-_ ]?(\d{1,4})", upper):
+        pid = f"ACO-{int(number):03d}"
         if con.execute("SELECT 1 FROM participants WHERE id=?", (pid,)).fetchone():
-            return pid
+            add(pid)
 
     digits = re.sub(r"[^A-Z0-9]", "", upper)
     for row in con.execute("SELECT id,passport_series,passport_number FROM participants "
                            "WHERE passport_number IS NOT NULL AND passport_number<>''"):
         full = f"{row['passport_series'] or ''}{row['passport_number'] or ''}".upper()
         if full and full in digits:
-            return row["id"]
+            add(row["id"])
 
-    # Ism bo'yicha: fayl nomida odamning BARCHA ism so'zlari bo'lsa yetarli —
-    # "Bilet_Niyazov_Bobir.pdf" dagi ortiqcha so'zlar xalaqit bermasin.
+    # Ism bo'yicha: odamning barcha ism so'zlari matnda uchrasa — o'shaniki.
+    # Bitta faylda bir necha kishi bo'lsa, hammasi topiladi.
     words = {w.lower() for w in re.split(r"[^A-Za-zА-Яа-яЎўҚқҒғҲҳ]+", stem) if len(w) > 2}
     if len(words) >= 2:
-        hits = []
         for row in con.execute("SELECT id,fio FROM participants"):
             parts = {w.lower() for w in str(row["fio"]).split() if len(w) > 2}
             if len(parts) >= 2 and parts <= words:
-                hits.append(row["id"])
-        if len(hits) == 1:
-            return hits[0]
-    return None
+                add(row["id"])
+    return found
 
 
 def _doc_row(r, con=None):
@@ -867,42 +874,52 @@ def docs_released(con, kind):
 @app.post("/api/docs/upload")
 @panel_auth("manager")
 def docs_upload():
-    """Bir yoki bir nechta faylni yuklaydi va egasiga biriktiradi.
+    """Fayllarni yuklaydi va egalariga biriktiradi.
 
-    `pid` berilsa hammasi o'sha odamga, aks holda har bir fayl nomi bo'yicha
-    o'zi topiladi.  Topilmagani `unmatched` ro'yxatida qaytadi va panelda qo'lda
-    biriktiriladi.
+    Bitta faylda bir necha kishining ismi bo'lishi mumkin (masalan uch kishilik
+    xona voucheri) — fayl diskda **bir marta** saqlanadi, har bir egasiga esa
+    alohida yozuv ochiladi, shunda bot har biriga o'z nusxasini yuboradi va kim
+    olganini alohida belgilaydi.
+
+    `pids` (yoki `pid`) berilsa egalari majburan shular; aks holda fayl nomidan
+    va `hint` matnidan topiladi.  Hech kim topilmasa fayl saqlanmaydi.
     """
-    forced = str(request.form.get("pid") or "").strip().upper()
+    forced = [x.strip().upper() for x in
+              re.split(r"[,\s]+", request.form.get("pids") or request.form.get("pid") or "")
+              if x.strip()]
+    hint = str(request.form.get("hint") or "")
     kind_hint = str(request.form.get("kind") or "").strip().lower()
     files = request.files.getlist("files") or request.files.getlist("file")
     if not files:
         return jsonify(error="no_files"), 400
 
     con = db()
+    os.makedirs(DOCS_FILES, exist_ok=True)
     saved, unmatched = [], []
     for storage in files:
         name = storage.filename or "fayl"
-        pid = forced or match_participant(con, name)
-        if not pid or not con.execute("SELECT 1 FROM participants WHERE id=?", (pid,)).fetchone():
+        owners = forced or match_participants(con, name + " " + hint)
+        owners = [p for p in owners
+                  if con.execute("SELECT 1 FROM participants WHERE id=?", (p,)).fetchone()]
+        if not owners:
             unmatched.append(name)
             continue
         blob = storage.read()
         if len(blob) > MAX_DOC_BYTES:
             unmatched.append(f"{name} (juda katta)")
             continue
-        kind = kind_hint if kind_hint in DOC_KINDS else guess_kind(name)
-        folder = os.path.join(DOCS_DIR, pid)
-        os.makedirs(folder, exist_ok=True)
+        kind = kind_hint if kind_hint in DOC_KINDS else guess_kind(name + " " + hint)
         stored = f"{secrets.token_hex(6)}_{_safe_name(name)}"
-        with open(os.path.join(folder, stored), "wb") as fh:
+        with open(os.path.join(DOCS_FILES, stored), "wb") as fh:
             fh.write(blob)
-        cur = con.execute(
-            "INSERT INTO documents(pid,kind,file_name,stored,mime,size,uploaded_at,uploaded_by) "
-            "VALUES(?,?,?,?,?,?,?,?)",
-            (pid, kind, _safe_name(name), stored, storage.mimetype or "", len(blob),
-             _now(), request.panel_user["id"]))
-        saved.append({"id": cur.lastrowid, "pid": pid, "kind": kind, "file_name": _safe_name(name)})
+        for pid in owners:
+            cur = con.execute(
+                "INSERT INTO documents(pid,kind,file_name,stored,mime,size,uploaded_at,uploaded_by) "
+                "VALUES(?,?,?,?,?,?,?,?)",
+                (pid, kind, _safe_name(name), stored, storage.mimetype or "", len(blob),
+                 _now(), request.panel_user["id"]))
+            saved.append({"id": cur.lastrowid, "pid": pid, "kind": kind,
+                          "file_name": _safe_name(name)})
     con.commit(); con.close()
     return jsonify(ok=True, saved=saved, unmatched=unmatched)
 
@@ -935,7 +952,7 @@ def docs_download(doc_id):
     con.close()
     if not row or row["pid"] not in allowed:
         abort(404)
-    return send_from_directory(os.path.join(DOCS_DIR, row["pid"]), row["stored"],
+    return send_from_directory(DOCS_FILES, row["stored"],
                                as_attachment=True, download_name=row["file_name"])
 
 
@@ -949,11 +966,16 @@ def docs_delete():
         con.close()
         return jsonify(error="not_found"), 404
     con.execute("DELETE FROM documents WHERE id=?", (doc_id,))
-    con.commit(); con.close()
-    try:
-        os.remove(os.path.join(DOCS_DIR, row["pid"], row["stored"]))
-    except OSError:
-        pass
+    con.commit()
+    # Fayl bir necha odamga tegishli bo'lishi mumkin — oxirgi yozuv ketgandagina
+    # diskdan o'chiramiz.
+    others = con.execute("SELECT 1 FROM documents WHERE stored=?", (row["stored"],)).fetchone()
+    con.close()
+    if not others:
+        try:
+            os.remove(os.path.join(DOCS_FILES, row["stored"]))
+        except OSError:
+            pass
     return jsonify(ok=True)
 
 
@@ -974,17 +996,43 @@ def docs_assign():
     if not con.execute("SELECT 1 FROM participants WHERE id=?", (pid,)).fetchone():
         con.close()
         return jsonify(error="participant_not_found"), 404
-    if pid != row["pid"]:
-        os.makedirs(os.path.join(DOCS_DIR, pid), exist_ok=True)
-        try:
-            os.replace(os.path.join(DOCS_DIR, row["pid"], row["stored"]),
-                       os.path.join(DOCS_DIR, pid, row["stored"]))
-        except OSError:
-            con.close()
-            return jsonify(error="move_failed"), 500
     con.execute("UPDATE documents SET pid=?,kind=?,sent_at=NULL WHERE id=?", (pid, kind, row["id"]))
     con.commit(); con.close()
     return jsonify(ok=True)
+
+
+@app.post("/api/docs/share")
+@panel_auth("manager")
+def docs_share():
+    """Mavjud faylni yana bir necha odamga biriktiradi.
+
+    Bir voucherda ikki-uch kishi bo'lsa, fayl qayta yuklanmaydi — shu yozuvdan
+    nusxa olinadi va har kimga o'zi yuboriladi.
+    """
+    d = request.get_json(silent=True) or {}
+    con = db()
+    row = con.execute("SELECT * FROM documents WHERE id=?", (d.get("id"),)).fetchone()
+    if not row:
+        con.close()
+        return jsonify(error="not_found"), 404
+    wanted = d.get("pids") or []
+    if isinstance(wanted, str):
+        wanted = re.split(r"[,\s]+", wanted)
+    added, skipped = [], []
+    for pid in [str(x).strip().upper() for x in wanted if str(x).strip()]:
+        if not con.execute("SELECT 1 FROM participants WHERE id=?", (pid,)).fetchone():
+            skipped.append(pid)
+            continue
+        if con.execute("SELECT 1 FROM documents WHERE stored=? AND pid=?",
+                       (row["stored"], pid)).fetchone():
+            continue
+        con.execute("INSERT INTO documents(pid,kind,file_name,stored,mime,size,uploaded_at,"
+                    "uploaded_by) VALUES(?,?,?,?,?,?,?,?)",
+                    (pid, row["kind"], row["file_name"], row["stored"], row["mime"],
+                     row["size"], _now(), request.panel_user["id"]))
+        added.append(pid)
+    con.commit(); con.close()
+    return jsonify(ok=True, added=added, skipped=skipped)
 
 
 @app.post("/api/docs/release")
@@ -1797,6 +1845,28 @@ def bot_docs_pending():
     return jsonify(people=list(out.values()), not_registered=waiting)
 
 
+@app.post("/api/bot/docs/upload")
+@bot_auth
+def bot_docs_upload():
+    """Botdan kelgan faylni saqlaydi — admin telegramga tashlaganini."""
+    request.panel_user = {"id": str(request.form.get("uploader") or "bot")}
+    return docs_upload.__wrapped__()
+
+
+@app.post("/api/bot/docs/share")
+@bot_auth
+def bot_docs_share():
+    request.panel_user = {"id": "bot"}
+    return docs_share.__wrapped__()
+
+
+@app.post("/api/bot/docs/delete")
+@bot_auth
+def bot_docs_delete():
+    request.panel_user = {"id": "bot"}
+    return docs_delete.__wrapped__()
+
+
 @app.get("/api/bot/docs/file/<int:doc_id>")
 @bot_auth
 def bot_docs_file(doc_id):
@@ -1805,7 +1875,7 @@ def bot_docs_file(doc_id):
     con.close()
     if not row:
         abort(404)
-    return send_from_directory(os.path.join(DOCS_DIR, row["pid"]), row["stored"],
+    return send_from_directory(DOCS_FILES, row["stored"],
                                as_attachment=True, download_name=row["file_name"])
 
 

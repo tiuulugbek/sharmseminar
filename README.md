@@ -386,9 +386,19 @@ Guruhni panelda o'zgartirsangiz, odamga botdan xabar boradi.
 Har bir ishtirokchining o'z hujjatlari saqlanadi va bot ularni **faqat egasiga**
 yuboradi.
 
-### Yuklash
+### Yuklash — ikki yo'l
 
-Panel → **«Hujjatlar»** bo'limi. Fayllarni maydonga tashlaysiz (bir vaqtda
+**1. Botga tashlab.** Faylni shunchaki `@sharmseminarbot` ga yuborasiz (admin
+sifatida). Bot uni saqlaydi va egasini fayl nomidan yoki **izohdan** topadi:
+
+> *fayl:* `IMG_2841.pdf` · *izoh:* `Musaev Sardorjon voucher`
+> → ✅ ACO-004 — Musaev Sardorjon · 1-guruh
+
+Egasi topilmasa bot **«Kimga tegishli?»** deb so'raydi — ism, ACO raqami yoki
+pasportni yozasiz, bir nechta bo'lsa vergul bilan (`ACO-004, ACO-104`). Telefonda
+turib, agentlikdan kelgan faylni to'g'ridan-to'g'ri qayta yuborsangiz bo'ladi.
+
+**2. Paneldan.** «Hujjatlar» bo'limida fayllarni maydonga tashlaysiz (bir vaqtda
 yuzlab bo'lsa ham) — egasi **fayl nomidan** o'zi topiladi:
 
 | Fayl nomi | Topilgan egasi |
@@ -405,7 +415,19 @@ Egasi **aniq topilmasa fayl biriktirilmaydi** va ro'yxatda ko'rsatiladi —
 noto'g'ri odamga voucher ketgandan ko'ra qo'lda biriktirgan yaxshiroq. Uni
 odamning qatoridagi **«+ Fayl»** tugmasi bilan qo'shasiz.
 
-Fayllar `data/docs/<ACO-id>/` da yotadi (git ga tushmaydi), bittasi 20 MB gacha.
+### Bitta faylda bir necha kishi
+
+Uch kishilik xona voucherida uchalasining ismi bo'ladi — bunday fayl **hammasiga
+biriktiriladi**:
+
+> `Voucher_Musaev_Sardorjon_Niyazov_Bobir.pdf` → ikkalasiga ham
+
+Fayl diskda **bir marta** saqlanadi, har bir egasiga alohida yozuv ochiladi:
+bot har biriga o'z nusxasini yuboradi va kim olganini alohida belgilaydi.
+Keyin yana birov qo'shilsa — fayl qayta yuklanmaydi. Bittasidan olib tashlansa
+fayl qolganlar uchun saqlanib qoladi.
+
+Fayllar `data/docs/_files/` da yotadi (git ga tushmaydi), bittasi 20 MB gacha.
 
 ### Kim ko'radi
 

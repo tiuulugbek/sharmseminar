@@ -45,6 +45,12 @@ class BotApiTest(unittest.TestCase):
         con.execute(statement, params)
         con.commit(); con.close()
 
+    def _all(self, statement, *params):
+        con = sqlite3.connect(server.DB_PATH)
+        rows = con.execute(statement, params).fetchall()
+        con.close()
+        return rows
+
     def one(self, statement, *params):
         con = sqlite3.connect(server.DB_PATH)
         row = con.execute(statement, params).fetchone()
@@ -628,6 +634,55 @@ class BotApiTest(unittest.TestCase):
         # Fayl haqiqatan diskda va yuklab olinadi.
         doc_id = by_name[f"{member['id']}_voucher.pdf"]["id"]
         self.assertEqual(panel.get(f"/api/docs/file/{doc_id}").status_code, 200)
+
+    def test_one_file_can_belong_to_several_people(self):
+        """Uch kishilik xona voucherida uchalasining ismi bo'ladi."""
+        leader, member, other = self.build_group()
+        self.sql("UPDATE participants SET fio='Musaev Sardorjon' WHERE id=?", leader["id"])
+        self.sql("UPDATE participants SET fio='Niyazov Bobir' WHERE id=?", member["id"])
+        admin = self.register("Panel Admin", "0000786")
+        os.environ["PANEL_ADMIN_IDS"] = admin["id"]
+        server.DOCS_DIR = os.path.join(self.tmp.name, "docs")
+        server.DOCS_FILES = os.path.join(server.DOCS_DIR, "_files")
+        panel = self.panel(admin["id"])
+
+        body = self.upload(panel, ["Voucher_Musaev_Sardorjon_Niyazov_Bobir.pdf"]).get_json()
+        self.assertEqual({s["pid"] for s in body["saved"]}, {leader["id"], member["id"]})
+        # Disk ustida bitta nusxa, yozuvi ikkita.
+        stored = {r[0] for r in self._all("SELECT stored FROM documents")}
+        self.assertEqual(len(stored), 1)
+        self.assertEqual(len(os.listdir(server.DOCS_FILES)), 1)
+
+        # Ikkalasi ham o'z nusxasini oladi.
+        for pid in (leader["id"], member["id"]):
+            got = self.client.get(f"/api/bot/docs?id={pid}", headers=self.headers).get_json()
+            self.assertEqual(len(got["documents"]), 1, pid)
+
+        # Uchinchi odamga keyin qo'shish — faylni qayta yuklamasdan.
+        doc_id = body["saved"][0]["id"]
+        shared = panel.post("/api/docs/share", json={"id": doc_id, "pids": [other["id"]]})
+        self.assertEqual(shared.get_json()["added"], [other["id"]])
+        self.assertEqual(len(os.listdir(server.DOCS_FILES)), 1)
+
+        # Bittasini o'chirsak fayl qolganlar uchun saqlanadi.
+        panel.post("/api/docs/delete", json={"id": doc_id})
+        self.assertEqual(len(os.listdir(server.DOCS_FILES)), 1)
+        for row in self._all("SELECT id FROM documents"):
+            panel.post("/api/docs/delete", json={"id": row[0]})
+        self.assertEqual(os.listdir(server.DOCS_FILES), [])
+
+    def test_owners_can_come_from_a_caption_when_the_filename_says_nothing(self):
+        leader, member, _ = self.build_group()
+        admin = self.register("Panel Admin", "0000787")
+        os.environ["PANEL_ADMIN_IDS"] = admin["id"]
+        server.DOCS_DIR = os.path.join(self.tmp.name, "docs")
+        server.DOCS_FILES = os.path.join(server.DOCS_DIR, "_files")
+        panel = self.panel(admin["id"])
+
+        body = self.upload(panel, ["IMG_2841.pdf"],
+                           hint=f"{leader['id']}, {member['id']} chipta").get_json()
+        self.assertEqual({s["pid"] for s in body["saved"]}, {leader["id"], member["id"]})
+        self.assertEqual({s["kind"] for s in body["saved"]}, {"ticket"})
 
     def test_documents_are_only_visible_to_their_owner_and_the_staff(self):
         leader, member, other = self.build_group()

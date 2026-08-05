@@ -1688,6 +1688,114 @@ async def send_documents(user_id: int, *, participant_id=None, silent=False) -> 
     return len(sent)
 
 
+class Docs(StatesGroup):
+    """Botga tashlangan fayl egasini aniqlash."""
+    owner = State()   # "kimga tegishli?" javobini kutish
+
+
+def _owners_text(saved) -> str:
+    names = {}
+    for item in saved:
+        names.setdefault(item["pid"], item)
+    return ", ".join(f"{pid}" for pid in names)
+
+
+async def _describe(pids) -> str:
+    """ACO raqamlarini ism bilan ko'rsatadi."""
+    out = []
+    for pid in pids:
+        try:
+            data = await asyncio.to_thread(api_client.participant, pid)
+            person = data.get("participant") or {}
+            group = f" · {person.get('group')}-guruh" if person.get("group") else ""
+            out.append(f"{pid} — {person.get('fio') or ''}{group}")
+        except Exception:
+            out.append(pid)
+    return "\n".join(f"• {x}" for x in out)
+
+
+@dp.message(StateFilter(None), F.chat.type == "private", F.document | F.photo)
+async def admin_document(message: Message, state: FSMContext):
+    """Admin botga voucher/chipta tashlaganda saqlaydi va egasini topadi.
+
+    Fayl nomida yoki izohda ism, ACO raqami yoki pasport bo'lsa — egasi o'zi
+    aniqlanadi. Bitta faylda bir necha kishi bo'lsa hammasiga biriktiriladi.
+    """
+    if not _is_admin(message.from_user.id):
+        me = await whoami(message.from_user.id)
+        if me.get("role") not in {"admin", "manager"}:
+            return await message.answer(
+                "📎 Hujjat yuborish faqat adminlar uchun.\n"
+                "O'z hujjatlaringizni olish uchun «📎 Hujjatlarim» tugmasini bosing.")
+
+    if message.document:
+        tg_file, name = message.document, message.document.file_name or "hujjat.pdf"
+        mime = message.document.mime_type or ""
+    else:
+        tg_file, name, mime = message.photo[-1], f"rasm_{message.photo[-1].file_unique_id}.jpg", "image/jpeg"
+    caption = (message.caption or "").strip()
+
+    note = await message.answer("⏳ Saqlanmoqda…")
+    try:
+        buf = await bot.download(tg_file)
+        blob = buf.read()
+    except Exception as exc:
+        return await note.edit_text(f"⚠️ Faylni olib bo'lmadi: <code>{exc}</code>")
+
+    try:
+        result = await asyncio.to_thread(
+            api_client.docs_upload, [(name, blob, mime)],
+            hint=caption, uploader=str(message.from_user.id))
+    except api_client.ApiError as exc:
+        return await note.edit_text(f"⚠️ Saqlab bo'lmadi: <code>{exc}</code>")
+
+    saved = result.get("saved") or []
+    if saved:
+        kind = saved[0]["kind"]
+        pids = list(dict.fromkeys(s["pid"] for s in saved))
+        await note.edit_text(
+            f"✅ <b>{name}</b> saqlandi ({DOC_CAPTION.get(kind, '📎')})\n\n"
+            f"Egalari ({len(pids)}):\n{await _describe(pids)}\n\n"
+            "<i>Noto'g'ri bo'lsa paneldagi «Hujjatlar» bo'limidan tuzating.</i>")
+        return
+
+    # Egasi topilmadi — faylni yodda tutamiz va kimligini so'raymiz.
+    await state.set_state(Docs.owner)
+    await state.update_data(file_name=name, mime=mime, blob=blob.hex(), caption=caption)
+    await note.edit_text(
+        f"❓ <b>{name}</b> — egasi topilmadi.\n\n"
+        "Kimga tegishli? Ism-familya, <b>ACO raqami</b> yoki pasportni yozing.\n"
+        "Bir nechta bo'lsa vergul bilan: <code>ACO-004, ACO-104</code>\n\n"
+        "<i>Bekor qilish — /bekor</i>")
+
+
+@dp.message(Docs.owner, F.text)
+async def admin_document_owner(message: Message, state: FSMContext):
+    data = await state.get_data()
+    await state.clear()
+    blob = bytes.fromhex(data.get("blob") or "")
+    if not blob:
+        return await message.answer("⚠️ Fayl saqlanmagan, qaytadan yuboring.")
+    try:
+        result = await asyncio.to_thread(
+            api_client.docs_upload, [(data["file_name"], blob, data.get("mime") or "")],
+            hint=f"{data.get('caption','')} {message.text}",
+            uploader=str(message.from_user.id))
+    except api_client.ApiError as exc:
+        return await message.answer(f"⚠️ Saqlab bo'lmadi: <code>{exc}</code>")
+
+    saved = result.get("saved") or []
+    if not saved:
+        return await message.answer(
+            "❌ Bu ism bo'yicha ham topilmadi.\n"
+            "Aniq <b>ACO raqami</b> bilan urinib ko'ring (masalan <code>ACO-042</code>) "
+            "yoki paneldagi «Hujjatlar» bo'limidan qo'lda biriktiring.")
+    pids = list(dict.fromkeys(s["pid"] for s in saved))
+    await message.answer(f"✅ <b>{data['file_name']}</b> saqlandi.\n\n"
+                         f"Egalari ({len(pids)}):\n{await _describe(pids)}")
+    await show_menu(message.from_user.id)
+
+
 @dp.message(Command("hujjatlarim"), F.chat.type == "private")
 @dp.message(StateFilter(None), F.chat.type == "private", F.text == messaging.BTN_DOCS)
 async def menu_docs(message: Message, state: FSMContext):

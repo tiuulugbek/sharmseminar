@@ -194,3 +194,40 @@ def docs_file(doc_id):
 
 def docs_mark_sent(ids):
     return _request("POST", "/api/bot/docs/sent", payload={"ids": list(ids)})
+
+
+def docs_upload(files, *, pids=None, hint="", kind="", uploader=""):
+    """Fayllarni yuklaydi. `files` — [(nom, baytlar, mime), ...].
+
+    `pids` berilmasa egalari fayl nomidan va `hint` matnidan topiladi.
+    """
+    if not config.BOT_API_TOKEN:
+        raise ApiError("BOT_API_TOKEN is not configured")
+    url = f"{config.API_BASE.rstrip('/')}/api/bot/docs/upload"
+    data = {"hint": hint, "kind": kind, "uploader": str(uploader or "")}
+    if pids:
+        data["pids"] = ",".join(pids)
+    payload = [("files", (name, blob, mime or "application/octet-stream"))
+               for name, blob, mime in files]
+    try:
+        response = requests.post(url, data=data, files=payload,
+                                 headers={"X-Bot-Token": config.BOT_API_TOKEN}, timeout=120)
+    except requests.RequestException as exc:
+        raise ApiError(f"Faylni yuklab bo'lmadi: {exc}") from exc
+    try:
+        body = response.json()
+    except ValueError:
+        body = {}
+    if not response.ok:
+        raise ApiError(body.get("error") or f"HTTP {response.status_code}",
+                       response.status_code, body)
+    return body
+
+
+def docs_share(doc_id, pids):
+    return _request("POST", "/api/bot/docs/share",
+                    payload={"id": doc_id, "pids": list(pids)})
+
+
+def docs_delete(doc_id):
+    return _request("POST", "/api/bot/docs/delete", payload={"id": doc_id})

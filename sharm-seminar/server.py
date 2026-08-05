@@ -8,7 +8,7 @@ Flask + SQLite. Admin panel + ishtirokchi sahifasi (/p/<id>).
     python server.py
     http://SERVER_IP:8000
 """
-import os, json, sqlite3, datetime, re, hmac, hashlib, secrets
+import os, io, json, sqlite3, datetime, re, hmac, hashlib, secrets
 from urllib.parse import parse_qsl
 from functools import wraps
 from flask import Flask, request, jsonify, send_from_directory, abort
@@ -857,6 +857,86 @@ def match_participants(con, text):
     return found
 
 
+# ─────────────── PDF ichidan ismlarni o'qib, sahifalarga bo'lish ───────────────
+def _name_index(con):
+    """{ishtirokchi id: ism so'zlari to'plami} — matn ichidan qidirish uchun."""
+    index = {}
+    for row in con.execute("SELECT id,fio FROM participants"):
+        words = {w.lower() for w in re.split(r"[^\wА-Яа-яЎўҚқҒғҲҳ]+", str(row["fio"] or ""))
+                 if len(w) > 2}
+        if len(words) >= 2:
+            index[row["id"]] = words
+    return index
+
+
+def _people_in_text(index, text):
+    """Matnda to'liq ism-familyasi uchragan ishtirokchilar."""
+    words = {w.lower() for w in re.split(r"[^\wА-Яа-яЎўҚқҒғҲҳ]+", text or "") if len(w) > 2}
+    return [pid for pid, name in index.items() if name <= words]
+
+
+def split_pdf_by_participants(con, blob):
+    """PDF ni egalari bo'yicha bo'lakларга ajratadi.
+
+    Qaytadi: ``[(baytlar, [pid, ...], sahifalar_soni), ...]``.
+
+    Har sahifadagi matndan ismlar o'qiladi.  Ketma-ket sahifalar bir xil
+    odam(lar)ga tegishli bo'lsa — bitta bo'lakka birlashadi, ya'ni ikki
+    sahifali voucher bo'linib ketmaydi.  Bir necha odam bitta sahifada bo'lsa
+    (xonadoshlar) — bo'lak hammasiga biriktiriladi.
+
+    Matni yo'q (skanerlangan) PDF da hech kim topilmaydi — ``None`` qaytadi va
+    yuklash fayl nomi/izohiga qaytadi.
+    """
+    try:
+        from pypdf import PdfReader, PdfWriter
+    except ImportError:
+        return None
+    try:
+        reader = PdfReader(io.BytesIO(blob))
+        pages = [(p.extract_text() or "") for p in reader.pages]
+    except Exception:
+        return None
+    if not pages:
+        return None
+
+    index = _name_index(con)
+    per_page = [tuple(sorted(_people_in_text(index, text))) for text in pages]
+    if not any(per_page):
+        return None
+
+    # Ismi topilmagan sahifa oldingisiga qo'shiladi — ko'p sahifali hujjatning
+    # davomi bo'lishi mumkin.
+    runs, current, page_numbers = [], None, []
+    for number, owners in enumerate(per_page):
+        if owners and owners != current:
+            if current:
+                runs.append((current, page_numbers))
+            current, page_numbers = owners, [number]
+        else:
+            if current is None:
+                continue          # boshidagi ismsiz sahifalarni tashlab ketamiz
+            page_numbers.append(number)
+    if current:
+        runs.append((current, page_numbers))
+    if not runs:
+        return None
+
+    # Butun hujjat bitta odam(lar)ga tegishli bo'lsa — bo'lish shart emas.
+    if len(runs) == 1 and len(runs[0][1]) == len(pages):
+        return [(blob, list(runs[0][0]), len(pages))]
+
+    out = []
+    for owners, numbers in runs:
+        writer = PdfWriter()
+        for number in numbers:
+            writer.add_page(reader.pages[number])
+        buffer = io.BytesIO()
+        writer.write(buffer)
+        out.append((buffer.getvalue(), list(owners), len(numbers)))
+    return out
+
+
 def _doc_row(r, con=None):
     return {"id": r["id"], "pid": r["pid"], "kind": r["kind"], "file_name": r["file_name"],
             "size": r["size"], "uploaded_at": r["uploaded_at"], "sent_at": r["sent_at"]}
@@ -895,33 +975,63 @@ def docs_upload():
 
     con = db()
     os.makedirs(DOCS_FILES, exist_ok=True)
-    saved, unmatched = [], []
-    for storage in files:
-        name = storage.filename or "fayl"
-        owners = forced or match_participants(con, name + " " + hint)
-        owners = [p for p in owners
-                  if con.execute("SELECT 1 FROM participants WHERE id=?", (p,)).fetchone()]
-        if not owners:
-            unmatched.append(name)
-            continue
-        blob = storage.read()
-        if len(blob) > MAX_DOC_BYTES:
-            unmatched.append(f"{name} (juda katta)")
-            continue
-        kind = kind_hint if kind_hint in DOC_KINDS else guess_kind(name + " " + hint)
+    saved, unmatched, split_note = [], [], []
+
+    def store(blob, name, kind, owners, mime):
         stored = f"{secrets.token_hex(6)}_{_safe_name(name)}"
         with open(os.path.join(DOCS_FILES, stored), "wb") as fh:
             fh.write(blob)
         for pid in owners:
             cur = con.execute(
-                "INSERT INTO documents(pid,kind,file_name,stored,mime,size,uploaded_at,uploaded_by) "
-                "VALUES(?,?,?,?,?,?,?,?)",
-                (pid, kind, _safe_name(name), stored, storage.mimetype or "", len(blob),
-                 _now(), request.panel_user["id"]))
+                "INSERT INTO documents(pid,kind,file_name,stored,mime,size,uploaded_at,"
+                "uploaded_by) VALUES(?,?,?,?,?,?,?,?)",
+                (pid, kind, _safe_name(name), stored, mime, len(blob), _now(),
+                 request.panel_user["id"]))
             saved.append({"id": cur.lastrowid, "pid": pid, "kind": kind,
                           "file_name": _safe_name(name)})
+
+    for storage in files:
+        name = storage.filename or "fayl"
+        blob = storage.read()
+        if len(blob) > MAX_DOC_BYTES:
+            unmatched.append(f"{name} (juda katta)")
+            continue
+        mime = storage.mimetype or ""
+        kind = kind_hint if kind_hint in DOC_KINDS else guess_kind(name + " " + hint)
+
+        if forced:
+            owners = [p for p in forced
+                      if con.execute("SELECT 1 FROM participants WHERE id=?", (p,)).fetchone()]
+            if owners:
+                store(blob, name, kind, owners, mime)
+            else:
+                unmatched.append(name)
+            continue
+
+        # PDF bo'lsa avval ichidan o'qiymiz: fayl nomida ism bo'lmasligi mumkin,
+        # va bitta faylda bir necha odam bo'lsa har biriga o'z sahifasi ketadi.
+        parts = None
+        if blob[:5] == b"%PDF-":
+            parts = split_pdf_by_participants(con, blob)
+        if parts:
+            base = os.path.splitext(_safe_name(name))[0]
+            for index, (chunk, owners, page_count) in enumerate(parts, 1):
+                piece = name if len(parts) == 1 else f"{base}_{index}.pdf"
+                store(chunk, piece, kind, owners, "application/pdf")
+            if len(parts) > 1:
+                split_note.append({"file": name, "parts": len(parts)})
+            continue
+
+        owners = match_participants(con, name + " " + hint)
+        owners = [p for p in owners
+                  if con.execute("SELECT 1 FROM participants WHERE id=?", (p,)).fetchone()]
+        if owners:
+            store(blob, name, kind, owners, mime)
+        else:
+            unmatched.append(name)
+
     con.commit(); con.close()
-    return jsonify(ok=True, saved=saved, unmatched=unmatched)
+    return jsonify(ok=True, saved=saved, unmatched=unmatched, split=split_note)
 
 
 @app.get("/api/docs")

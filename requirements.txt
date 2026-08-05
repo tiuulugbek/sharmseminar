@@ -8,3 +8,5 @@ qrcode[pil]>=7.4
 gunicorn>=22,<24
 # tools/import_xlsx.py uchun
 openpyxl>=3.1
+# PDF ni egalari bo'yicha sahifalarga ajratish uchun
+pypdf>=5.0

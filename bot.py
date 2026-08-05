@@ -1735,7 +1735,7 @@ async def admin_document(message: Message, state: FSMContext):
         tg_file, name, mime = message.photo[-1], f"rasm_{message.photo[-1].file_unique_id}.jpg", "image/jpeg"
     caption = (message.caption or "").strip()
 
-    note = await message.answer("⏳ Saqlanmoqda…")
+    note = await message.answer("⏳ Saqlanmoqda — PDF ichidan ismlar o'qilmoqda…")
     try:
         buf = await bot.download(tg_file)
         blob = buf.read()
@@ -1753,9 +1753,13 @@ async def admin_document(message: Message, state: FSMContext):
     if saved:
         kind = saved[0]["kind"]
         pids = list(dict.fromkeys(s["pid"] for s in saved))
+        split = result.get("split") or []
+        head = f"✅ <b>{name}</b> saqlandi ({DOC_CAPTION.get(kind, '📎')})"
+        if split:
+            head += (f"\n📄 PDF <b>{split[0]['parts']}</b> ta bo'lakka ajratildi — "
+                     "har kimga faqat o'z sahifasi boradi.")
         await note.edit_text(
-            f"✅ <b>{name}</b> saqlandi ({DOC_CAPTION.get(kind, '📎')})\n\n"
-            f"Egalari ({len(pids)}):\n{await _describe(pids)}\n\n"
+            f"{head}\n\nEgalari ({len(pids)}):\n{await _describe(pids)}\n\n"
             "<i>Noto'g'ri bo'lsa paneldagi «Hujjatlar» bo'limidan tuzating.</i>")
         return
 
@@ -1791,7 +1795,9 @@ async def admin_document_owner(message: Message, state: FSMContext):
             "Aniq <b>ACO raqami</b> bilan urinib ko'ring (masalan <code>ACO-042</code>) "
             "yoki paneldagi «Hujjatlar» bo'limidan qo'lda biriktiring.")
     pids = list(dict.fromkeys(s["pid"] for s in saved))
-    await message.answer(f"✅ <b>{data['file_name']}</b> saqlandi.\n\n"
+    split = result.get("split") or []
+    extra = (f"\n📄 PDF {split[0]['parts']} ta bo'lakka ajratildi." if split else "")
+    await message.answer(f"✅ <b>{data['file_name']}</b> saqlandi.{extra}\n\n"
                          f"Egalari ({len(pids)}):\n{await _describe(pids)}")
     await show_menu(message.from_user.id)
 

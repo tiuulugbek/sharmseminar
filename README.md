@@ -415,6 +415,29 @@ Egasi **aniq topilmasa fayl biriktirilmaydi** va ro'yxatda ko'rsatiladi —
 noto'g'ri odamga voucher ketgandan ko'ra qo'lda biriktirgan yaxshiroq. Uni
 odamning qatoridagi **«+ Fayl»** tugmasi bilan qo'shasiz.
 
+### PDF ichidan o'qish va sahifalarga bo'lish
+
+Fayl nomida ism bo'lmasligi mumkin (`voucher_001.pdf`, `IMG_2841.pdf`), shuning
+uchun **PDF ning matni o'qiladi** va ismlar shundan topiladi. Uch holat o'z-o'zidan
+hal bo'ladi:
+
+| Fayl | Natija |
+|---|---|
+| Bir sahifada bitta odam | o'shanga biriktiriladi |
+| Bir sahifada 2–3 xonadosh | **hammasiga** biriktiriladi, fayl bo'linmaydi |
+| Hammasi bitta katta PDF da | **sahifalarga ajratiladi**, har kimga faqat o'ziniki |
+
+Ajratishda ketma-ket sahifalar bir xil odamga tegishli bo'lsa birga qoladi, ya'ni
+ikki sahifali chipta bo'linib ketmaydi. Ismi yozilmagan sahifa (masalan «Baggage:
+20 kg» degan davomi) oldingi odam bilan qoladi.
+
+Bu **maxfiylik uchun ham muhim**: 105 sahifali umumiy faylni hammaga yuborish
+o'rniga, har kim faqat o'z sahifasini oladi.
+
+**Skanerlangan PDF** (matn qatlami yo'q, faqat rasm) da ism topilmaydi — u holda
+fayl nomi va izohga qaytiladi, ya'ni `ACO-042 voucher.pdf` deb nomlang yoki botga
+yuborayotganda izohga ismni yozing.
+
 ### Bitta faylda bir necha kishi
 
 Uch kishilik xona voucherida uchalasining ismi bo'ladi — bunday fayl **hammasiga

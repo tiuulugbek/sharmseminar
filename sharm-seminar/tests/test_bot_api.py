@@ -671,6 +671,90 @@ class BotApiTest(unittest.TestCase):
             panel.post("/api/docs/delete", json={"id": row[0]})
         self.assertEqual(os.listdir(server.DOCS_FILES), [])
 
+    def make_pdf(self, pages):
+        """Har sahifasida berilgan matn turgan PDF."""
+        from reportlab.lib.pagesizes import A4
+        from reportlab.pdfgen import canvas
+        import io
+        buffer = io.BytesIO()
+        c = canvas.Canvas(buffer, pagesize=A4)
+        for lines in pages:
+            c.setFont("Helvetica", 12)
+            y = 780
+            for line in lines:
+                c.drawString(60, y, line); y -= 20
+            c.showPage()
+        c.save()
+        return buffer.getvalue()
+
+    def upload_bytes(self, client, name, blob, **extra):
+        import io
+        data = {"files": (io.BytesIO(blob), name)}
+        data.update(extra)
+        return client.post("/api/docs/upload", data=data, content_type="multipart/form-data")
+
+    def test_a_combined_pdf_is_split_so_each_person_gets_only_their_pages(self):
+        leader, member, other = self.build_group()
+        admin = self.register("Panel Admin", "0000788")
+        os.environ["PANEL_ADMIN_IDS"] = admin["id"]
+        server.DOCS_DIR = os.path.join(self.tmp.name, "docs")
+        server.DOCS_FILES = os.path.join(server.DOCS_DIR, "_files")
+        panel = self.panel(admin["id"])
+
+        blob = self.make_pdf([
+            [f"Passenger: {leader['fio']}", "TAS - SSH"],
+            ["Baggage: 20 kg"],                              # ismsiz davomi
+            [f"Passenger: {member['fio']}", "TAS - SSH"],
+            [f"Passenger: {other['fio']}", "TAS - SSH"],
+        ])
+        body = self.upload_bytes(panel, "hammasi.pdf", blob).get_json()
+        self.assertEqual(body["split"], [{"file": "hammasi.pdf", "parts": 3}])
+        self.assertEqual({s["pid"] for s in body["saved"]},
+                         {leader["id"], member["id"], other["id"]})
+
+        # Har kim faqat o'z bo'lagini oladi, va bo'laklar boshqa-boshqa fayl.
+        stored = {r[0] for r in self._all("SELECT stored FROM documents")}
+        self.assertEqual(len(stored), 3)
+
+        from pypdf import PdfReader
+        import io as _io
+        pages_of = {}
+        for row in self._all("SELECT pid,stored FROM documents"):
+            with open(os.path.join(server.DOCS_FILES, row[1]), "rb") as fh:
+                pages_of[row[0]] = PdfReader(_io.BytesIO(fh.read())).pages
+        # Ismsiz sahifa oldingi odam bilan qoladi.
+        self.assertEqual(len(pages_of[leader["id"]]), 2)
+        self.assertEqual(len(pages_of[member["id"]]), 1)
+        # Va birovning bo'lagida boshqasining ismi yo'q.
+        self.assertNotIn(member["fio"], pages_of[leader["id"]][0].extract_text())
+
+    def test_roommates_on_one_page_share_the_same_file_unsplit(self):
+        leader, member, _ = self.build_group()
+        admin = self.register("Panel Admin", "0000789")
+        os.environ["PANEL_ADMIN_IDS"] = admin["id"]
+        server.DOCS_DIR = os.path.join(self.tmp.name, "docs")
+        server.DOCS_FILES = os.path.join(server.DOCS_DIR, "_files")
+        panel = self.panel(admin["id"])
+
+        blob = self.make_pdf([[f"Guest 1: {leader['fio']}", f"Guest 2: {member['fio']}", "DBL"]])
+        body = self.upload_bytes(panel, "room.pdf", blob).get_json()
+        self.assertEqual(body["split"], [])                       # bo'linmaydi
+        self.assertEqual({s["pid"] for s in body["saved"]}, {leader["id"], member["id"]})
+        self.assertEqual(len(os.listdir(server.DOCS_FILES)), 1)   # bitta nusxa
+
+    def test_a_pdf_without_a_text_layer_falls_back_to_the_filename(self):
+        _, member, _ = self.build_group()
+        admin = self.register("Panel Admin", "0000790")
+        os.environ["PANEL_ADMIN_IDS"] = admin["id"]
+        server.DOCS_DIR = os.path.join(self.tmp.name, "docs")
+        server.DOCS_FILES = os.path.join(server.DOCS_DIR, "_files")
+        panel = self.panel(admin["id"])
+
+        blob = self.make_pdf([["Hotel Rixos Sharm", "08-15 August 2026"]])   # ism yo'q
+        body = self.upload_bytes(panel, f"{member['id']} voucher.pdf", blob).get_json()
+        self.assertEqual([s["pid"] for s in body["saved"]], [member["id"]])
+        self.assertEqual(body["split"], [])
+
     def test_owners_can_come_from_a_caption_when_the_filename_says_nothing(self):
         leader, member, _ = self.build_group()
         admin = self.register("Panel Admin", "0000787")

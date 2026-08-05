@@ -408,8 +408,10 @@ yuzlab bo'lsa ham) — egasi **fayl nomidan** o'zi topiladi:
 | `voucher_FB1177095_hotel.pdf` | pasport bo'yicha |
 | `Sardorjon Musaev voucher.pdf` | ism-familya bo'yicha |
 
-Turi ham nomdan aniqlanadi: `voucher/hotel/mehmonxona` → 🏨, `ticket/bilet/avia`
-→ ✈️, qolgani → 📎.
+Turi ham shunday: avval fayl nomidan (`voucher/hotel/mehmonxona` → 🏨,
+`ticket/bilet/avia/passenger` → ✈️), nomda yozilmagan bo'lsa — **hujjatning o'z
+matnidan**. Baribir aniqlanmasa 📎 bo'lib qoladi va panelda chip sariq rangda
+ajralib turadi; uning yonidagi ochiladigan ro'yxatdan bir bosishda to'g'rilanadi.
 
 Egasi **aniq topilmasa fayl biriktirilmaydi** va ro'yxatda ko'rsatiladi —
 noto'g'ri odamga voucher ketgandan ko'ra qo'lda biriktirgan yaxshiroq. Uni
@@ -417,9 +419,12 @@ odamning qatoridagi **«+ Fayl»** tugmasi bilan qo'shasiz.
 
 ### PDF ichidan o'qish va sahifalarga bo'lish
 
-Fayl nomida ism bo'lmasligi mumkin (`voucher_001.pdf`, `IMG_2841.pdf`), shuning
-uchun **PDF ning matni o'qiladi** va ismlar shundan topiladi. Uch holat o'z-o'zidan
-hal bo'ladi:
+Egasi shu tartibda topiladi:
+
+1. **Fayl nomi va izoh** — odam ataylab yozgan nom eng ishonchli manba;
+2. **PDF ning matni** — nom hech kimni ko'rsatmasa, hujjat ichidagi ismlardan.
+
+Ikkinchi holatda uch vaziyat o'z-o'zidan hal bo'ladi:
 
 | Fayl | Natija |
 |---|---|

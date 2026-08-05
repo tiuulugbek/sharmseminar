@@ -805,14 +805,36 @@ def _safe_name(name):
     return name[:120]
 
 
-def guess_kind(file_name):
-    """Fayl nomidan turini taxmin qiladi; topilmasa `other`."""
-    low = str(file_name or "").lower()
-    if any(w in low for w in ("voucher", "vaucher", "vouch", "hotel", "mehmonxona")):
+VOUCHER_WORDS = ("voucher", "vaucher", "vouch", "hotel", "mehmonxona", "ваучер", "отель")
+TICKET_WORDS = ("ticket", "tiket", "avia", "flight", "bilet", "chipta", "билет", "рейс",
+                "boarding", "passenger", "reservation number")
+
+
+def guess_kind(text):
+    """Matndan turini taxmin qiladi; topilmasa `other`."""
+    low = str(text or "").lower()
+    if any(w in low for w in VOUCHER_WORDS):
         return "voucher"
-    if any(w in low for w in ("ticket", "tiket", "avia", "flight", "bilet", "chipta")):
+    if any(w in low for w in TICKET_WORDS):
         return "ticket"
     return "other"
+
+
+def kind_from_pdf(blob, limit=2):
+    """Hujjat turini PDF ning o'z matnidan aniqlaydi.
+
+    Fayl nomida "voucher"/"ticket" yozilmagan bo'lishi mumkin, lekin hujjatning
+    ichida deyarli har doim yozilgan bo'ladi.
+    """
+    if not blob or blob[:5] != b"%PDF-":
+        return "other"
+    try:
+        from pypdf import PdfReader
+        reader = PdfReader(io.BytesIO(blob))
+        text = " ".join((page.extract_text() or "") for page in reader.pages[:limit])
+    except Exception:
+        return "other"
+    return guess_kind(text)
 
 
 def match_participants(con, text):
@@ -998,6 +1020,9 @@ def docs_upload():
             continue
         mime = storage.mimetype or ""
         kind = kind_hint if kind_hint in DOC_KINDS else guess_kind(name + " " + hint)
+        if kind == "other":
+            # Nomda yozilmagan bo'lsa hujjatning o'zidan o'qiymiz.
+            kind = kind_from_pdf(blob)
 
         if forced:
             owners = [p for p in forced
@@ -1008,27 +1033,27 @@ def docs_upload():
                 unmatched.append(name)
             continue
 
-        # PDF bo'lsa avval ichidan o'qiymiz: fayl nomida ism bo'lmasligi mumkin,
-        # va bitta faylda bir necha odam bo'lsa har biriga o'z sahifasi ketadi.
-        parts = None
-        if blob[:5] == b"%PDF-":
-            parts = split_pdf_by_participants(con, blob)
-        if parts:
-            base = os.path.splitext(_safe_name(name))[0]
-            for index, (chunk, owners, page_count) in enumerate(parts, 1):
-                piece = name if len(parts) == 1 else f"{base}_{index}.pdf"
-                store(chunk, piece, kind, owners, "application/pdf")
-            if len(parts) > 1:
-                split_note.append({"file": name, "parts": len(parts)})
-            continue
-
+        # Avval FAYL NOMI va izoh: odam ataylab yozgan nom eng ishonchli manba.
         owners = match_participants(con, name + " " + hint)
         owners = [p for p in owners
                   if con.execute("SELECT 1 FROM participants WHERE id=?", (p,)).fetchone()]
         if owners:
             store(blob, name, kind, owners, mime)
-        else:
-            unmatched.append(name)
+            continue
+
+        # Nom hech kimni ko'rsatmasa — PDF ichidagi matndan qidiramiz va
+        # kerak bo'lsa sahifalarga ajratamiz.
+        parts = split_pdf_by_participants(con, blob) if blob[:5] == b"%PDF-" else None
+        if parts:
+            base = os.path.splitext(_safe_name(name))[0]
+            for index, (chunk, chunk_owners, _pages) in enumerate(parts, 1):
+                piece = name if len(parts) == 1 else f"{base}_{index}.pdf"
+                store(chunk, piece, kind, chunk_owners, "application/pdf")
+            if len(parts) > 1:
+                split_note.append({"file": name, "parts": len(parts)})
+            continue
+
+        unmatched.append(name)
 
     con.commit(); con.close()
     return jsonify(ok=True, saved=saved, unmatched=unmatched, split=split_note)
@@ -1106,7 +1131,13 @@ def docs_assign():
     if not con.execute("SELECT 1 FROM participants WHERE id=?", (pid,)).fetchone():
         con.close()
         return jsonify(error="participant_not_found"), 404
-    con.execute("UPDATE documents SET pid=?,kind=?,sent_at=NULL WHERE id=?", (pid, kind, row["id"]))
+    # Egasi o'zgarsa yuborilgan belgisi tushadi; faqat turi o'zgarsa —
+    # allaqachon olgan odamga qayta yubormaymiz.
+    if pid != row["pid"]:
+        con.execute("UPDATE documents SET pid=?,kind=?,sent_at=NULL WHERE id=?",
+                    (pid, kind, row["id"]))
+    else:
+        con.execute("UPDATE documents SET kind=? WHERE id=?", (kind, row["id"]))
     con.commit(); con.close()
     return jsonify(ok=True)
 

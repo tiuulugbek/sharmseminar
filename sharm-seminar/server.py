@@ -970,7 +970,14 @@ def _doc_row(r, con=None):
 
 
 def docs_released(con, kind):
-    """Shu turdagi hujjatlarni tarqatish vaqti kelganmi?"""
+    """Shu turdagi hujjatlarni tarqatish mumkinmi?
+
+    `docs_hold` yoqilgan bo'lsa hech nima chiqmaydi — fayllarni yuklab
+    bo'lgunicha ushlab turish uchun.  Aks holda tur bo'yicha qo'yilgan vaqtga
+    qaraladi; vaqt qo'yilmagan bo'lsa darrov tayyor.
+    """
+    if sget(con, "docs_hold", False):
+        return False
     plan = sget(con, "docs_release", {}) or {}
     when = _parse_when(plan.get(kind) or plan.get("all"))
     if not when:
@@ -1091,8 +1098,9 @@ def docs_list():
         rows = con.execute("SELECT * FROM documents ORDER BY pid,kind,id").fetchall()
     out = [_doc_row(r) for r in rows if r["pid"] in allowed]
     release = sget(con, "docs_release", {}) or {}
+    hold = bool(sget(con, "docs_hold", False))
     con.close()
-    return jsonify(documents=out, release=release)
+    return jsonify(documents=out, release=release, hold=hold)
 
 
 @app.get("/api/docs/file/<int:doc_id>")
@@ -1197,11 +1205,58 @@ def docs_share():
 @app.post("/api/docs/release")
 @panel_auth("admin")
 def docs_release_set():
-    """Qaysi turdagi hujjat qachondan boshlab tarqatilishi."""
-    plan = (request.get_json(silent=True) or {}).get("release") or {}
-    clean = {k: str(v or "").strip() for k, v in plan.items() if k in DOC_KINDS + ("all",)}
-    con = db(); sset(con, "docs_release", clean); con.commit(); con.close()
-    return jsonify(ok=True, release=clean)
+    """Qaysi turdagi hujjat qachondan boshlab tarqatilishi (va ushlab turish)."""
+    payload = request.get_json(silent=True) or {}
+    con = db()
+    if "hold" in payload:
+        sset(con, "docs_hold", bool(payload["hold"]))
+    if "release" in payload:
+        plan = payload.get("release") or {}
+        clean = {k: str(v or "").strip() for k, v in plan.items() if k in DOC_KINDS + ("all",)}
+        sset(con, "docs_release", clean)
+    out = {"release": sget(con, "docs_release", {}) or {}, "hold": bool(sget(con, "docs_hold", False))}
+    con.commit(); con.close()
+    return jsonify(ok=True, **out)
+
+
+@app.get("/api/bot/docs/state")
+@bot_auth
+def bot_docs_state():
+    """Hujjatlar bo'yicha umumiy holat — botdagi hisobot uchun."""
+    con = db()
+    people = {r["id"]: r for r in con.execute("SELECT id,fio,grp,leader,telegram_id FROM participants")}
+    kinds = {}
+    for r in con.execute("SELECT pid,kind FROM documents"):
+        kinds.setdefault(r["pid"], set()).add(r["kind"])
+    both = [p for p in people if {"voucher", "ticket"} <= kinds.get(p, set())]
+    only_v = [p for p in people if kinds.get(p, set()) == {"voucher"}]
+    only_t = [p for p in people if kinds.get(p, set()) == {"ticket"}]
+    none_ = [p for p in people if p not in kinds]
+    files = con.execute("SELECT COUNT(*) c, COUNT(DISTINCT stored) f FROM documents").fetchone()
+    unsent = con.execute("SELECT COUNT(*) c FROM documents WHERE sent_at IS NULL").fetchone()["c"]
+    out = {
+        "hold": bool(sget(con, "docs_hold", False)),
+        "release": sget(con, "docs_release", {}) or {},
+        "rows": files["c"], "files": files["f"], "unsent": unsent,
+        "both": len(both), "only_voucher": len(only_v), "only_ticket": len(only_t),
+        "none": [{"id": p, "fio": people[p]["fio"], "group": people[p]["grp"]} for p in none_],
+        "missing_ticket": [{"id": p, "fio": people[p]["fio"], "group": people[p]["grp"],
+                            "leader": bool(people[p]["leader"])} for p in only_v],
+        "missing_voucher": [{"id": p, "fio": people[p]["fio"], "group": people[p]["grp"]}
+                            for p in only_t],
+    }
+    con.close()
+    return jsonify(out)
+
+
+@app.post("/api/bot/docs/hold")
+@bot_auth
+def bot_docs_hold():
+    con = db()
+    sset(con, "docs_hold", bool((request.get_json(silent=True) or {}).get("hold")))
+    hold = bool(sget(con, "docs_hold", False))
+    con.commit(); con.close()
+    return jsonify(ok=True, hold=hold)
 
 
 # ---------------------------------------------------------------- admin API

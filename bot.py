@@ -1750,17 +1750,22 @@ async def admin_document(message: Message, state: FSMContext):
         return await note.edit_text(f"⚠️ Saqlab bo'lmadi: <code>{exc}</code>")
 
     saved = result.get("saved") or []
-    if saved:
-        kind = saved[0]["kind"]
+    dupes = result.get("duplicates") or []
+    if saved or dupes:
         pids = list(dict.fromkeys(s["pid"] for s in saved))
         split = result.get("split") or []
-        head = f"✅ <b>{name}</b> saqlandi ({DOC_CAPTION.get(kind, '📎')})"
-        if split:
-            head += (f"\n📄 PDF <b>{split[0]['parts']}</b> ta bo'lakka ajratildi — "
-                     "har kimga faqat o'z sahifasi boradi.")
-        await note.edit_text(
-            f"{head}\n\nEgalari ({len(pids)}):\n{await _describe(pids)}\n\n"
-            "<i>Noto'g'ri bo'lsa paneldagi «Hujjatlar» bo'limidan tuzating.</i>")
+        lines = []
+        if saved:
+            kind = saved[0]["kind"]
+            lines.append(f"✅ <b>{name}</b> — {DOC_CAPTION.get(kind, '📎')}")
+            if split:
+                lines.append(f"📄 {split[0]['parts']} ta bo'lakka ajratildi")
+            lines.append(await _describe(pids))
+        if dupes:
+            already = list(dict.fromkeys(d["pid"] for d in dupes))
+            lines.append(f"🔁 <b>{name}</b> — allaqachon bor "
+                         f"({len(already)} kishida), qayta saqlanmadi")
+        await note.edit_text("\n".join(lines))
         return
 
     # Egasi topilmadi — faylni yodda tutamiz va kimligini so'raymiz.
@@ -1812,11 +1817,69 @@ async def menu_docs(message: Message, state: FSMContext):
     await send_documents(message.from_user.id)
 
 
+@dp.message(Command("hujjat_holat"), F.chat.type == "private")
+async def cmd_docs_state(message: Message):
+    """Hujjatlar bo'yicha umumiy holat: nima bor, nima yetishmaydi."""
+    if not _is_admin(message.from_user.id):
+        return
+    try:
+        d = await asyncio.to_thread(api_client.docs_state)
+    except api_client.ApiError as exc:
+        return await message.answer(f"⚠️ <code>{exc}</code>")
+    lines = ["📎 <b>Hujjatlar holati</b>\n",
+             ("🔒 <b>Tarqatish ushlab turilgan</b> — hech kimga yuborilmaydi."
+              if d["hold"] else "🔓 Tarqatish ochiq — so'raganlar oladi."),
+             f"\n📄 Fayl: <b>{d['files']}</b> · yozuv: <b>{d['rows']}</b> · "
+             f"yuborilmagan: <b>{d['unsent']}</b>\n",
+             f"✅ Voucher + chipta: <b>{d['both']}</b>",
+             f"🏨 Faqat voucher: <b>{d['only_voucher']}</b>",
+             f"✈️ Faqat chipta: <b>{d['only_ticket']}</b>",
+             f"❌ Hech narsa yo'q: <b>{len(d['none'])}</b>"]
+    if d["none"]:
+        lines.append("\n<b>Hujjatsizlar:</b>")
+        lines += [f"• {x['fio']}" + (f" ({x['group']}-guruh)" if x["group"] else "")
+                  for x in d["none"]]
+    if d["missing_ticket"]:
+        lines.append(f"\n<b>Chiptasi yo'q ({len(d['missing_ticket'])}):</b>")
+        by_group = {}
+        for x in d["missing_ticket"]:
+            by_group.setdefault(x["group"], []).append(x["fio"] + ("★" if x["leader"] else ""))
+        for group in sorted(by_group, key=lambda g: (g is None, g)):
+            lines.append(f"{group}-guruh: " + ", ".join(by_group[group]))
+    lines.append("\n/hujjat_yuborish — hammaga tarqatish")
+    text = "\n".join(lines)
+    for chunk in [text[i:i + 3500] for i in range(0, len(text), 3500)]:
+        await message.answer(chunk)
+
+
+@dp.message(Command("hujjat_ushla"), F.chat.type == "private")
+async def cmd_docs_hold(message: Message):
+    """Tarqatishni ushlab turadi — fayllarni yuklab bo'lguncha."""
+    if not _is_admin(message.from_user.id):
+        return
+    await asyncio.to_thread(api_client.docs_hold, True)
+    await message.answer(
+        "🔒 <b>Hujjatlar ushlab turildi.</b>\n\n"
+        "Endi hech kimga yuborilmaydi — ro'yxatdan o'tganlarga ham, "
+        "«📎 Hujjatlarim» bosganlarga ham.\n\n"
+        "Fayllarni bemalol yuklayvering. Tayyor bo'lganda /hujjat_yuborish.")
+
+
 @dp.message(Command("hujjat_yuborish"), F.chat.type == "private")
 async def cmd_docs_broadcast(message: Message):
     """Hujjati bor, lekin hali olmagan hammaga yuborish."""
     if not _is_admin(message.from_user.id):
         return
+    state = await asyncio.to_thread(api_client.docs_state)
+    if state["hold"]:
+        return await message.answer(
+            "🔒 <b>Hujjatlar hozir ushlab turilgan.</b>\n\n"
+            f"📄 Tayyor fayl: <b>{state['files']}</b>\n"
+            f"✅ Voucher + chipta: <b>{state['both']}</b> · "
+            f"🏨 faqat voucher: <b>{state['only_voucher']}</b> · "
+            f"❌ hech narsasi yo'q: <b>{len(state['none'])}</b>\n\n"
+            "Tarqatishni ochib, hammaga yuboraymi?",
+            reply_markup=_confirm_kb("docsopen:go"))
     data = await asyncio.to_thread(api_client.docs_pending)
     people = data.get("people") or []
     waiting = data.get("not_registered") or 0
@@ -1834,12 +1897,26 @@ async def cmd_docs_broadcast(message: Message):
         reply_markup=_confirm_kb("docsend:go"))
 
 
+@dp.callback_query(F.data == "docsopen:go")
+async def docs_open_and_send(call: CallbackQuery):
+    if not _is_admin(call.from_user.id):
+        return await call.answer("Ruxsat yo'q", show_alert=True)
+    await call.answer("Ochilmoqda…")
+    await asyncio.to_thread(api_client.docs_hold, False)
+    await call.message.edit_text("🔓 Tarqatish ochildi. ⏳ Yuborilmoqda…")
+    await _docs_broadcast(call.message)
+
+
 @dp.callback_query(F.data == "docsend:go")
 async def docs_broadcast_go(call: CallbackQuery):
     if not _is_admin(call.from_user.id):
         return await call.answer("Ruxsat yo'q", show_alert=True)
     await call.answer("Yuborilmoqda…")
     await call.message.edit_text("⏳ Hujjatlar yuborilmoqda…")
+    await _docs_broadcast(call.message)
+
+
+async def _docs_broadcast(target: Message):
     data = await asyncio.to_thread(api_client.docs_pending)
     ok, failed = 0, []
     for person in data.get("people") or []:
@@ -1850,11 +1927,15 @@ async def docs_broadcast_go(call: CallbackQuery):
         else:
             failed.append(person["fio"])
         await asyncio.sleep(0.15)
-    text = f"📎 <b>Yuborildi:</b> {ok} ta fayl"
+    text = (f"📎 <b>Yuborildi:</b> {ok} ta fayl\n"
+            f"👤 Odam: <b>{len(data.get('people') or []) - len(failed)}</b>")
+    if data.get("not_registered"):
+        text += (f"\n⏳ Hujjati bor, lekin botda tasdiqlamagan: "
+                 f"<b>{data['not_registered']}</b> — tasdiqlaganda o'zi boradi.")
     if failed:
         text += (f"\n⚠️ Yetmadi: <b>{len(failed)}</b>\n"
                  + "\n".join(f"• {f}" for f in failed[:15]))
-    await call.message.edit_text(text)
+    await target.edit_text(text + "\n\n/hujjat_holat")
 
 
 @dp.message(StateFilter(None), F.chat.type == "private", F.text == messaging.BTN_PAGE)

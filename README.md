@@ -462,6 +462,22 @@ Fayllar `data/docs/_files/` da yotadi (git ga tushmaydi), bittasi 20 MB gacha.
 Odamning o'zi va guruh mas'uli — o'z guruhinikini; rahbar va admin — hammasini.
 Boshqa birov havolani bilsa ham ocholmaydi.
 
+### Yuklab bo'lgunicha ushlab turish
+
+Fayllarni bo'lak-bo'lak yuklayotganda yarim tayyor holat odamlarga ketib
+qolmasligi kerak. Buning uchun **«Tarqatishni ushlab turish»** bor:
+
+- Panel → «Hujjatlar» bo'limining tepasidagi belgi, yoki botda `/hujjat_ushla`;
+- yoqilganda **hech kimga hech narsa yubormaydi** — ro'yxatdan o'tganlarga ham,
+  «📎 Hujjatlarim» bosganlarga ham; odam so'rasa «hali tayyor emas» deb javob
+  beradi;
+- fayllarni bemalol yuklayverasiz, takrorlari o'zi aniqlanadi;
+- tayyor bo'lgach `/hujjat_yuborish` — bot «ochib, hammaga yuboraymi?» deb
+  so'raydi va tasdiqlansa qulfni ochib, birdan tarqatadi.
+
+`/hujjat_holat` istalgan paytda holatni ko'rsatadi: ushlab turilganmi, nechta
+fayl bor, kimda voucher/chipta yetishmayapti.
+
 ### Qachon yuboriladi
 
 «Hujjatlar» bo'limida har bir tur uchun **chiqarish vaqti** qo'yiladi (bo'sh
@@ -658,6 +674,8 @@ chop etilgan beyjiklar ishlashda davom etadi.
 - `/tasdiqlanmaganlar` — kim hali tasdiqlamagan (admin va guruh mas'uli).
 - `/hujjatlarim` — o'z voucher va chiptalarini olish.
 - `/hujjat_yuborish` — hujjatlarni hali olmaganlarga ommaviy yuborish (admin).
+- `/hujjat_ushla` — tarqatishni to'xtatib turish (admin).
+- `/hujjat_holat` — nechta fayl bor, kimda nima yetishmayapti (admin).
 - `/royxat` — yangi ishtirokchi/oila a'zosini to'liq ro'yxatga olish.
 - `/yangilash` — mavjud ma'lumotni pasport orqali yangilash.
 - `/bekor` — joriy jarayonni bekor qilish.

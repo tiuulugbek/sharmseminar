@@ -191,6 +191,7 @@ tbody tr:hover{background:#FAFAFE}
 .whoami b{color:#211F52;font-weight:700}
 .whoami .out{border:1px solid #E7E8F0;background:#fff;border-radius:8px;padding:6px 10px;
   font-weight:700;cursor:pointer;color:#7A7990}
+.holdon{background:#FFF4E5;border-color:#F0C68A}
 .dropzone{border:2px dashed var(--line-2);border-radius:16px;padding:26px 18px;text-align:center;
   cursor:pointer;background:#fff;margin-bottom:14px;transition:.15s}
 .dropzone:hover,.dropzone.over{border-color:var(--indigo);background:#F7F8FE}
@@ -218,7 +219,8 @@ tbody tr:hover{background:#FAFAFE}
 @keyframes draftin{from{opacity:0;transform:translate(-50%,12px)}to{opacity:1;transform:translate(-50%,0)}}
 .draftbar .cnt{font-size:13px;font-weight:700;white-space:nowrap}
 .draftbar .btn{padding:7px 13px;font-size:13px}
-@media(max-width:520px){.dropzone{border:2px dashed var(--line-2);border-radius:16px;padding:26px 18px;text-align:center;
+@media(max-width:520px){.holdon{background:#FFF4E5;border-color:#F0C68A}
+.dropzone{border:2px dashed var(--line-2);border-radius:16px;padding:26px 18px;text-align:center;
   cursor:pointer;background:#fff;margin-bottom:14px;transition:.15s}
 .dropzone:hover,.dropzone.over{border-color:var(--indigo);background:#F7F8FE}
 .dropzone .dzi{font-size:28px;margin-bottom:6px}
@@ -352,7 +354,7 @@ const SIZE_PRESETS=[[70,100],[70,110],[80,120],[90,130]];  // cm: 7x10, 7x11, 8x
 
 /* ===== i18n ===== */
 const T = {
- uz:{dash:"Boshqaruv paneli",parts:"Ishtirokchilar",groups:"Guruhlar",qr:"QR kodlar",docs:"Hujjatlar",loading:"Yuklanmoqda…",docDrop:"Fayllarni shu yerga tashlang yoki bosing",docDropHint:"Fayl nomida ACO raqami, pasport yoki ism-familya bo'lsa — egasi o'zi topiladi",docAdd:"Fayl",docHave:"%n kishida bor",docNone:"%n kishida yo'q",docMissing:"Hujjati yo'qlar",docSent:"Yuborilgan",docUploading:"Yuklanmoqda… %a / %b",docSaved:"%n ta fayl saqlandi",docUnmatched:"Egasi topilmadi — ismini fayl nomiga yozib qayta yuklang yoki odam qatoridagi «+ Fayl» bilan qo'shing",docDelQ:"Shu fayl o'chirilsinmi?",docVoucher:"Voucher",docTicket:"Chipta",docKind:"Hujjat turi",docReleaseHint:"Qachondan boshlab bot yuborsin — bo'sh bo'lsa darrov yuboriladi",checkin:"Check-in",
+ uz:{dash:"Boshqaruv paneli",parts:"Ishtirokchilar",groups:"Guruhlar",qr:"QR kodlar",docs:"Hujjatlar",loading:"Yuklanmoqda…",docDrop:"Fayllarni shu yerga tashlang yoki bosing",docDropHint:"Fayl nomida ACO raqami, pasport yoki ism-familya bo'lsa — egasi o'zi topiladi",docAdd:"Fayl",docHave:"%n kishida bor",docNone:"%n kishida yo'q",docMissing:"Hujjati yo'qlar",docSent:"Yuborilgan",docUploading:"Yuklanmoqda… %a / %b",docSaved:"%n ta fayl saqlandi",docUnmatched:"Egasi topilmadi — ismini fayl nomiga yozib qayta yuklang yoki odam qatoridagi «+ Fayl» bilan qo'shing",docDelQ:"Shu fayl o'chirilsinmi?",docVoucher:"Voucher",docTicket:"Chipta",docKind:"Hujjat turi",docHold:"Tarqatishni ushlab turish",docHoldOn:"Hech kimga yuborilmaydi — fayllarni bemalol yuklayvering",docHoldOff:"Hujjatlar so'raganlarga darrov yuboriladi",docReleaseHint:"Qachondan boshlab bot yuborsin — bo'sh bo'lsa darrov yuboriladi",checkin:"Check-in",
   roles:"Mas'ullar",program:"Rejalar",
   total:"Jami ishtirokchi",assigned:"Guruhga biriktirilgan",leaders:"Guruh mas'ullari",foreign:"Chet eldan alohida",
   byGroup:"Guruhlar bo'yicha taqsimot",cpProgress:"Check-in holati",search:"Ism yoki ID bo'yicha qidirish…",
@@ -381,7 +383,7 @@ const T = {
   pageBase:"Sahifa manzili (domen)",roleTag:"Mas'ul",openPage:"Sahifani ochish",
   qrHint:"QR skanlanganda ishtirokchining shaxsiy sahifasi ochiladi. Kod ichida pasportdan olingan maxfiy token turadi — pasport raqami ko'rinmaydi."},
 
- ru:{dash:"Панель управления",parts:"Участники",groups:"Группы",qr:"QR коды",docs:"Документы",loading:"Загрузка…",docDrop:"Перетащите файлы сюда или нажмите",docDropHint:"Если в имени файла есть номер ACO, паспорт или Ф.И.О. — владелец определится сам",docAdd:"Файл",docHave:"есть у %n",docNone:"нет у %n",docMissing:"Без документов",docSent:"Отправлено",docUploading:"Загрузка… %a / %b",docSaved:"Сохранено файлов: %n",docUnmatched:"Владелец не найден — впишите имя в название файла или добавьте через «+ Файл»",docDelQ:"Удалить этот файл?",docVoucher:"Ваучер",docTicket:"Билет",docKind:"Тип документа",docReleaseHint:"С какого момента бот отправляет — пусто значит сразу",checkin:"Check-in",
+ ru:{dash:"Панель управления",parts:"Участники",groups:"Группы",qr:"QR коды",docs:"Документы",loading:"Загрузка…",docDrop:"Перетащите файлы сюда или нажмите",docDropHint:"Если в имени файла есть номер ACO, паспорт или Ф.И.О. — владелец определится сам",docAdd:"Файл",docHave:"есть у %n",docNone:"нет у %n",docMissing:"Без документов",docSent:"Отправлено",docUploading:"Загрузка… %a / %b",docSaved:"Сохранено файлов: %n",docUnmatched:"Владелец не найден — впишите имя в название файла или добавьте через «+ Файл»",docDelQ:"Удалить этот файл?",docVoucher:"Ваучер",docTicket:"Билет",docKind:"Тип документа",docHold:"Придержать рассылку",docHoldOn:"Никому не отправляется — можно спокойно загружать",docHoldOff:"Документы выдаются сразу по запросу",docReleaseHint:"С какого момента бот отправляет — пусто значит сразу",checkin:"Check-in",
   roles:"Ответственные",program:"Программа",
   total:"Всего участников",assigned:"Распределено по группам",leaders:"Старосты групп",foreign:"Из-за рубежа отдельно",
   byGroup:"Распределение по группам",cpProgress:"Статус check-in",search:"Поиск по имени или ID…",
@@ -410,7 +412,7 @@ const T = {
   pageBase:"Адрес страницы (домен)",roleTag:"Ответ.",openPage:"Открыть страницу",
   qrHint:"При сканировании QR открывается личная страница участника. Внутри кода — секретный токен, номер паспорта не виден."},
 
- en:{dash:"Dashboard",parts:"Participants",groups:"Groups",qr:"QR codes",docs:"Documents",loading:"Loading…",docDrop:"Drop files here, or click",docDropHint:"If the filename holds an ACO number, a passport or a full name, the owner is found automatically",docAdd:"File",docHave:"%n have them",docNone:"%n do not",docMissing:"Without documents",docSent:"Sent",docUploading:"Uploading… %a / %b",docSaved:"%n files saved",docUnmatched:"Owner not found — put the name in the filename and retry, or add it with “+ File”",docDelQ:"Delete this file?",docVoucher:"Voucher",docTicket:"Ticket",docKind:"Document kind",docReleaseHint:"When the bot may start sending — empty means straight away",checkin:"Check-in",
+ en:{dash:"Dashboard",parts:"Participants",groups:"Groups",qr:"QR codes",docs:"Documents",loading:"Loading…",docDrop:"Drop files here, or click",docDropHint:"If the filename holds an ACO number, a passport or a full name, the owner is found automatically",docAdd:"File",docHave:"%n have them",docNone:"%n do not",docMissing:"Without documents",docSent:"Sent",docUploading:"Uploading… %a / %b",docSaved:"%n files saved",docUnmatched:"Owner not found — put the name in the filename and retry, or add it with “+ File”",docDelQ:"Delete this file?",docVoucher:"Voucher",docTicket:"Ticket",docKind:"Document kind",docHold:"Hold delivery",docHoldOn:"Nothing is sent — upload freely",docHoldOff:"Documents go out as soon as they are asked for",docReleaseHint:"When the bot may start sending — empty means straight away",checkin:"Check-in",
   roles:"Responsibilities",program:"Programme",
   total:"Participants in total",assigned:"Assigned to a group",leaders:"Group leaders",foreign:"Arriving separately",
   byGroup:"Distribution by group",cpProgress:"Check-in progress",search:"Search by name or ID…",
@@ -1153,6 +1155,7 @@ async function loadDocs(){
     if(r.status===401){showGate();return;}
     if(r.ok)docsData=await r.json();}catch(e){}
 }
+// /api/docs javobida `hold` ham keladi.
 
 async function renderDocs(v){
   v.innerHTML=`<div class="muted" style="padding:24px">${t('loading')}</div>`;
@@ -1166,7 +1169,13 @@ async function renderDocs(v){
   const manage=can('manager');
 
   const rel=docsData.release||{};
-  const relBlock=can('admin')?`<div class="card" style="display:flex;gap:12px;align-items:end;flex-wrap:wrap">
+  const held=!!docsData.hold;
+  const relBlock=can('admin')?`
+    <div class="card ${held?'holdon':''}" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <label class="chk"><input type="checkbox" ${held?'checked':''} onchange="setDocHold(this.checked)">
+        <b>${t('docHold')}</b></label>
+      <span class="muted" style="font-size:12px">${held?t('docHoldOn'):t('docHoldOff')}</span></div>
+    <div class="card" style="display:flex;gap:12px;align-items:end;flex-wrap:wrap">
     <div class="frow" style="margin:0"><label>${KIND_ICON.voucher} ${t('docVoucher')}</label>
       <input type="datetime-local" value="${escapeHtml(rel.voucher||'')}" onchange="setDocRelease('voucher',this.value)"></div>
     <div class="frow" style="margin:0"><label>${KIND_ICON.ticket} ${t('docTicket')}</label>
@@ -1287,6 +1296,13 @@ async function delDoc(id){
   const ok=await api._post('/api/docs/delete',{id});
   if(ok===false)return;
   renderDocs(VW());
+}
+
+// Fayllarni yuklab bo'lgunicha tarqatishni to'xtatib turish.
+async function setDocHold(on){
+  const ok=await api._post('/api/docs/release',{hold:on});
+  if(ok===false)return;
+  docsData.hold=on; renderDocs(VW()); toast(t('saved'));
 }
 
 async function setDocRelease(kind,value){

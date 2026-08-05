@@ -811,6 +811,54 @@ class BotApiTest(unittest.TestCase):
         self.assertEqual([d["kind"] for p in pending["people"] for d in p["documents"]],
                          ["voucher"])
 
+    def test_holding_delivery_stops_everything_going_out(self):
+        """Fayllarni yuklab bo'lgunicha hech kimga yuborilmasin."""
+        _, member, _ = self.build_group()
+        admin = self.register("Panel Admin", "0000791")
+        os.environ["PANEL_ADMIN_IDS"] = admin["id"]
+        server.DOCS_DIR = os.path.join(self.tmp.name, "docs")
+        server.DOCS_FILES = os.path.join(server.DOCS_DIR, "_files")
+        panel = self.panel(admin["id"])
+        self.upload(panel, [f"{member['id']} voucher.pdf", f"{member['id']} ticket.pdf"])
+
+        self.assertEqual(panel.post("/api/docs/release", json={"hold": True}).status_code, 200)
+        held = self.client.get(f"/api/bot/docs?id={member['id']}",
+                               headers=self.headers).get_json()
+        self.assertEqual(held["documents"], [])
+        self.assertEqual(len(held["pending"]), 2)
+        self.assertEqual(self.client.get("/api/bot/docs/pending",
+                                         headers=self.headers).get_json()["people"], [])
+        self.assertTrue(panel.get("/api/docs").get_json()["hold"])
+
+        # Ochilgach hammasi tayyor bo'ladi.
+        panel.post("/api/docs/release", json={"hold": False})
+        opened = self.client.get(f"/api/bot/docs?id={member['id']}",
+                                 headers=self.headers).get_json()
+        self.assertEqual(len(opened["documents"]), 2)
+
+    def test_the_same_file_is_not_stored_twice_for_one_person(self):
+        _, member, other = self.build_group()
+        admin = self.register("Panel Admin", "0000792")
+        os.environ["PANEL_ADMIN_IDS"] = admin["id"]
+        server.DOCS_DIR = os.path.join(self.tmp.name, "docs")
+        server.DOCS_FILES = os.path.join(server.DOCS_DIR, "_files")
+        panel = self.panel(admin["id"])
+
+        name = f"{member['id']} voucher.pdf"
+        first = self.upload(panel, [name]).get_json()
+        self.assertEqual(len(first["saved"]), 1)
+
+        again = self.upload(panel, [name]).get_json()
+        self.assertEqual(again["saved"], [])
+        self.assertEqual([d["pid"] for d in again["duplicates"]], [member["id"]])
+        self.assertEqual(len(self._all("SELECT id FROM documents")), 1)
+        self.assertEqual(len(os.listdir(server.DOCS_FILES)), 1)
+
+        # Boshqa odamga o'sha fayl — yozuv qo'shiladi, fayl nusxalanmaydi.
+        shared = self.upload(panel, [name], pid=other["id"]).get_json()
+        self.assertEqual([s["pid"] for s in shared["saved"]], [other["id"]])
+        self.assertEqual(len(os.listdir(server.DOCS_FILES)), 1)
+
     def test_sent_documents_are_not_sent_again(self):
         _, member, _ = self.build_group()
         admin = self.register("Panel Admin", "0000785")

@@ -231,3 +231,13 @@ def docs_share(doc_id, pids):
 
 def docs_delete(doc_id):
     return _request("POST", "/api/bot/docs/delete", payload={"id": doc_id})
+
+
+def docs_state():
+    """Hujjatlar bo'yicha umumiy holat."""
+    return _request("GET", "/api/bot/docs/state")
+
+
+def docs_hold(on):
+    """Tarqatishni ushlab turish yoki ochish."""
+    return _request("POST", "/api/bot/docs/hold", payload={"hold": bool(on)})

@@ -55,7 +55,12 @@ BOT_COLUMNS = {
     "panel_role": "TEXT",
     # Ishtirokchining asosiy tili: shaxsiy sahifa shu tilda ochiladi.
     "lang": "TEXT",
+    # Tashkilotchi: safarda qatnashmaydi, ro'yxat va hisobotlarga kirmaydi.
+    "staff": "INTEGER DEFAULT 0",
 }
+
+# Hisobotlar, ro'yxatlar va tarqatishlarda tashkilotchilar hisobga olinmaydi.
+NOT_STAFF = "COALESCE(staff,0)=0"
 
 LANGS = ("uz", "ru", "en")
 
@@ -493,7 +498,12 @@ def _whoami(con, telegram_id):
 
 
 def _may_checkin(con, actor, target_row):
-    """Only an admin, or a leader over their own group, may check somebody in."""
+    """Only an admin, or a leader over their own group, may check somebody in.
+
+    Tashkilotchilar safarda qatnashmaydi — ularni belgilash kerak emas.
+    """
+    if target_row["staff"]:
+        return False
     if actor["role"] == "admin":
         return True
     if actor["role"] != "leader":
@@ -879,12 +889,48 @@ def match_participants(con, text):
     if len(words) >= 2:
         for row in con.execute("SELECT id,fio FROM participants"):
             parts = {w.lower() for w in str(row["fio"]).split() if len(w) > 2}
-            if len(parts) >= 2 and parts <= words:
+            if len(parts) >= 2 and all(any(word_matches(p, w) for w in words) for p in parts):
                 add(row["id"])
     return found
 
 
 # ─────────────── PDF ichidan ismlarni o'qib, sahifalarga bo'lish ───────────────
+# Ism yozilishidagi tabiiy farqlar: Jumayev/Jumaev, Toshkhodjaev/Toshhojaev,
+# Aziz/Azizbek.  Fayl nomini kim yozganiga qarab har xil bo'ladi.
+NAME_SUFFIXES = ("bek", "jon", "jan", "xon", "hon", "khon", "boy", "bay", "ali",
+                 "illo", "ulla", "beck", "zoda", "zade")
+
+
+def norm_word(word):
+    """Ismni bir ko'rinishga keltiradi: yozilish farqlari yo'qoladi."""
+    w = str(word or "").lower().replace("'", "").replace("\u2018", "").replace("\u2019", "")
+    for a, b in (("ayev", "aev"), ("oyev", "oev"), ("iyev", "iev"), ("yev", "ev"),
+                 ("kh", "h"), ("ts", "s"), ("iy", "i"), ("yo", "o"), ("ye", "e"),
+                 ("sch", "sh"), ("ph", "f")):
+        w = w.replace(a, b)
+    out = []
+    for ch in w:                       # takroriy harflarni qisqartiramiz
+        if not out or out[-1] != ch:
+            out.append(ch)
+    return "".join(out)
+
+
+def word_matches(name_word, text_word):
+    """Ism so'zi matndagi so'zga mos keladimi.
+
+    Aynan bir xil bo'lishi shart emas: ``Aziz`` va ``Azizbek`` bir odam, lekin
+    ``Karimov`` va ``Karimova`` — ikki xil odam, shuning uchun faqat ma'lum
+    qo'shimchalar hisobga olinadi.
+    """
+    a, b = norm_word(name_word), norm_word(text_word)
+    if a == b:
+        return True
+    long, short = (b, a) if len(b) > len(a) else (a, b)
+    if len(short) >= 4 and long.startswith(short):
+        return long[len(short):] in NAME_SUFFIXES
+    return False
+
+
 def _name_index(con):
     """{ishtirokchi id: ism so'zlari to'plami} — matn ichidan qidirish uchun."""
     index = {}
@@ -899,7 +945,11 @@ def _name_index(con):
 def _people_in_text(index, text):
     """Matnda to'liq ism-familyasi uchragan ishtirokchilar."""
     words = {w.lower() for w in re.split(r"[^\wА-Яа-яЎўҚқҒғҲҳ]+", text or "") if len(w) > 2}
-    return [pid for pid, name in index.items() if name <= words]
+    out = []
+    for pid, name in index.items():
+        if all(any(word_matches(part, w) for w in words) for part in name):
+            out.append(pid)
+    return out
 
 
 def split_pdf_by_participants(con, blob):
@@ -1224,7 +1274,8 @@ def docs_release_set():
 def bot_docs_state():
     """Hujjatlar bo'yicha umumiy holat — botdagi hisobot uchun."""
     con = db()
-    people = {r["id"]: r for r in con.execute("SELECT id,fio,grp,leader,telegram_id FROM participants")}
+    people = {r["id"]: r for r in con.execute(
+        f"SELECT id,fio,grp,leader,telegram_id FROM participants WHERE {NOT_STAFF}")}
     kinds = {}
     for r in con.execute("SELECT pid,kind FROM documents"):
         kinds.setdefault(r["pid"], set()).add(r["kind"])
@@ -1327,13 +1378,14 @@ def upd_participant():
                        detail="guruhni faqat admin o'zgartira oladi"), 403
     before = con.execute("SELECT grp,xona_guruhi FROM participants WHERE id=?", (pid,)).fetchone()
     m = {"group": "grp", "leader": "leader", "room": "room", "branch": "branch",
-         "telegram": "telegram", "lang": "lang",
+         "telegram": "telegram", "lang": "lang", "staff": "staff",
          "xona_guruhi": "xona_guruhi", "xona_turi": "xona_turi"}
     for k, col in m.items():
         if k in patch:
             v = patch[k]
             if k == "leader": v = 1 if v else 0
             if k == "lang": v = v if v in LANGS else None
+            if k == "staff": v = 1 if v else 0
             if k == "xona_guruhi": v = str(v or "").strip().upper()
             con.execute("UPDATE participants SET %s=? WHERE id=?" % col, (v, pid))
     if "xona_guruhi" in patch:
@@ -1666,9 +1718,10 @@ def bot_groups():
     names = _group_names(con)
     checked = {r["pid"] for r in con.execute("SELECT DISTINCT pid FROM checkins")}
     out = []
-    for gid in sorted({r["grp"] for r in con.execute("SELECT DISTINCT grp FROM participants")
-                       if r["grp"]}):
-        members = con.execute("SELECT * FROM participants WHERE grp=? ORDER BY fio", (gid,)).fetchall()
+    for gid in sorted({r["grp"] for r in con.execute(
+            f"SELECT DISTINCT grp FROM participants WHERE {NOT_STAFF}") if r["grp"]}):
+        members = con.execute(f"SELECT * FROM participants WHERE grp=? AND {NOT_STAFF} "
+                              "ORDER BY fio", (gid,)).fetchall()
         leader = next((m for m in members if m["leader"]), None)
         out.append({
             "id": gid, "name": names.get(str(gid)),
@@ -1692,7 +1745,8 @@ def bot_group_members(gid):
     for r in con.execute("SELECT pid,checkpoint,ts FROM checkins").fetchall():
         marks.setdefault(r["pid"], {})[r["checkpoint"]] = r["ts"]
     members = []
-    for r in con.execute("SELECT * FROM participants WHERE grp=? ORDER BY leader DESC,fio", (gid,)):
+    for r in con.execute(f"SELECT * FROM participants WHERE grp=? AND {NOT_STAFF} "
+                         "ORDER BY leader DESC,fio", (gid,)):
         members.append({"id": r["id"], "fio": r["fio"], "token": r["token"],
                         "leader": bool(r["leader"]), "room": r["room"],
                         "telegram_id": r["telegram_id"], "phone": r["phone"],
@@ -1754,8 +1808,8 @@ def _resolve_targets(con, actor, scope, value):
     if scope == "all":
         if actor["role"] != "admin":
             return [], "forbidden"
-        rows = con.execute("SELECT * FROM participants WHERE telegram_id IS NOT NULL "
-                           "AND telegram_id<>'' ORDER BY grp,fio").fetchall()
+        rows = con.execute(f"SELECT * FROM participants WHERE telegram_id IS NOT NULL "
+                           f"AND telegram_id<>'' AND {NOT_STAFF} ORDER BY grp,fio").fetchall()
     elif scope == "group":
         try:
             gid = int(value) if value not in (None, "") else actor["group"]
@@ -2045,7 +2099,8 @@ def bot_docs_pending():
     for r in con.execute(
             "SELECT d.*, p.telegram_id, p.fio FROM documents d "
             "JOIN participants p ON p.id=d.pid "
-            "WHERE d.sent_at IS NULL AND p.telegram_id IS NOT NULL AND p.telegram_id<>''"):
+            f"WHERE d.sent_at IS NULL AND p.telegram_id IS NOT NULL AND p.telegram_id<>'' "
+            f"AND COALESCE(p.staff,0)=0"):
         if not docs_released(con, r["kind"]):
             continue
         entry = out.setdefault(r["pid"], {"id": r["pid"], "fio": r["fio"],
@@ -2123,7 +2178,8 @@ def bot_recipients():
                 "group": r["grp"], "token": r["token"]} for r in rows]
         con.close()
         return jsonify(recipients=out)
-    rows = con.execute("SELECT * FROM participants ORDER BY xona_guruhi,id").fetchall()
+    rows = con.execute(f"SELECT * FROM participants WHERE {NOT_STAFF} "
+                       "ORDER BY xona_guruhi,id").fetchall()
     by_room = {}
     for r in rows:
         if r["xona_guruhi"]:
@@ -2148,7 +2204,7 @@ def bot_recipients():
 @bot_auth
 def bot_stats():
     con = db()
-    rows = con.execute("SELECT * FROM participants").fetchall()
+    rows = con.execute(f"SELECT * FROM participants WHERE {NOT_STAFF}").fetchall()
     room_counts = {}
     for r in rows:
         if r["xona_guruhi"]:

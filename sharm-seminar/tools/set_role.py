@@ -49,6 +49,10 @@ def main():
     parser.add_argument("who", nargs="?", help="ACO-xxx yoki ism")
     parser.add_argument("role", nargs="?", choices=ROLES)
     parser.add_argument("--db", default=DB_PATH)
+    parser.add_argument("--staff", action="store_true",
+                        help="tashkilotchi: safarda qatnashmaydi, ro'yxatlarga kirmaydi")
+    parser.add_argument("--participant", action="store_true",
+                        help="tashkilotchi belgisini olib tashlash")
     args = parser.parse_args()
 
     con = sqlite3.connect(args.db)
@@ -56,18 +60,30 @@ def main():
 
     if not args.who:
         print("Panel rollari (bo'sh = oddiy ishtirokchi):\n")
-        rows = con.execute("SELECT id,fio,grp,leader,panel_role FROM participants "
-                           "WHERE (panel_role IS NOT NULL AND panel_role<>'') OR leader=1 "
+        rows = con.execute("SELECT id,fio,grp,leader,panel_role,COALESCE(staff,0) staff "
+                           "FROM participants WHERE (panel_role IS NOT NULL AND panel_role<>'') "
+                           "OR leader=1 OR COALESCE(staff,0)=1 "
                            "ORDER BY panel_role DESC, grp, id").fetchall()
         if not rows:
             print("  hech kimga rol berilmagan")
         for r in rows:
             role = r["panel_role"] or ("leader" if r["leader"] else "member")
             print(f"  {r['id']}  {role:8}  {r['fio']}"
-                  + (f"  ({r['grp']}-guruh)" if r["grp"] else ""))
+                  + (f"  ({r['grp']}-guruh)" if r["grp"] else "")
+                  + ("  [tashkilotchi]" if r["staff"] else ""))
         env = os.environ.get("PANEL_ADMIN_IDS", "")
         if env:
             print(f"\n.env dagi PANEL_ADMIN_IDS: {env}")
+        con.close()
+        return
+
+    if args.staff or args.participant:
+        row = resolve(con, args.who)
+        con.execute("UPDATE participants SET staff=? WHERE id=?",
+                    (1 if args.staff else 0, row["id"]))
+        con.commit()
+        print(f"{row['id']} · {row['fio']} → "
+              + ("tashkilotchi (ro'yxatlarga kirmaydi)" if args.staff else "oddiy ishtirokchi"))
         con.close()
         return
 

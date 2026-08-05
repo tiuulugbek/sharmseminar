@@ -462,6 +462,36 @@ Fayllar `data/docs/_files/` da yotadi (git ga tushmaydi), bittasi 20 MB gacha.
 Odamning o'zi va guruh mas'uli — o'z guruhinikini; rahbar va admin — hammasini.
 Boshqa birov havolani bilsa ham ocholmaydi.
 
+### Tashkilotchilar — ro'yxatdan tashqarida
+
+Safarda qatnashmaydigan, lekin panelga kiradigan odam (tashkilotchi, texnik
+admin) `staff` deb belgilanadi:
+
+```bash
+./venv/bin/python sharm-seminar/tools/set_role.py ACO-105 --staff        # chiqarish
+./venv/bin/python sharm-seminar/tools/set_role.py ACO-105 --participant  # qaytarish
+```
+
+Shundan keyin u **hech qaysi ro'yxat va hisobotga kirmaydi**: statistikadagi umumiy
+son, guruh ro'yxatlari, «hammaga xabar» manzillari, hujjat qamrovi, check-in
+kutilayotganlar — hech qayerda. Uni QR bilan check-in qilib ham bo'lmaydi
+(«forbidden»). Panelga kirishi va admin huquqlari o'zgarmaydi; ishtirokchilar
+jadvalida «tashkilotchi» yorlig'i bilan ko'rinadi.
+
+### Ism yozilishidagi farqlar
+
+Fayl nomini kim yozganiga qarab ism har xil yozilishi mumkin. Moslashtirish
+shularni bir xil deb qabul qiladi:
+
+| | |
+|---|---|
+| `Jumayev` = `Jumaev` | `yev/ayev/oyev` → `ev/aev/oev` |
+| `Toshkhodjaev` = `Toshhojaev` | `kh` → `h`, `iy` → `i`, `yo` → `o` |
+| `Azizbek` = `Aziz` | `bek, jon, xon, boy, zoda…` qo'shimchalari |
+
+Lekin `Karimov` va `Karimova` ikki xil odam bo'lib qoladi — faqat ma'lum
+qo'shimchalar hisobga olinadi, ixtiyoriy harf emas.
+
 ### Yuklab bo'lgunicha ushlab turish
 
 Fayllarni bo'lak-bo'lak yuklayotganda yarim tayyor holat odamlarga ketib

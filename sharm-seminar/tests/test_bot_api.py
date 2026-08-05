@@ -811,6 +811,50 @@ class BotApiTest(unittest.TestCase):
         self.assertEqual([d["kind"] for p in pending["people"] for d in p["documents"]],
                          ["voucher"])
 
+    def test_name_spelling_variants_still_find_the_right_person(self):
+        """Fayl nomini kim yozganiga qarab yozilishi har xil bo'ladi."""
+        con = sqlite3.connect(server.DB_PATH)
+        for pid, fio in (("ACO-901", "Jumaev Aziz"), ("ACO-902", "Karimov Kudratbek"),
+                         ("ACO-903", "Karimova Nargiza"), ("ACO-904", "Mirzaev Shavkat")):
+            con.execute("INSERT INTO participants(id,fio) VALUES(?,?)", (pid, fio))
+        con.commit(); con.close()
+        con = server.db()
+        try:
+            cases = {
+                "JUMAYEV_AZIZBEK_TICKET.pdf": ["ACO-901"],   # yev→ev va +bek
+                "JUMAEV_AZIZ_VOUCHER.pdf": ["ACO-901"],
+                "MIRZAYEV_SHAVKAT.pdf": ["ACO-904"],
+                "KARIMOV_KUDRATBEK.pdf": ["ACO-902"],
+                # Karimov va Karimova — ikki xil odam, aralashib ketmasin.
+                "KARIMOVA_NARGIZA.pdf": ["ACO-903"],
+            }
+            for name, expected in cases.items():
+                self.assertEqual(server.match_participants(con, name), expected, name)
+        finally:
+            con.close()
+
+    def test_organisers_are_left_out_of_rosters_and_statistics(self):
+        leader, member, _ = self.build_group()
+        staff = self.register("Organiser One", "0000793", "9500")
+        self.sql("UPDATE participants SET staff=1 WHERE id=?", staff["id"])
+
+        stats = self.client.get("/api/bot/stats", headers=self.headers).get_json()
+        self.assertEqual(stats["total"], 3)              # 4 emas — tashkilotchi sanalmaydi
+        everyone = self.client.get("/api/bot/recipients", headers=self.headers).get_json()
+        self.assertNotIn(staff["id"], [r["id"] for r in everyone["recipients"]])
+
+        # "Hammaga xabar" ham unga bormaydi.
+        sent = self.post("/api/bot/message", {
+            "from_telegram_id": "555", "scope": "all", "text": "salom"}).get_json()
+        self.assertNotIn(staff["id"], [r["id"] for r in sent["recipients"]])
+
+        # Uni check-in qilib bo'lmaydi — safarda qatnashmaydi.
+        self.assertEqual(self.scan(staff["token"], "seminar").status_code, 403)
+
+        # Hujjat hisobotida ham yo'q.
+        state = self.client.get("/api/bot/docs/state", headers=self.headers).get_json()
+        self.assertNotIn(staff["id"], [x["id"] for x in state["none"]])
+
     def test_holding_delivery_stops_everything_going_out(self):
         """Fayllarni yuklab bo'lgunicha hech kimga yuborilmasin."""
         _, member, _ = self.build_group()

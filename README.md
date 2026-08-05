@@ -492,6 +492,22 @@ shularni bir xil deb qabul qiladi:
 Lekin `Karimov` va `Karimova` ikki xil odam bo'lib qoladi — faqat ma'lum
 qo'shimchalar hisobga olinadi, ixtiyoriy harf emas.
 
+### Hujjat bilan yuboriladigan xabar
+
+Chipta yoki voucherga **qo'shimcha matn** biriktirish mumkin — masalan reys
+vaqti o'zgargani. Bot uni o'sha turdagi birinchi fayldan **oldin**, odamning
+tilida, bir marta yuboradi.
+
+Panel → «Hujjatlar» bo'limining tepasidagi maydonlar. Har til alohida: yuqoridagi
+**UZ/RU/EN** tugmasi bilan tilni almashtirib yozasiz. Bo'sh qoldirilsa hech nima
+yuborilmaydi.
+
+Matn HTML qabul qiladi: `<b>qalin</b>`, `<i>qiya</i>`, `<s>chizilgan</s>` —
+eski vaqtni chizib tashlash uchun qulay.
+
+Xabar faqat **tarqatilayotgan** turga chiqadi: chiptalar hali ushlab turilgan
+bo'lsa, chipta izohi ham yuborilmaydi.
+
 ### Yuklab bo'lgunicha ushlab turish
 
 Fayllarni bo'lak-bo'lak yuklayotganda yarim tayyor holat odamlarga ketib

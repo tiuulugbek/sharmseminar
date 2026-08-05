@@ -1149,8 +1149,9 @@ def docs_list():
     out = [_doc_row(r) for r in rows if r["pid"] in allowed]
     release = sget(con, "docs_release", {}) or {}
     hold = bool(sget(con, "docs_hold", False))
+    notes = sget(con, "docs_note", {}) or {}
     con.close()
-    return jsonify(documents=out, release=release, hold=hold)
+    return jsonify(documents=out, release=release, hold=hold, note=notes)
 
 
 @app.get("/api/docs/file/<int:doc_id>")
@@ -1252,6 +1253,36 @@ def docs_share():
     return jsonify(ok=True, added=added, skipped=skipped)
 
 
+@app.post("/api/docs/note")
+@panel_auth("admin")
+def docs_note_set():
+    """Hujjat turiga qo'shimcha xabar (masalan reys vaqti o'zgargani).
+
+    Matn uch tilli saqlanadi va bot uni fayllardan oldin, odamning tilida
+    yuboradi.
+    """
+    payload = request.get_json(silent=True) or {}
+    kind = str(payload.get("kind") or "").lower()
+    if kind not in DOC_KINDS:
+        return jsonify(error="unknown_kind"), 400
+    con = db()
+    notes = sget(con, "docs_note", {}) or {}
+    text = payload.get("text")
+    if isinstance(text, dict):
+        notes[kind] = {k: str(v or "") for k, v in text.items() if k in LANGS}
+    else:
+        lang = payload.get("lang") if payload.get("lang") in LANGS else "uz"
+        current = notes.get(kind) or {}
+        if not isinstance(current, dict):
+            current = {"uz": str(current or "")}
+        current[lang] = str(text or "")
+        notes[kind] = current
+    notes = {k: v for k, v in notes.items() if any((v or {}).values())}
+    sset(con, "docs_note", notes)
+    con.commit(); con.close()
+    return jsonify(ok=True, note=notes)
+
+
 @app.post("/api/docs/release")
 @panel_auth("admin")
 def docs_release_set():
@@ -1288,6 +1319,7 @@ def bot_docs_state():
     out = {
         "hold": bool(sget(con, "docs_hold", False)),
         "release": sget(con, "docs_release", {}) or {},
+        "note": sget(con, "docs_note", {}) or {},
         "rows": files["c"], "files": files["f"], "unsent": unsent,
         "both": len(both), "only_voucher": len(only_v), "only_ticket": len(only_t),
         "none": [{"id": p, "fio": people[p]["fio"], "group": people[p]["grp"]} for p in none_],
@@ -2085,8 +2117,21 @@ def bot_docs():
     ready, pending = [], []
     for r in con.execute("SELECT * FROM documents WHERE pid=? ORDER BY kind,id", (pid,)):
         (ready if docs_released(con, r["kind"]) else pending).append(_doc_row(r))
+    notes = sget(con, "docs_note", {}) or {}
+    lang = (person["lang"] if person else None) or "uz"
+    # Faqat yuborilayotgan turlarga tegishli izohlar.
+    wanted = {d["kind"] for d in ready}
+    out_notes = {}
+    for kind in wanted:
+        value = notes.get(kind)
+        if isinstance(value, dict):
+            text = value.get(lang) or value.get("uz") or value.get("ru") or value.get("en")
+        else:
+            text = value
+        if text:
+            out_notes[kind] = text
     con.close()
-    return jsonify(documents=ready, pending=pending,
+    return jsonify(documents=ready, pending=pending, notes=out_notes,
                    participant=dict(person) if person else None)
 
 

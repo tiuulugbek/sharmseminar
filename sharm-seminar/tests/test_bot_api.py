@@ -855,6 +855,41 @@ class BotApiTest(unittest.TestCase):
         state = self.client.get("/api/bot/docs/state", headers=self.headers).get_json()
         self.assertNotIn(staff["id"], [x["id"] for x in state["none"]])
 
+    def test_a_note_travels_with_its_document_kind_in_the_right_language(self):
+        """Reys vaqti o'zgargani kabi xabar chipta bilan birga ketadi."""
+        _, member, _ = self.build_group()
+        admin = self.register("Panel Admin", "0000794")
+        os.environ["PANEL_ADMIN_IDS"] = admin["id"]
+        server.DOCS_DIR = os.path.join(self.tmp.name, "docs")
+        server.DOCS_FILES = os.path.join(server.DOCS_DIR, "_files")
+        panel = self.panel(admin["id"])
+        self.upload(panel, [f"{member['id']} voucher.pdf", f"{member['id']} ticket.pdf"])
+
+        self.assertEqual(panel.post("/api/docs/note", json={
+            "kind": "ticket", "text": {"uz": "Reys vaqti o'zgardi",
+                                       "ru": "Время рейса изменилось",
+                                       "en": "The flight time has changed"}}).status_code, 200)
+
+        got = self.client.get(f"/api/bot/docs?id={member['id']}",
+                              headers=self.headers).get_json()
+        self.assertEqual(got["notes"], {"ticket": "Reys vaqti o'zgardi"})   # tili yo'q -> uz
+
+        self.sql("UPDATE participants SET lang='ru' WHERE id=?", member["id"])
+        self.assertEqual(self.client.get(f"/api/bot/docs?id={member['id']}",
+                                         headers=self.headers).get_json()["notes"],
+                         {"ticket": "Время рейса изменилось"})
+
+        # Voucherga izoh qo'yilmagan — u bilan hech nima ketmaydi.
+        self.assertNotIn("voucher", got["notes"])
+
+        # Chipta vaqti kelmagan bo'lsa izohi ham chiqmaydi.
+        later = (server._event_now().replace(tzinfo=None)
+                 + datetime.timedelta(days=1)).strftime("%Y-%m-%dT%H:%M")
+        panel.post("/api/docs/release", json={"release": {"ticket": later}})
+        held = self.client.get(f"/api/bot/docs?id={member['id']}",
+                               headers=self.headers).get_json()
+        self.assertEqual(held["notes"], {})
+
     def test_holding_delivery_stops_everything_going_out(self):
         """Fayllarni yuklab bo'lgunicha hech kimga yuborilmasin."""
         _, member, _ = self.build_group()

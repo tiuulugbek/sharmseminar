@@ -1666,13 +1666,23 @@ async def send_documents(user_id: int, *, participant_id=None, silent=False) -> 
                 "Savol bo'lsa guruh mas'ulingizga yozing."))
         return 0
 
+    # Turga biriktirilgan izoh (masalan reys vaqti o'zgargani) o'sha turdagi
+    # birinchi fayldan oldin, bir marta yuboriladi.
+    notes, announced = data.get("notes") or {}, set()
     sent = []
-    for doc in ready:
+    for doc in sorted(ready, key=lambda d: d["kind"]):
+        kind = doc["kind"]
+        if kind in notes and kind not in announced:
+            announced.add(kind)
+            try:
+                await bot.send_message(user_id, notes[kind], disable_web_page_preview=True)
+            except Exception:
+                logger.debug("Izoh yuborilmadi: %s", user_id)
         try:
             blob = await asyncio.to_thread(api_client.docs_file, doc["id"])
             await bot.send_document(
                 user_id, BufferedInputFile(blob, filename=doc["file_name"]),
-                caption=DOC_CAPTION.get(doc["kind"], DOC_CAPTION["other"]))
+                caption=DOC_CAPTION.get(kind, DOC_CAPTION["other"]))
             sent.append(doc["id"])
         except Exception as exc:
             logger.warning("Hujjat yuborilmadi (%s → %s): %s", doc["id"], user_id, exc)

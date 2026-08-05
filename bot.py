@@ -1714,7 +1714,7 @@ async def _describe(pids) -> str:
     return "\n".join(f"• {x}" for x in out)
 
 
-@dp.message(StateFilter(None), F.chat.type == "private", F.document | F.photo)
+@dp.message(StateFilter(None, Docs.owner), F.chat.type == "private", F.document | F.photo)
 async def admin_document(message: Message, state: FSMContext):
     """Admin botga voucher/chipta tashlaganda saqlaydi va egasini topadi.
 
@@ -1727,6 +1727,11 @@ async def admin_document(message: Message, state: FSMContext):
             return await message.answer(
                 "📎 Hujjat yuborish faqat adminlar uchun.\n"
                 "O'z hujjatlaringizni olish uchun «📎 Hujjatlarim» tugmasini bosing.")
+
+    # Oldingi fayl uchun "kimga tegishli?" savoli javobsiz qolgan bo'lsa —
+    # yangi fayl kelgani uni bekor qiladi, lekin qaysi fayl qolganini aytamiz.
+    skipped = (await state.get_data()).get("file_name") if await state.get_state() else None
+    await state.clear()
 
     if message.document:
         tg_file, name = message.document, message.document.file_name or "hujjat.pdf"
@@ -1765,6 +1770,8 @@ async def admin_document(message: Message, state: FSMContext):
             already = list(dict.fromkeys(d["pid"] for d in dupes))
             lines.append(f"🔁 <b>{name}</b> — allaqachon bor "
                          f"({len(already)} kishida), qayta saqlanmadi")
+        if skipped:
+            lines.append(f"\n⚠️ <b>{skipped}</b> egasiz qoldi — uni qaytadan yuboring.")
         await note.edit_text("\n".join(lines))
         return
 
@@ -1775,7 +1782,8 @@ async def admin_document(message: Message, state: FSMContext):
         f"❓ <b>{name}</b> — egasi topilmadi.\n\n"
         "Kimga tegishli? Ism-familya, <b>ACO raqami</b> yoki pasportni yozing.\n"
         "Bir nechta bo'lsa vergul bilan: <code>ACO-004, ACO-104</code>\n\n"
-        "<i>Bekor qilish — /bekor</i>")
+        "<i>Javob bermay yangi fayl yuborsangiz, bu fayl saqlanmay qoladi.</i>"
+        + (f"\n⚠️ <b>{skipped}</b> ham egasiz qoldi." if skipped else ""))
 
 
 @dp.message(Docs.owner, F.text)

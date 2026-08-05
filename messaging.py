@@ -44,6 +44,7 @@ BTN_ROSTER  = "👥 Guruhim ro'yxati"
 BTN_ATT     = "📊 Kim keldi / kim yo'q"
 BTN_ASK     = "✍️ Rahbarimga savol"
 BTN_PAGE    = "📄 Mening sahifam"
+BTN_DOCS    = "📎 Hujjatlarim"
 BTN_PENDING = "⏳ Tasdiqlanmaganlar"
 BTN_INVITE  = "➕ Guruhga taklif"
 
@@ -66,13 +67,15 @@ def role_menu(role: str) -> ReplyKeyboardMarkup:
         rows = [[KeyboardButton(text=BTN_ALL), KeyboardButton(text=BTN_GROUP)],
                 [KeyboardButton(text=BTN_ONE), KeyboardButton(text=BTN_STATS)],
                 [KeyboardButton(text=BTN_SCAN), KeyboardButton(text=BTN_PENDING)],
-                [KeyboardButton(text=BTN_INVITE)]]
+                [KeyboardButton(text=BTN_INVITE), KeyboardButton(text=BTN_DOCS)]]
     elif role == "leader":
         rows = [[KeyboardButton(text=BTN_MYGROUP), KeyboardButton(text=BTN_ROSTER)],
                 [KeyboardButton(text=BTN_SCAN), KeyboardButton(text=BTN_ATT)],
-                [KeyboardButton(text=BTN_PENDING), KeyboardButton(text=BTN_PAGE)]]
+                [KeyboardButton(text=BTN_PENDING), KeyboardButton(text=BTN_PAGE)],
+                [KeyboardButton(text=BTN_DOCS)]]
     else:
-        rows = [[KeyboardButton(text=BTN_ASK)], [KeyboardButton(text=BTN_PAGE)]]
+        rows = [[KeyboardButton(text=BTN_ASK)],
+                [KeyboardButton(text=BTN_PAGE), KeyboardButton(text=BTN_DOCS)]]
     return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
 
 

@@ -14,3 +14,4 @@ client_secret.json
 token.json
 sharm-seminar/data/*.xlsx
 sharm-seminar/data/telegram_links_backup.json
+sharm-seminar/data/docs/

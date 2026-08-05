@@ -372,6 +372,8 @@ async def _do_join(user_id: int, full_name: str, idx: int, username: str = ""):
         await bot.send_message(user_id, "💬 Endi safar guruhida yozishingiz mumkin.")
     await send_group_card(user_id, pid)
     await send_personal_page(user_id, pid)
+    # Hujjatlari tayyor bo'lsa darrov yuboriladi; bo'lmasa jim o'tadi.
+    await send_documents(user_id, participant_id=pid, silent=True)
 
     if not config.GROUP_CHAT_ID:
         await bot.send_message(user_id, "ℹ️ Guruh havolasi hozircha mavjud emas. Administrator bilan bog'laning.")
@@ -1632,6 +1634,113 @@ async def menu_ask(message: Message, state: FSMContext):
         return await show_menu(message.from_user.id, me)
     await _ask_text(message, state, "leader",
                     prompt="✍️ <b>Guruh rahbaringizga savol</b> — matnni yozing.")
+
+
+# ═══════════════════════ Hujjatlar (voucher, chipta) ═══════════════════════
+DOC_CAPTION = {"voucher": "🏨 Mehmonxona voucheri", "ticket": "✈️ Aviachipta",
+               "other": "📎 Hujjat"}
+
+
+async def send_documents(user_id: int, *, participant_id=None, silent=False) -> int:
+    """Odamning hujjatlarini yuboradi. Nechta yuborilganini qaytaradi.
+
+    ``silent`` — hujjat bo'lmasa hech narsa yozmaydi (ro'yxatdan o'tish oqimida
+    ortiqcha xabar chiqmasin).
+    """
+    try:
+        data = await asyncio.to_thread(
+            api_client.docs_for,
+            telegram_id=None if participant_id else user_id,
+            participant_id=participant_id)
+    except api_client.ApiError:
+        logger.exception("Hujjatlarni olishda xato: %s", user_id)
+        return 0
+
+    ready, pending = data.get("documents") or [], data.get("pending") or []
+    if not ready:
+        if not silent:
+            await bot.send_message(user_id, (
+                "⏳ Hujjatlaringiz hali tayyor emas — tayyor bo'lishi bilan "
+                "bot o'zi yuboradi." if pending else
+                "📎 Sizga biriktirilgan hujjat topilmadi. "
+                "Savol bo'lsa guruh mas'ulingizga yozing."))
+        return 0
+
+    sent = []
+    for doc in ready:
+        try:
+            blob = await asyncio.to_thread(api_client.docs_file, doc["id"])
+            await bot.send_document(
+                user_id, BufferedInputFile(blob, filename=doc["file_name"]),
+                caption=DOC_CAPTION.get(doc["kind"], DOC_CAPTION["other"]))
+            sent.append(doc["id"])
+        except Exception as exc:
+            logger.warning("Hujjat yuborilmadi (%s → %s): %s", doc["id"], user_id, exc)
+        await asyncio.sleep(0.2)
+    if sent:
+        try:
+            await asyncio.to_thread(api_client.docs_mark_sent, sent)
+        except api_client.ApiError:
+            logger.debug("Yuborilgan hujjatni belgilab bo'lmadi")
+    if pending and not silent:
+        await bot.send_message(user_id, f"⏳ Yana <b>{len(pending)}</b> ta hujjat "
+                                        "tayyorlanmoqda — tayyor bo'lishi bilan yuboriladi.")
+    return len(sent)
+
+
+@dp.message(Command("hujjatlarim"), F.chat.type == "private")
+@dp.message(StateFilter(None), F.chat.type == "private", F.text == messaging.BTN_DOCS)
+async def menu_docs(message: Message, state: FSMContext):
+    await state.clear()
+    me = await whoami(message.from_user.id)
+    if not me.get("id"):
+        return await show_menu(message.from_user.id, me)
+    await send_documents(message.from_user.id)
+
+
+@dp.message(Command("hujjat_yuborish"), F.chat.type == "private")
+async def cmd_docs_broadcast(message: Message):
+    """Hujjati bor, lekin hali olmagan hammaga yuborish."""
+    if not _is_admin(message.from_user.id):
+        return
+    data = await asyncio.to_thread(api_client.docs_pending)
+    people = data.get("people") or []
+    waiting = data.get("not_registered") or 0
+    if not people:
+        return await message.answer(
+            "✅ Yuborilmagan hujjat qolmadi.\n\n"
+            + (f"⏳ <b>{waiting}</b> kishining hujjati bor, lekin ular hali botda "
+               "tasdiqlamagan — tasdiqlashi bilan o'zi yuboriladi." if waiting else ""))
+    total = sum(len(p["documents"]) for p in people)
+    await message.answer(
+        f"📎 <b>Hujjatlarni yuborish</b>\n\n"
+        f"👤 Odam: <b>{len(people)}</b>\n📄 Fayl: <b>{total}</b>\n"
+        + (f"⏳ Hali tasdiqlamaganlar: <b>{waiting}</b> (ular tasdiqlaganda o'zi boradi)\n"
+           if waiting else "") + "\nDavom etamizmi?",
+        reply_markup=_confirm_kb("docsend:go"))
+
+
+@dp.callback_query(F.data == "docsend:go")
+async def docs_broadcast_go(call: CallbackQuery):
+    if not _is_admin(call.from_user.id):
+        return await call.answer("Ruxsat yo'q", show_alert=True)
+    await call.answer("Yuborilmoqda…")
+    await call.message.edit_text("⏳ Hujjatlar yuborilmoqda…")
+    data = await asyncio.to_thread(api_client.docs_pending)
+    ok, failed = 0, []
+    for person in data.get("people") or []:
+        count = await send_documents(int(person["telegram_id"]),
+                                     participant_id=person["id"], silent=True)
+        if count:
+            ok += count
+        else:
+            failed.append(person["fio"])
+        await asyncio.sleep(0.15)
+    text = f"📎 <b>Yuborildi:</b> {ok} ta fayl"
+    if failed:
+        text += (f"\n⚠️ Yetmadi: <b>{len(failed)}</b>\n"
+                 + "\n".join(f"• {f}" for f in failed[:15]))
+    await call.message.edit_text(text)
 
 
 @dp.message(StateFilter(None), F.chat.type == "private", F.text == messaging.BTN_PAGE)

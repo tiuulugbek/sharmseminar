@@ -598,6 +598,96 @@ class BotApiTest(unittest.TestCase):
         self.assertEqual(self.client.post(
             "/api/participant/unlink", json={"id": member["id"]}).status_code, 401)
 
+    # ------------------------------------------------------------- hujjatlar
+    def upload(self, client, names, **extra):
+        import io
+        data = {"files": [(io.BytesIO(b"%PDF-1.4 test"), n) for n in names]}
+        data.update(extra)
+        return client.post("/api/docs/upload", data=data,
+                           content_type="multipart/form-data")
+
+    def test_uploaded_files_find_their_owner_by_name(self):
+        leader, member, other = self.build_group()
+        self.sql("UPDATE participants SET fio='Niyazov Bobir' WHERE id=?", other["id"])
+        admin = self.register("Panel Admin", "0000782")
+        os.environ["PANEL_ADMIN_IDS"] = admin["id"]
+        server.DOCS_DIR = os.path.join(self.tmp.name, "docs")
+        panel = self.panel(admin["id"])
+
+        body = self.upload(panel, [f"{member['id']} voucher.pdf",
+                                   "Bilet_Niyazov_Bobir.pdf",
+                                   "kimningdir_fayli.pdf"]).get_json()
+        by_name = {d["file_name"]: d for d in body["saved"]}
+        self.assertEqual(len(body["saved"]), 2)
+        self.assertEqual(body["unmatched"], ["kimningdir_fayli.pdf"])
+        self.assertEqual(by_name[f"{member['id']}_voucher.pdf"]["pid"], member["id"])
+        self.assertEqual(by_name[f"{member['id']}_voucher.pdf"]["kind"], "voucher")
+        self.assertEqual(by_name["Bilet_Niyazov_Bobir.pdf"]["pid"], other["id"])
+        self.assertEqual(by_name["Bilet_Niyazov_Bobir.pdf"]["kind"], "ticket")
+
+        # Fayl haqiqatan diskda va yuklab olinadi.
+        doc_id = by_name[f"{member['id']}_voucher.pdf"]["id"]
+        self.assertEqual(panel.get(f"/api/docs/file/{doc_id}").status_code, 200)
+
+    def test_documents_are_only_visible_to_their_owner_and_the_staff(self):
+        leader, member, other = self.build_group()
+        admin = self.register("Panel Admin", "0000783")
+        os.environ["PANEL_ADMIN_IDS"] = admin["id"]
+        server.DOCS_DIR = os.path.join(self.tmp.name, "docs")
+        panel = self.panel(admin["id"])
+        doc = self.upload(panel, [f"{member['id']}.pdf"]).get_json()["saved"][0]
+
+        self.assertEqual(len(self.panel(member["id"]).get("/api/docs").get_json()["documents"]), 1)
+        self.assertEqual(len(self.panel(leader["id"]).get("/api/docs").get_json()["documents"]), 1)
+        # Boshqa guruh a'zosi na ro'yxatda ko'radi, na faylni ocha oladi.
+        outsider = self.panel(other["id"])
+        self.assertEqual(outsider.get("/api/docs").get_json()["documents"], [])
+        self.assertEqual(outsider.get(f"/api/docs/file/{doc['id']}").status_code, 404)
+        self.assertEqual(self.client.get(f"/api/docs/file/{doc['id']}").status_code, 401)
+
+    def test_release_time_holds_documents_back_from_the_bot(self):
+        _, member, _ = self.build_group()
+        admin = self.register("Panel Admin", "0000784")
+        os.environ["PANEL_ADMIN_IDS"] = admin["id"]
+        server.DOCS_DIR = os.path.join(self.tmp.name, "docs")
+        panel = self.panel(admin["id"])
+        self.upload(panel, [f"{member['id']} voucher.pdf", f"{member['id']} ticket.pdf"])
+
+        ready = self.client.get(f"/api/bot/docs?id={member['id']}",
+                                headers=self.headers).get_json()
+        self.assertEqual(len(ready["documents"]), 2)   # vaqt qo'yilmagan — darrov tayyor
+
+        later = (server._event_now().replace(tzinfo=None)
+                 + datetime.timedelta(days=1)).strftime("%Y-%m-%dT%H:%M")
+        self.assertEqual(panel.post("/api/docs/release",
+                                    json={"release": {"ticket": later}}).status_code, 200)
+        gated = self.client.get(f"/api/bot/docs?id={member['id']}",
+                                headers=self.headers).get_json()
+        self.assertEqual([d["kind"] for d in gated["documents"]], ["voucher"])
+        self.assertEqual([d["kind"] for d in gated["pending"]], ["ticket"])
+
+        # Ommaviy yuborish ham vaqti kelmaganini olmaydi.
+        pending = self.client.get("/api/bot/docs/pending", headers=self.headers).get_json()
+        self.assertEqual([d["kind"] for p in pending["people"] for d in p["documents"]],
+                         ["voucher"])
+
+    def test_sent_documents_are_not_sent_again(self):
+        _, member, _ = self.build_group()
+        admin = self.register("Panel Admin", "0000785")
+        os.environ["PANEL_ADMIN_IDS"] = admin["id"]
+        server.DOCS_DIR = os.path.join(self.tmp.name, "docs")
+        doc = self.upload(self.panel(admin["id"]),
+                          [f"{member['id']}.pdf"]).get_json()["saved"][0]
+
+        pending = self.client.get("/api/bot/docs/pending", headers=self.headers).get_json()
+        self.assertEqual(len(pending["people"]), 1)
+        self.post("/api/bot/docs/sent", {"ids": [doc["id"]]})
+        after = self.client.get("/api/bot/docs/pending", headers=self.headers).get_json()
+        self.assertEqual(after["people"], [])
+        # Odamning o'zi so'rasa baribir oladi — bir marta yuborilgani to'siq emas.
+        self.assertEqual(len(self.client.get(
+            f"/api/bot/docs?id={member['id']}", headers=self.headers).get_json()["documents"]), 1)
+
     def test_participant_page_and_scanner_stay_public(self):
         person = self.register("Public Person", "0000888")
         self.assertEqual(self.client.get(f"/api/p/{person['token']}").status_code, 200)

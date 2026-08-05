@@ -191,13 +191,51 @@ tbody tr:hover{background:#FAFAFE}
 .whoami b{color:#211F52;font-weight:700}
 .whoami .out{border:1px solid #E7E8F0;background:#fff;border-radius:8px;padding:6px 10px;
   font-weight:700;cursor:pointer;color:#7A7990}
+.dropzone{border:2px dashed var(--line-2);border-radius:16px;padding:26px 18px;text-align:center;
+  cursor:pointer;background:#fff;margin-bottom:14px;transition:.15s}
+.dropzone:hover,.dropzone.over{border-color:var(--indigo);background:#F7F8FE}
+.dropzone .dzi{font-size:28px;margin-bottom:6px}
+.dzmsg{margin-top:10px;font-size:12.5px;font-weight:600;text-align:left;
+  background:#F4F5FA;border-radius:9px;padding:8px 11px}
+.dzmsg.ok{background:#EAFBF3;color:#0B7A5A}
+.dzmsg.bad{background:#FFF4E5;color:#9A5B00}
+.docchip{display:inline-flex;align-items:center;gap:6px;background:#EEF0FA;border-radius:8px;
+  padding:3px 8px;font-size:11.5px;font-weight:600;max-width:100%}
+.docchip a{color:var(--indigo);text-decoration:none;max-width:210px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.docchip a:hover{text-decoration:underline}
+.docchip i{font-style:normal;color:var(--muted);font-size:10.5px}
+.docchip u{text-decoration:none;color:#12B886}
+.docchip b{cursor:pointer;color:#C0392B;opacity:.6}
+.docchip b:hover{opacity:1}
+.lab2{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+  font-weight:800;margin-bottom:7px}
 .draftbar{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:800;
   display:flex;align-items:center;gap:10px;background:#211F52;color:#fff;border-radius:999px;
   padding:9px 12px 9px 18px;box-shadow:0 12px 34px rgba(20,18,60,.34);animation:draftin .22s ease}
 @keyframes draftin{from{opacity:0;transform:translate(-50%,12px)}to{opacity:1;transform:translate(-50%,0)}}
 .draftbar .cnt{font-size:13px;font-weight:700;white-space:nowrap}
 .draftbar .btn{padding:7px 13px;font-size:13px}
-@media(max-width:520px){.draftbar{left:12px;right:12px;transform:none;justify-content:space-between;
+@media(max-width:520px){.dropzone{border:2px dashed var(--line-2);border-radius:16px;padding:26px 18px;text-align:center;
+  cursor:pointer;background:#fff;margin-bottom:14px;transition:.15s}
+.dropzone:hover,.dropzone.over{border-color:var(--indigo);background:#F7F8FE}
+.dropzone .dzi{font-size:28px;margin-bottom:6px}
+.dzmsg{margin-top:10px;font-size:12.5px;font-weight:600;text-align:left;
+  background:#F4F5FA;border-radius:9px;padding:8px 11px}
+.dzmsg.ok{background:#EAFBF3;color:#0B7A5A}
+.dzmsg.bad{background:#FFF4E5;color:#9A5B00}
+.docchip{display:inline-flex;align-items:center;gap:6px;background:#EEF0FA;border-radius:8px;
+  padding:3px 8px;font-size:11.5px;font-weight:600;max-width:100%}
+.docchip a{color:var(--indigo);text-decoration:none;max-width:210px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.docchip a:hover{text-decoration:underline}
+.docchip i{font-style:normal;color:var(--muted);font-size:10.5px}
+.docchip u{text-decoration:none;color:#12B886}
+.docchip b{cursor:pointer;color:#C0392B;opacity:.6}
+.docchip b:hover{opacity:1}
+.lab2{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+  font-weight:800;margin-bottom:7px}
+.draftbar{left:12px;right:12px;transform:none;justify-content:space-between;
   border-radius:14px;padding:10px 12px}
   @keyframes draftin{from{opacity:0}to{opacity:1}}}
 .movers{display:flex;gap:1px;align-items:center}
@@ -310,7 +348,7 @@ const SIZE_PRESETS=[[70,100],[70,110],[80,120],[90,130]];  // cm: 7x10, 7x11, 8x
 
 /* ===== i18n ===== */
 const T = {
- uz:{dash:"Boshqaruv paneli",parts:"Ishtirokchilar",groups:"Guruhlar",qr:"QR kodlar",checkin:"Check-in",
+ uz:{dash:"Boshqaruv paneli",parts:"Ishtirokchilar",groups:"Guruhlar",qr:"QR kodlar",docs:"Hujjatlar",loading:"Yuklanmoqda…",docDrop:"Fayllarni shu yerga tashlang yoki bosing",docDropHint:"Fayl nomida ACO raqami, pasport yoki ism-familya bo'lsa — egasi o'zi topiladi",docAdd:"Fayl",docHave:"%n kishida bor",docNone:"%n kishida yo'q",docMissing:"Hujjati yo'qlar",docSent:"Yuborilgan",docUploading:"Yuklanmoqda… %a / %b",docSaved:"%n ta fayl saqlandi",docUnmatched:"Egasi topilmadi — ismini fayl nomiga yozib qayta yuklang yoki odam qatoridagi «+ Fayl» bilan qo'shing",docDelQ:"Shu fayl o'chirilsinmi?",docVoucher:"Voucher",docTicket:"Chipta",docReleaseHint:"Qachondan boshlab bot yuborsin — bo'sh bo'lsa darrov yuboriladi",checkin:"Check-in",
   roles:"Mas'ullar",program:"Rejalar",
   total:"Jami ishtirokchi",assigned:"Guruhga biriktirilgan",leaders:"Guruh mas'ullari",foreign:"Chet eldan alohida",
   byGroup:"Guruhlar bo'yicha taqsimot",cpProgress:"Check-in holati",search:"Ism yoki ID bo'yicha qidirish…",
@@ -326,7 +364,7 @@ const T = {
   saved:"Saqlandi",distDone:"Guruhlarga taqsimlandi",cleared:"Guruhlar tozalandi",notFound:"Topilmadi",
   pos:"belgilandi",neg:"bekor qilindi",
   vdesc_dash:"Umumiy holat va check-in monitoringi",vdesc_parts:"Guruh, mas'ul va tilni shu yerda belgilang",
-  vdesc_groups:"5 guruh · sheriklar birga saqlanadi",vdesc_qr:"Har bir ishtirokchining QR kodi · PNG yoki ZIP",
+  vdesc_groups:"5 guruh · sheriklar birga saqlanadi",vdesc_qr:"Har bir ishtirokchining QR kodi · PNG yoki ZIP",vdesc_docs:"Voucher va chiptalar — yuklang, bot egasiga yuboradi",
   vdesc_checkin:"Nuqta tanlang va ishtirokchini belgilang",
   vdesc_roles:"Mas'uliyatlarni belgilash — koordinator, sayr, dengiz va h.k.",
   vdesc_program:"Seminar dasturi — ishtirokchi sahifasida ko'rinadi",
@@ -339,7 +377,7 @@ const T = {
   pageBase:"Sahifa manzili (domen)",roleTag:"Mas'ul",openPage:"Sahifani ochish",
   qrHint:"QR skanlanganda ishtirokchining shaxsiy sahifasi ochiladi. Kod ichida pasportdan olingan maxfiy token turadi — pasport raqami ko'rinmaydi."},
 
- ru:{dash:"Панель управления",parts:"Участники",groups:"Группы",qr:"QR коды",checkin:"Check-in",
+ ru:{dash:"Панель управления",parts:"Участники",groups:"Группы",qr:"QR коды",docs:"Документы",loading:"Загрузка…",docDrop:"Перетащите файлы сюда или нажмите",docDropHint:"Если в имени файла есть номер ACO, паспорт или Ф.И.О. — владелец определится сам",docAdd:"Файл",docHave:"есть у %n",docNone:"нет у %n",docMissing:"Без документов",docSent:"Отправлено",docUploading:"Загрузка… %a / %b",docSaved:"Сохранено файлов: %n",docUnmatched:"Владелец не найден — впишите имя в название файла или добавьте через «+ Файл»",docDelQ:"Удалить этот файл?",docVoucher:"Ваучер",docTicket:"Билет",docReleaseHint:"С какого момента бот отправляет — пусто значит сразу",checkin:"Check-in",
   roles:"Ответственные",program:"Программа",
   total:"Всего участников",assigned:"Распределено по группам",leaders:"Старосты групп",foreign:"Из-за рубежа отдельно",
   byGroup:"Распределение по группам",cpProgress:"Статус check-in",search:"Поиск по имени или ID…",
@@ -355,7 +393,7 @@ const T = {
   saved:"Сохранено",distDone:"Распределено по группам",cleared:"Группы очищены",notFound:"Не найдено",
   pos:"отмечен",neg:"снята отметка",
   vdesc_dash:"Общий статус и мониторинг check-in",vdesc_parts:"Здесь задаются группа, староста и язык",
-  vdesc_groups:"5 групп · соседи вместе",vdesc_qr:"QR-код каждого участника · PNG или ZIP",
+  vdesc_groups:"5 групп · соседи вместе",vdesc_qr:"QR-код каждого участника · PNG или ZIP",vdesc_docs:"Ваучеры и билеты — загрузите, бот отправит владельцу",
   vdesc_checkin:"Выберите точку и отметьте участника",
   vdesc_roles:"Назначение ответственности — координатор, экскурсия, море и т.д.",
   vdesc_program:"Программа семинара — видна на странице участника",
@@ -368,7 +406,7 @@ const T = {
   pageBase:"Адрес страницы (домен)",roleTag:"Ответ.",openPage:"Открыть страницу",
   qrHint:"При сканировании QR открывается личная страница участника. Внутри кода — секретный токен, номер паспорта не виден."},
 
- en:{dash:"Dashboard",parts:"Participants",groups:"Groups",qr:"QR codes",checkin:"Check-in",
+ en:{dash:"Dashboard",parts:"Participants",groups:"Groups",qr:"QR codes",docs:"Documents",loading:"Loading…",docDrop:"Drop files here, or click",docDropHint:"If the filename holds an ACO number, a passport or a full name, the owner is found automatically",docAdd:"File",docHave:"%n have them",docNone:"%n do not",docMissing:"Without documents",docSent:"Sent",docUploading:"Uploading… %a / %b",docSaved:"%n files saved",docUnmatched:"Owner not found — put the name in the filename and retry, or add it with “+ File”",docDelQ:"Delete this file?",docVoucher:"Voucher",docTicket:"Ticket",docReleaseHint:"When the bot may start sending — empty means straight away",checkin:"Check-in",
   roles:"Responsibilities",program:"Programme",
   total:"Participants in total",assigned:"Assigned to a group",leaders:"Group leaders",foreign:"Arriving separately",
   byGroup:"Distribution by group",cpProgress:"Check-in progress",search:"Search by name or ID…",
@@ -384,7 +422,7 @@ const T = {
   saved:"Saved",distDone:"Distributed into groups",cleared:"Groups cleared",notFound:"Nothing found",
   pos:"checked in",neg:"cleared",
   vdesc_dash:"Overall status and check-in monitoring",vdesc_parts:"Set group, leader and language here",
-  vdesc_groups:"5 groups · roommates stay together",vdesc_qr:"Every participant's QR code · PNG or ZIP",
+  vdesc_groups:"5 groups · roommates stay together",vdesc_qr:"Every participant's QR code · PNG or ZIP",vdesc_docs:"Vouchers and tickets — upload and the bot sends each to its owner",
   vdesc_checkin:"Pick a checkpoint and mark participants",
   vdesc_roles:"Assign responsibilities — coordinator, excursion, sea trip and so on",
   vdesc_program:"Seminar programme — shown on the participant page",
@@ -479,7 +517,7 @@ function toast(m){const el=document.getElementById('toast');el.textContent=m;el.
 // leader — o'z guruhi, manager — barcha guruhlar, admin — sozlamalar ham.
 const NAV=[['dash','▦','member'],['parts','☰','member'],['groups','◍','leader'],
            ['roles','◆','manager'],['program','▤','member'],['qr','▩','leader'],
-           ['checkin','✓','leader']];
+           ['docs','📎','member'],['checkin','✓','leader']];
 const RANK={member:0,leader:1,manager:2,admin:3};
 const myRank=()=>RANK[(S.user&&S.user.role)||'member']||0;
 const can=need=>myRank()>=RANK[need];
@@ -508,6 +546,7 @@ function render(){
   else if(VIEW==='roles')renderRoles(v);
   else if(VIEW==='program')renderProgram(v);
   else if(VIEW==='qr')renderQR(v);
+  else if(VIEW==='docs')renderDocs(v);
   else if(VIEW==='checkin')renderCheckin(v);
 }
 
@@ -1095,6 +1134,150 @@ function camBeep(good){
       o.connect(g);g.connect(camAudio.destination);o.start(at);o.stop(at+0.11);
     });
   }catch(e){}
+}
+
+
+/* ===== HUJJATLAR (voucher, chipta) ===== */
+// Fayllar odam bo'yicha saqlanadi va bot ularni faqat egasiga yuboradi.
+// Yuklashda fayl nomidan egasi topiladi; topilmagani qo'lda biriktiriladi.
+let docsData={documents:[],release:{}}, docsSearch='', docsBusy=false;
+
+const KIND_ICON={voucher:'🏨',ticket:'✈️',other:'📎'};
+
+async function loadDocs(){
+  try{const r=await fetch('/api/docs',{cache:'no-store'});
+    if(r.status===401){showGate();return;}
+    if(r.ok)docsData=await r.json();}catch(e){}
+}
+
+async function renderDocs(v){
+  v.innerHTML=`<div class="muted" style="padding:24px">${t('loading')}</div>`;
+  await loadDocs();
+  const byPid={};
+  (docsData.documents||[]).forEach(d=>{(byPid[d.pid]=byPid[d.pid]||[]).push(d);});
+  const q=docsSearch.trim().toLowerCase();
+  const people=P().filter(p=>!q||p.fio.toLowerCase().includes(q)||p.id.toLowerCase().includes(q));
+  const withDocs=people.filter(p=>byPid[p.id]);
+  const without=people.filter(p=>!byPid[p.id]);
+  const manage=can('manager');
+
+  const rel=docsData.release||{};
+  const relBlock=can('admin')?`<div class="card" style="display:flex;gap:12px;align-items:end;flex-wrap:wrap">
+    <div class="frow" style="margin:0"><label>${KIND_ICON.voucher} ${t('docVoucher')}</label>
+      <input type="datetime-local" value="${escapeHtml(rel.voucher||'')}" onchange="setDocRelease('voucher',this.value)"></div>
+    <div class="frow" style="margin:0"><label>${KIND_ICON.ticket} ${t('docTicket')}</label>
+      <input type="datetime-local" value="${escapeHtml(rel.ticket||'')}" onchange="setDocRelease('ticket',this.value)"></div>
+    <span class="muted" style="font-size:12px">${t('docReleaseHint')}</span></div>`:'';
+
+  v.innerHTML=`
+    ${manage?`<div class="dropzone" id="dz">
+      <div class="dzi">📥</div>
+      <div><b>${t('docDrop')}</b></div>
+      <div class="muted" style="font-size:12.5px;margin-top:4px">${t('docDropHint')}</div>
+      <input type="file" id="dzf" multiple hidden>
+      <div id="dzlog"></div></div>`:''}
+    ${relBlock}
+    <div class="toolbar">
+      <div class="search"><span class="mag">⌕</span>
+        <input id="docq" placeholder="${t('search')}" value="${escapeHtml(docsSearch)}"></div>
+      <span class="muted" style="font-size:12.5px">
+        ${t('docHave').replace('%n',withDocs.length)} · ${t('docNone').replace('%n',without.length)}</span>
+    </div>
+    <div class="card"><div id="doclist">${docRows(withDocs,byPid,manage)}</div></div>
+    ${without.length?`<div class="card" style="margin-top:12px">
+      <div class="lab2">${t('docMissing')}</div>
+      <div class="muted" style="font-size:12.5px">${without.slice(0,60).map(p=>escapeHtml(p.fio)).join(' · ')}${without.length>60?' …':''}</div>
+    </div>`:''}`;
+
+  document.getElementById('docq').oninput=e=>{docsSearch=e.target.value;renderDocs(VW());};
+  if(manage)wireDropzone();
+}
+
+function docRows(people,byPid,manage){
+  if(!people.length)return `<div class="empty" style="padding:26px;text-align:center">${t('notFound')}</div>`;
+  return people.map(p=>{
+    const docs=byPid[p.id]||[];
+    return `<div class="mrow" style="padding:10px 14px;align-items:flex-start">
+      <span class="id">${p.id}</span>
+      <span class="nm" style="flex:1">
+        <b style="font-weight:600">${escapeHtml(p.fio)}</b>
+        <div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:6px">
+          ${docs.map(d=>`<span class="docchip">
+            ${KIND_ICON[d.kind]||'📎'}
+            <a href="/api/docs/file/${d.id}" target="_blank">${escapeHtml(d.file_name)}</a>
+            <i>${(d.size/1024).toFixed(0)} KB</i>
+            ${d.sent_at?`<u title="${t('docSent')}">✓</u>`:''}
+            ${manage?`<b onclick="delDoc(${d.id})" title="${t('cpDel')}">✕</b>`:''}</span>`).join('')}
+        </div></span>
+      ${manage?`<button class="btn sm" onclick="uploadFor('${p.id}')">+ ${t('docAdd')}</button>`:''}
+    </div>`;
+  }).join('');
+}
+
+function wireDropzone(){
+  const dz=document.getElementById('dz'), input=document.getElementById('dzf');
+  if(!dz)return;
+  dz.onclick=()=>input.click();
+  input.onchange=()=>{sendDocs([...input.files]);input.value='';};
+  ['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{
+    e.preventDefault();dz.classList.add('over');}));
+  ['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{
+    e.preventDefault();dz.classList.remove('over');}));
+  dz.addEventListener('drop',e=>{ if(e.dataTransfer&&e.dataTransfer.files.length)
+    sendDocs([...e.dataTransfer.files]); });
+}
+
+function uploadFor(pid){
+  const input=document.createElement('input');
+  input.type='file'; input.multiple=true;
+  input.onchange=()=>sendDocs([...input.files],pid);
+  input.click();
+}
+
+async function sendDocs(files,pid){
+  if(!files.length||docsBusy)return;
+  docsBusy=true;
+  const log=document.getElementById('dzlog');
+  const say=m=>{ if(log)log.innerHTML=`<div class="dzmsg">${m}</div>`; };
+  // Bo'lak-bo'lak yuboramiz: 100 ta faylni bitta so'rovga tiqish shart emas.
+  const CHUNK=10;
+  let saved=0, unmatched=[];
+  for(let i=0;i<files.length;i+=CHUNK){
+    const part=files.slice(i,i+CHUNK);
+    const form=new FormData();
+    part.forEach(f=>form.append('files',f));
+    if(pid)form.append('pid',pid);
+    say(t('docUploading').replace('%a',Math.min(i+CHUNK,files.length)).replace('%b',files.length));
+    try{
+      const r=await fetch('/api/docs/upload',{method:'POST',body:form});
+      if(r.status===401){showGate();break;}
+      if(r.status===403){toast(t('noRight'));break;}
+      const j=await r.json();
+      saved+=(j.saved||[]).length;
+      unmatched=unmatched.concat(j.unmatched||[]);
+    }catch(e){ unmatched=unmatched.concat(part.map(f=>f.name)); }
+  }
+  docsBusy=false;
+  await renderDocs(VW());
+  const box=document.getElementById('dzlog');
+  if(box)box.innerHTML=`<div class="dzmsg ok">✅ ${t('docSaved').replace('%n',saved)}</div>`
+    +(unmatched.length?`<div class="dzmsg bad">⚠️ ${t('docUnmatched')}:<br>${unmatched.map(escapeHtml).join('<br>')}</div>`:'');
+  toast(t('docSaved').replace('%n',saved));
+}
+
+async function delDoc(id){
+  if(!confirm(t('docDelQ')))return;
+  const ok=await api._post('/api/docs/delete',{id});
+  if(ok===false)return;
+  renderDocs(VW());
+}
+
+async function setDocRelease(kind,value){
+  const rel=Object.assign({},docsData.release||{});
+  if(value)rel[kind]=value; else delete rel[kind];
+  const ok=await api._post('/api/docs/release',{release:rel});
+  if(ok===false)return;
+  docsData.release=rel; toast(t('saved'));
 }
 
 /* ===== QR KODLAR ===== */

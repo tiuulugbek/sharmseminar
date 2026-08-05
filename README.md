@@ -381,6 +381,53 @@ alohida qadam emas: odam tasdiqlanishi bilan o'z guruhini biladi, guruh mas'uli
 uni ro'yxatida ko'radi, mas'ul unga xabar yoza oladi va QR bilan check-in qiladi.
 Guruhni panelda o'zgartirsangiz, odamga botdan xabar boradi.
 
+## Hujjatlar — voucher va chiptalar
+
+Har bir ishtirokchining o'z hujjatlari saqlanadi va bot ularni **faqat egasiga**
+yuboradi.
+
+### Yuklash
+
+Panel → **«Hujjatlar»** bo'limi. Fayllarni maydonga tashlaysiz (bir vaqtda
+yuzlab bo'lsa ham) — egasi **fayl nomidan** o'zi topiladi:
+
+| Fayl nomi | Topilgan egasi |
+|---|---|
+| `ACO-042 voucher.pdf` | ACO-042, turi — voucher |
+| `Bilet_Niyazov_Bobir.pdf` | Niyazov Bobir, turi — chipta |
+| `voucher_FB1177095_hotel.pdf` | pasport bo'yicha |
+| `Sardorjon Musaev voucher.pdf` | ism-familya bo'yicha |
+
+Turi ham nomdan aniqlanadi: `voucher/hotel/mehmonxona` → 🏨, `ticket/bilet/avia`
+→ ✈️, qolgani → 📎.
+
+Egasi **aniq topilmasa fayl biriktirilmaydi** va ro'yxatda ko'rsatiladi —
+noto'g'ri odamga voucher ketgandan ko'ra qo'lda biriktirgan yaxshiroq. Uni
+odamning qatoridagi **«+ Fayl»** tugmasi bilan qo'shasiz.
+
+Fayllar `data/docs/<ACO-id>/` da yotadi (git ga tushmaydi), bittasi 20 MB gacha.
+
+### Kim ko'radi
+
+Odamning o'zi va guruh mas'uli — o'z guruhinikini; rahbar va admin — hammasini.
+Boshqa birov havolani bilsa ham ocholmaydi.
+
+### Qachon yuboriladi
+
+«Hujjatlar» bo'limida har bir tur uchun **chiqarish vaqti** qo'yiladi (bo'sh
+bo'lsa darrov). Vaqti kelmagan hujjat botga umuman ko'rinmaydi.
+
+Uch yo'l bilan yetadi:
+
+1. **Odam so'raganda** — botdagi **«📎 Hujjatlarim»** tugmasi yoki `/hujjatlarim`;
+2. **Ro'yxatdan o'tgan zahoti** — hali tasdiqlamaganlar `/start` bosib pasportini
+   kiritishi bilan hujjatlari o'zi yuboriladi;
+3. **Ommaviy** — admin `/hujjat_yuborish` bilan hali olmaganlarning hammasiga
+   birdan yuboradi. Hisobotda hali tasdiqlamaganlar soni ham ko'rsatiladi.
+
+Yuborilgan hujjat belgilanadi va ommaviy yuborishda ikkinchi marta ketmaydi;
+odamning o'zi so'rasa baribir qayta oladi.
+
 ## Telegram guruhini nazorat qilish
 
 Bot guruhda **hech qachon javob bermaydi**. Buni `GroupSilence` middleware
@@ -559,6 +606,8 @@ chop etilgan beyjiklar ishlashda davom etadi.
 - `/skaner` — check-in skanerini (mini-app) ochish.
 - `/guruh_chaqiruv` · `/guruh_taklif` · `/guruh_holat` · `/guruh_qulf` · `/guruh_ochiq` · `/guruh_tozala` — guruh nazorati (admin).
 - `/tasdiqlanmaganlar` — kim hali tasdiqlamagan (admin va guruh mas'uli).
+- `/hujjatlarim` — o'z voucher va chiptalarini olish.
+- `/hujjat_yuborish` — hujjatlarni hali olmaganlarga ommaviy yuborish (admin).
 - `/royxat` — yangi ishtirokchi/oila a'zosini to'liq ro'yxatga olish.
 - `/yangilash` — mavjud ma'lumotni pasport orqali yangilash.
 - `/bekor` — joriy jarayonni bekor qilish.

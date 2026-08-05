@@ -162,3 +162,35 @@ def get_setting(key):
 
 def set_setting(key, value):
     return _request("POST", f"/api/bot/setting/{key}", payload={"value": value})
+
+
+# ------------------------------------------------------ hujjatlar (voucher, chipta)
+def docs_for(*, telegram_id=None, participant_id=None):
+    """Bir odamning tarqatishga tayyor hujjatlari va vaqti kelmaganlari."""
+    params = {}
+    if telegram_id:
+        params["telegram_id"] = str(telegram_id)
+    if participant_id:
+        params["id"] = participant_id
+    return _request("GET", "/api/bot/docs", params=params)
+
+
+def docs_pending():
+    """Hujjati bor, lekin hali yuborilmagan odamlar."""
+    return _request("GET", "/api/bot/docs/pending")
+
+
+def docs_file(doc_id):
+    """Fayl baytlari — bot uni Telegramga yuboradi."""
+    url = f"{config.API_BASE.rstrip('/')}/api/bot/docs/file/{int(doc_id)}"
+    try:
+        response = requests.get(url, headers={"X-Bot-Token": config.BOT_API_TOKEN}, timeout=60)
+    except requests.RequestException as exc:
+        raise ApiError(f"Faylni olib bo'lmadi: {exc}") from exc
+    if not response.ok:
+        raise ApiError(f"HTTP {response.status_code}", response.status_code)
+    return response.content
+
+
+def docs_mark_sent(ids):
+    return _request("POST", "/api/bot/docs/sent", payload={"ids": list(ids)})

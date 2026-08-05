@@ -105,6 +105,11 @@ def init_db():
         msg_id INTEGER, pid TEXT, telegram_id TEXT, telegram_msg_id TEXT,
         status TEXT DEFAULT 'pending', PRIMARY KEY(msg_id, pid));
     CREATE INDEX IF NOT EXISTS ix_msg_targets_msg ON msg_targets(msg_id);
+    CREATE TABLE IF NOT EXISTS documents(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        pid TEXT, kind TEXT, file_name TEXT, stored TEXT, mime TEXT, size INTEGER,
+        uploaded_at TEXT, uploaded_by TEXT, sent_at TEXT);
+    CREATE INDEX IF NOT EXISTS ix_documents_pid ON documents(pid);
     CREATE TABLE IF NOT EXISTS group_members(
         chat_id TEXT, telegram_id TEXT, username TEXT, full_name TEXT,
         status TEXT, source TEXT, first_seen TEXT, last_seen TEXT,
@@ -783,6 +788,213 @@ def _find_by_passport(con, value):
     rows = con.execute("SELECT * FROM participants WHERE UPPER(COALESCE(passport_series,''))=?",
                        (series,)).fetchall()
     return [r for r in rows if ((r["passport_number"] or "").lstrip("0") or "0") == key]
+
+
+# ═══════════════════════ Hujjatlar (voucher, ticket) ═══════════════════════
+# Fayllar diskda `data/docs/<ACO-id>/` ostida yotadi, bazada faqat yozuvi.
+# Har bir hujjat bitta odamga tegishli — bot uni faqat egasiga yuboradi.
+DOCS_DIR = os.path.join(BASE_DIR, "data", "docs")
+DOC_KINDS = ("voucher", "ticket", "other")
+MAX_DOC_BYTES = 20 * 1024 * 1024
+
+
+def _safe_name(name):
+    name = os.path.basename(str(name or "fayl"))
+    name = re.sub(r"[^A-Za-z0-9._-]+", "_", name).strip("._") or "fayl"
+    return name[:120]
+
+
+def guess_kind(file_name):
+    """Fayl nomidan turini taxmin qiladi; topilmasa `other`."""
+    low = str(file_name or "").lower()
+    if any(w in low for w in ("voucher", "vaucher", "vouch", "hotel", "mehmonxona")):
+        return "voucher"
+    if any(w in low for w in ("ticket", "tiket", "avia", "flight", "bilet", "chipta")):
+        return "ticket"
+    return "other"
+
+
+def match_participant(con, file_name):
+    """Fayl nomidan egasini topadi: ACO raqami → pasport → ism.
+
+    Faqat bitta odamga to'g'ri kelsa qaytaradi; shubhali holatda ``None`` —
+    noto'g'ri odamga voucher yuborilgandan ko'ra qo'lda biriktirgan yaxshiroq.
+    """
+    stem = os.path.splitext(os.path.basename(str(file_name or "")))[0]
+    upper = stem.upper()
+
+    found = re.search(r"ACO[-_ ]?(\d{1,4})", upper)
+    if found:
+        pid = f"ACO-{int(found.group(1)):03d}"
+        if con.execute("SELECT 1 FROM participants WHERE id=?", (pid,)).fetchone():
+            return pid
+
+    digits = re.sub(r"[^A-Z0-9]", "", upper)
+    for row in con.execute("SELECT id,passport_series,passport_number FROM participants "
+                           "WHERE passport_number IS NOT NULL AND passport_number<>''"):
+        full = f"{row['passport_series'] or ''}{row['passport_number'] or ''}".upper()
+        if full and full in digits:
+            return row["id"]
+
+    # Ism bo'yicha: fayl nomida odamning BARCHA ism so'zlari bo'lsa yetarli —
+    # "Bilet_Niyazov_Bobir.pdf" dagi ortiqcha so'zlar xalaqit bermasin.
+    words = {w.lower() for w in re.split(r"[^A-Za-zА-Яа-яЎўҚқҒғҲҳ]+", stem) if len(w) > 2}
+    if len(words) >= 2:
+        hits = []
+        for row in con.execute("SELECT id,fio FROM participants"):
+            parts = {w.lower() for w in str(row["fio"]).split() if len(w) > 2}
+            if len(parts) >= 2 and parts <= words:
+                hits.append(row["id"])
+        if len(hits) == 1:
+            return hits[0]
+    return None
+
+
+def _doc_row(r, con=None):
+    return {"id": r["id"], "pid": r["pid"], "kind": r["kind"], "file_name": r["file_name"],
+            "size": r["size"], "uploaded_at": r["uploaded_at"], "sent_at": r["sent_at"]}
+
+
+def docs_released(con, kind):
+    """Shu turdagi hujjatlarni tarqatish vaqti kelganmi?"""
+    plan = sget(con, "docs_release", {}) or {}
+    when = _parse_when(plan.get(kind) or plan.get("all"))
+    if not when:
+        return True
+    return _event_now(con).replace(tzinfo=None) >= when
+
+
+@app.post("/api/docs/upload")
+@panel_auth("manager")
+def docs_upload():
+    """Bir yoki bir nechta faylni yuklaydi va egasiga biriktiradi.
+
+    `pid` berilsa hammasi o'sha odamga, aks holda har bir fayl nomi bo'yicha
+    o'zi topiladi.  Topilmagani `unmatched` ro'yxatida qaytadi va panelda qo'lda
+    biriktiriladi.
+    """
+    forced = str(request.form.get("pid") or "").strip().upper()
+    kind_hint = str(request.form.get("kind") or "").strip().lower()
+    files = request.files.getlist("files") or request.files.getlist("file")
+    if not files:
+        return jsonify(error="no_files"), 400
+
+    con = db()
+    saved, unmatched = [], []
+    for storage in files:
+        name = storage.filename or "fayl"
+        pid = forced or match_participant(con, name)
+        if not pid or not con.execute("SELECT 1 FROM participants WHERE id=?", (pid,)).fetchone():
+            unmatched.append(name)
+            continue
+        blob = storage.read()
+        if len(blob) > MAX_DOC_BYTES:
+            unmatched.append(f"{name} (juda katta)")
+            continue
+        kind = kind_hint if kind_hint in DOC_KINDS else guess_kind(name)
+        folder = os.path.join(DOCS_DIR, pid)
+        os.makedirs(folder, exist_ok=True)
+        stored = f"{secrets.token_hex(6)}_{_safe_name(name)}"
+        with open(os.path.join(folder, stored), "wb") as fh:
+            fh.write(blob)
+        cur = con.execute(
+            "INSERT INTO documents(pid,kind,file_name,stored,mime,size,uploaded_at,uploaded_by) "
+            "VALUES(?,?,?,?,?,?,?,?)",
+            (pid, kind, _safe_name(name), stored, storage.mimetype or "", len(blob),
+             _now(), request.panel_user["id"]))
+        saved.append({"id": cur.lastrowid, "pid": pid, "kind": kind, "file_name": _safe_name(name)})
+    con.commit(); con.close()
+    return jsonify(ok=True, saved=saved, unmatched=unmatched)
+
+
+@app.get("/api/docs")
+@panel_auth("member")
+def docs_list():
+    """Hujjatlar ro'yxati. A'zo faqat o'zinikini, mas'ul o'z guruhinikini ko'radi."""
+    user = request.panel_user
+    con = db()
+    allowed = {r["id"] for r in _scope_rows(con, user)}
+    pid = str(request.args.get("pid") or "").strip().upper()
+    if pid:
+        rows = con.execute("SELECT * FROM documents WHERE pid=? ORDER BY kind,id", (pid,)).fetchall()
+    else:
+        rows = con.execute("SELECT * FROM documents ORDER BY pid,kind,id").fetchall()
+    out = [_doc_row(r) for r in rows if r["pid"] in allowed]
+    release = sget(con, "docs_release", {}) or {}
+    con.close()
+    return jsonify(documents=out, release=release)
+
+
+@app.get("/api/docs/file/<int:doc_id>")
+@panel_auth("member")
+def docs_download(doc_id):
+    user = request.panel_user
+    con = db()
+    row = con.execute("SELECT * FROM documents WHERE id=?", (doc_id,)).fetchone()
+    allowed = {r["id"] for r in _scope_rows(con, user)} if row else set()
+    con.close()
+    if not row or row["pid"] not in allowed:
+        abort(404)
+    return send_from_directory(os.path.join(DOCS_DIR, row["pid"]), row["stored"],
+                               as_attachment=True, download_name=row["file_name"])
+
+
+@app.post("/api/docs/delete")
+@panel_auth("manager")
+def docs_delete():
+    doc_id = (request.get_json(silent=True) or {}).get("id")
+    con = db()
+    row = con.execute("SELECT * FROM documents WHERE id=?", (doc_id,)).fetchone()
+    if not row:
+        con.close()
+        return jsonify(error="not_found"), 404
+    con.execute("DELETE FROM documents WHERE id=?", (doc_id,))
+    con.commit(); con.close()
+    try:
+        os.remove(os.path.join(DOCS_DIR, row["pid"], row["stored"]))
+    except OSError:
+        pass
+    return jsonify(ok=True)
+
+
+@app.post("/api/docs/assign")
+@panel_auth("manager")
+def docs_assign():
+    """Hujjatning egasini yoki turini o'zgartirish."""
+    d = request.get_json(silent=True) or {}
+    con = db()
+    row = con.execute("SELECT * FROM documents WHERE id=?", (d.get("id"),)).fetchone()
+    if not row:
+        con.close()
+        return jsonify(error="not_found"), 404
+    pid = str(d.get("pid") or row["pid"]).strip().upper()
+    kind = str(d.get("kind") or row["kind"]).lower()
+    if kind not in DOC_KINDS:
+        kind = row["kind"]
+    if not con.execute("SELECT 1 FROM participants WHERE id=?", (pid,)).fetchone():
+        con.close()
+        return jsonify(error="participant_not_found"), 404
+    if pid != row["pid"]:
+        os.makedirs(os.path.join(DOCS_DIR, pid), exist_ok=True)
+        try:
+            os.replace(os.path.join(DOCS_DIR, row["pid"], row["stored"]),
+                       os.path.join(DOCS_DIR, pid, row["stored"]))
+        except OSError:
+            con.close()
+            return jsonify(error="move_failed"), 500
+    con.execute("UPDATE documents SET pid=?,kind=?,sent_at=NULL WHERE id=?", (pid, kind, row["id"]))
+    con.commit(); con.close()
+    return jsonify(ok=True)
+
+
+@app.post("/api/docs/release")
+@panel_auth("admin")
+def docs_release_set():
+    """Qaysi turdagi hujjat qachondan boshlab tarqatilishi."""
+    plan = (request.get_json(silent=True) or {}).get("release") or {}
+    clean = {k: str(v or "").strip() for k, v in plan.items() if k in DOC_KINDS + ("all",)}
+    con = db(); sset(con, "docs_release", clean); con.commit(); con.close()
+    return jsonify(ok=True, release=clean)
 
 
 # ---------------------------------------------------------------- admin API
@@ -1533,6 +1745,81 @@ def bot_group_audit():
                    not_in_list=[s for s in strangers if s["telegram_id"] not in admins],
                    admins_skipped=[s for s in strangers if s["telegram_id"] in admins],
                    verified_participants=verified_total)
+
+
+@app.get("/api/bot/docs")
+@bot_auth
+def bot_docs():
+    """Bir odamning tarqatishga tayyor hujjatlari.
+
+    ``telegram_id`` yoki ``id`` bo'yicha topiladi.  Vaqti kelmagan turdagi
+    hujjatlar ro'yxatga tushmaydi — bot ularni yubormaydi.
+    """
+    con = db()
+    tid = str(request.args.get("telegram_id") or "").strip()
+    pid = str(request.args.get("id") or "").strip().upper()
+    if tid and not pid:
+        row = con.execute("SELECT id FROM participants WHERE telegram_id=? AND telegram_id<>''",
+                          (tid,)).fetchone()
+        pid = row["id"] if row else ""
+    if not pid:
+        con.close()
+        return jsonify(documents=[], pending=[], participant=None)
+    person = con.execute("SELECT id,fio,lang FROM participants WHERE id=?", (pid,)).fetchone()
+    ready, pending = [], []
+    for r in con.execute("SELECT * FROM documents WHERE pid=? ORDER BY kind,id", (pid,)):
+        (ready if docs_released(con, r["kind"]) else pending).append(_doc_row(r))
+    con.close()
+    return jsonify(documents=ready, pending=pending,
+                   participant=dict(person) if person else None)
+
+
+@app.get("/api/bot/docs/pending")
+@bot_auth
+def bot_docs_pending():
+    """Hujjati bor, lekin hali yuborilmagan odamlar — ommaviy tarqatish uchun."""
+    con = db()
+    out = {}
+    for r in con.execute(
+            "SELECT d.*, p.telegram_id, p.fio FROM documents d "
+            "JOIN participants p ON p.id=d.pid "
+            "WHERE d.sent_at IS NULL AND p.telegram_id IS NOT NULL AND p.telegram_id<>''"):
+        if not docs_released(con, r["kind"]):
+            continue
+        entry = out.setdefault(r["pid"], {"id": r["pid"], "fio": r["fio"],
+                                          "telegram_id": str(r["telegram_id"]), "documents": []})
+        entry["documents"].append(_doc_row(r))
+    waiting = con.execute(
+        "SELECT COUNT(DISTINCT pid) c FROM documents WHERE pid NOT IN "
+        "(SELECT id FROM participants WHERE telegram_id IS NOT NULL AND telegram_id<>'')"
+    ).fetchone()["c"]
+    con.close()
+    return jsonify(people=list(out.values()), not_registered=waiting)
+
+
+@app.get("/api/bot/docs/file/<int:doc_id>")
+@bot_auth
+def bot_docs_file(doc_id):
+    con = db()
+    row = con.execute("SELECT * FROM documents WHERE id=?", (doc_id,)).fetchone()
+    con.close()
+    if not row:
+        abort(404)
+    return send_from_directory(os.path.join(DOCS_DIR, row["pid"]), row["stored"],
+                               as_attachment=True, download_name=row["file_name"])
+
+
+@app.post("/api/bot/docs/sent")
+@bot_auth
+def bot_docs_sent():
+    """Yuborilgan hujjatlarni belgilaydi — ikkinchi marta yuborilmasin."""
+    ids = (request.get_json(silent=True) or {}).get("ids") or []
+    if not ids:
+        return jsonify(ok=True, marked=0)
+    con = db()
+    con.executemany("UPDATE documents SET sent_at=? WHERE id=?", [(_now(), i) for i in ids])
+    con.commit(); con.close()
+    return jsonify(ok=True, marked=len(ids))
 
 
 @app.get("/api/bot/recipients")

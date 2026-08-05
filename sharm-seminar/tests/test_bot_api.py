@@ -607,7 +607,8 @@ class BotApiTest(unittest.TestCase):
     # ------------------------------------------------------------- hujjatlar
     def upload(self, client, names, **extra):
         import io
-        data = {"files": [(io.BytesIO(b"%PDF-1.4 test"), n) for n in names]}
+        # Har fayl boshqacha mazmunda — aks holda takror deb hisoblanadi.
+        data = {"files": [(io.BytesIO(b"%PDF-1.4 " + n.encode()), n) for n in names]}
         data.update(extra)
         return client.post("/api/docs/upload", data=data,
                            content_type="multipart/form-data")

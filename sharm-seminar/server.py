@@ -108,7 +108,7 @@ def init_db():
     CREATE TABLE IF NOT EXISTS documents(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         pid TEXT, kind TEXT, file_name TEXT, stored TEXT, mime TEXT, size INTEGER,
-        uploaded_at TEXT, uploaded_by TEXT, sent_at TEXT);
+        uploaded_at TEXT, uploaded_by TEXT, sent_at TEXT, sha TEXT);
     CREATE INDEX IF NOT EXISTS ix_documents_pid ON documents(pid);
     CREATE TABLE IF NOT EXISTS group_members(
         chat_id TEXT, telegram_id TEXT, username TEXT, full_name TEXT,
@@ -123,6 +123,11 @@ def init_db():
     for name, sql_type in BOT_COLUMNS.items():
         if name not in cols:
             con.execute(f"ALTER TABLE participants ADD COLUMN {name} {sql_type}")
+    # Eski bazada `documents.sha` bo'lmasligi mumkin — avval ustun, keyin indeks.
+    doc_cols = [r["name"] for r in con.execute("PRAGMA table_info(documents)")]
+    if "sha" not in doc_cols:
+        con.execute("ALTER TABLE documents ADD COLUMN sha TEXT")
+    con.execute("CREATE INDEX IF NOT EXISTS ix_documents_sha ON documents(sha)")
     con.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_participant_passport "
                 "ON participants(passport_series, passport_number) "
                 "WHERE passport_series IS NOT NULL AND passport_series<>'' "
@@ -997,18 +1002,30 @@ def docs_upload():
 
     con = db()
     os.makedirs(DOCS_FILES, exist_ok=True)
-    saved, unmatched, split_note = [], [], []
+    saved, unmatched, split_note, duplicates = [], [], [], []
 
     def store(blob, name, kind, owners, mime):
-        stored = f"{secrets.token_hex(6)}_{_safe_name(name)}"
-        with open(os.path.join(DOCS_FILES, stored), "wb") as fh:
-            fh.write(blob)
-        for pid in owners:
+        digest = hashlib.sha256(blob).hexdigest()
+        # Ayni shu fayl shu odamda allaqachon bo'lsa — qayta yozmaymiz.
+        fresh = [pid for pid in owners
+                 if not con.execute("SELECT 1 FROM documents WHERE pid=? AND sha=?",
+                                    (pid, digest)).fetchone()]
+        for pid in set(owners) - set(fresh):
+            duplicates.append({"pid": pid, "file_name": _safe_name(name)})
+        if not fresh:
+            return
+        # Fayl diskda bo'lishi mumkin (boshqa odam uchun saqlangan).
+        row = con.execute("SELECT stored FROM documents WHERE sha=? LIMIT 1", (digest,)).fetchone()
+        stored = row["stored"] if row else f"{secrets.token_hex(6)}_{_safe_name(name)}"
+        if not row:
+            with open(os.path.join(DOCS_FILES, stored), "wb") as fh:
+                fh.write(blob)
+        for pid in fresh:
             cur = con.execute(
                 "INSERT INTO documents(pid,kind,file_name,stored,mime,size,uploaded_at,"
-                "uploaded_by) VALUES(?,?,?,?,?,?,?,?)",
+                "uploaded_by,sha) VALUES(?,?,?,?,?,?,?,?,?)",
                 (pid, kind, _safe_name(name), stored, mime, len(blob), _now(),
-                 request.panel_user["id"]))
+                 request.panel_user["id"], digest))
             saved.append({"id": cur.lastrowid, "pid": pid, "kind": kind,
                           "file_name": _safe_name(name)})
 
@@ -1056,7 +1073,8 @@ def docs_upload():
         unmatched.append(name)
 
     con.commit(); con.close()
-    return jsonify(ok=True, saved=saved, unmatched=unmatched, split=split_note)
+    return jsonify(ok=True, saved=saved, unmatched=unmatched, split=split_note,
+                   duplicates=duplicates)
 
 
 @app.get("/api/docs")

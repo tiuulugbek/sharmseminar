@@ -664,6 +664,46 @@ class BotApiTest(unittest.TestCase):
         self.assertEqual(self.client.post(
             "/api/participant/unlink", json={"id": member["id"]}).status_code, 401)
 
+    # ------------------------------------------------ Telegram guruh nazorati
+    def seen_in_group(self, telegram_id, full_name, chat="-100777"):
+        return self.post("/api/bot/group/seen", {
+            "chat_id": chat, "telegram_id": telegram_id, "full_name": full_name,
+            "status": "member", "source": "message"})
+
+    def test_a_second_telegram_account_is_not_mistaken_for_a_stranger(self):
+        """Odam bot bilan bir akkauntda tasdiqlab, guruhda boshqasida turishi mumkin."""
+        leader, member, _ = self.build_group()
+        self.sql("UPDATE participants SET fio='Abdulazizov Farrukh' WHERE id=?", member["id"])
+
+        self.seen_in_group("9001", "Leader One")            # tasdiqlagan akkaunt
+        self.seen_in_group("777001", "Farrux Abdulazizov")  # ikkinchi akkaunti
+        self.seen_in_group("777002", "Acoustic Eshitish Markazi")   # begona
+
+        audit = self.client.get("/api/bot/group/audit?chat_id=-100777",
+                                headers=self.headers).get_json()
+        self.assertEqual([x["id"] for x in audit["in_list"]], [leader["id"]])
+        self.assertEqual([(x["id"], x["why"]) for x in audit["probable"]],
+                         [(member["id"], "second_account")])
+        self.assertEqual([x["telegram_id"] for x in audit["not_in_list"]], ["777002"])
+
+    def test_an_unverified_participant_in_the_group_is_recognised_by_name(self):
+        leader, member, _ = self.build_group()
+        self.sql("UPDATE participants SET telegram_id=NULL WHERE id=?", member["id"])
+        self.seen_in_group("777003", "Member One")
+        audit = self.client.get("/api/bot/group/audit?chat_id=-100777",
+                                headers=self.headers).get_json()
+        self.assertEqual([(x["id"], x["why"]) for x in audit["probable"]],
+                         [(member["id"], "not_verified")])
+        self.assertEqual(audit["not_in_list"], [])
+
+    def test_transliteration_variants_do_not_merge_different_people(self):
+        for uz, other in (("Farrux", "Farrukh"), ("Toshxojaev", "Toshkhodjaev"),
+                          ("Zhuraev", "Juraev"), ("Jumayev", "Jumaev")):
+            self.assertTrue(server.word_matches(uz, other), f"{uz}={other}")
+        for a, b in (("Karimov", "Karimova"), ("Shavkat", "Savkat"),
+                     ("Abdullaev", "Abdullaeva")):
+            self.assertFalse(server.word_matches(a, b), f"{a}!={b}")
+
     # ------------------------------------------------------- yosh va eksport
     def test_age_is_computed_and_visible_without_the_birth_date(self):
         leader, member, _ = self.build_group()

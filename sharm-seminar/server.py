@@ -929,8 +929,11 @@ NAME_SUFFIXES = ("bek", "jon", "jan", "xon", "hon", "khon", "boy", "bay", "ali",
 def norm_word(word):
     """Ismni bir ko'rinishga keltiradi: yozilish farqlari yo'qoladi."""
     w = str(word or "").lower().replace("'", "").replace("\u2018", "").replace("\u2019", "")
+    # O'zbek lotin, rus va ingliz transliteratsiyasi bir ko'rinishga keladi:
+    # Farrux = Farrukh, Toshxo'jayev = Toshkhodjaev, Zhuraev = Juraev.
     for a, b in (("ayev", "aev"), ("oyev", "oev"), ("iyev", "iev"), ("yev", "ev"),
-                 ("kh", "h"), ("ts", "s"), ("iy", "i"), ("yo", "o"), ("ye", "e"),
+                 ("kh", "h"), ("x", "h"), ("dj", "j"), ("zh", "j"),
+                 ("ts", "s"), ("iy", "i"), ("yo", "o"), ("ye", "e"),
                  ("sch", "sh"), ("ph", "f")):
         w = w.replace(a, b)
     out = []
@@ -2326,7 +2329,25 @@ def bot_group_audit():
     by_tid = {str(r["telegram_id"]): r for r in con.execute(
         "SELECT id,fio,grp,telegram_id FROM participants "
         "WHERE telegram_id IS NOT NULL AND telegram_id<>''")}
-    known, strangers, left = [], [], 0
+    # Telegram nomi bo'yicha taxmin. Ikki sabab bilan kerak: odam botda hali
+    # tasdiqlamagan bo'lishi mumkin, yoki guruhda uning **ikkinchi akkaunti**
+    # turgan bo'lishi mumkin.  Ikkala holatda ham u begona emas.
+    everyone = {r["id"]: r for r in con.execute(
+        f"SELECT id,fio,grp,telegram_id FROM participants WHERE {NOT_STAFF}")}
+    index = {pid: {w.lower() for w in str(r["fio"]).split() if len(w) > 2}
+             for pid, r in everyone.items()}
+    index = {pid: words for pid, words in index.items() if len(words) >= 2}
+
+    def guess(display):
+        seen_words = {w.lower() for w in re.split(r"[^\wА-Яа-яЎўҚқҒғҲҳ]+", display or "")
+                      if len(w) > 2}
+        if len(seen_words) < 2:
+            return None
+        hits = [pid for pid, words in index.items()
+                if all(any(word_matches(part, w) for w in seen_words) for part in words)]
+        return hits[0] if len(hits) == 1 else None
+
+    known, probable, strangers, left = [], [], [], 0
     for r in rows:
         if r["status"] not in IN_GROUP:
             left += 1
@@ -2338,6 +2359,14 @@ def bot_group_audit():
         if person:
             entry.update(id=person["id"], fio=person["fio"], group=person["grp"])
             known.append(entry)
+            continue
+        match = guess(r["full_name"])
+        if match:
+            other = everyone[match]["telegram_id"]
+            entry.update(id=match, fio=everyone[match]["fio"], group=everyone[match]["grp"],
+                         verified_as=other or None,
+                         why="second_account" if other else "not_verified")
+            probable.append(entry)
         else:
             strangers.append(entry)
     admins = {str(x) for x in _admin_ids()} | {str(x) for x in sget(con, "admins", []) or []}
@@ -2347,6 +2376,7 @@ def bot_group_audit():
     con.close()
     return jsonify(chat_id=chat, seen=len(rows), left=left,
                    in_list=sorted(known, key=lambda x: (x.get("group") or 99, x.get("fio") or "")),
+                   probable=sorted(probable, key=lambda x: x.get("fio") or ""),
                    not_in_list=[s for s in strangers if s["telegram_id"] not in admins],
                    admins_skipped=[s for s in strangers if s["telegram_id"] in admins],
                    verified_participants=verified_total)

@@ -588,7 +588,7 @@ Admin buyruqlari (botga shaxsiy chatda):
 |---|---|
 | `/guruh_chaqiruv` | Guruhga tasdiqlash chaqiruvini yuboradi — tugma bosilsa bot ochiladi |
 | `/guruh_taklif` | Tasdiqlagan, lekin guruhda yo'q odamlarga taklif havolasi |
-| `/guruh_holat` | Hisobot: guruhda jami nechta, bot nechtasini taniydi, ro'yxatda borlar va yo'qlar |
+| `/guruh_holat` | Hisobot: guruhda jami nechta, bot nechtasini taniydi, uch toifaga bo'lib |
 | `/guruh_tozala` | Ro'yxatda yo'qlarni guruhdan chiqaradi (tasdiqlashdan keyin) |
 
 ### Guruhga taklif
@@ -636,6 +636,24 @@ unga «Endi safar guruhida yozishingiz mumkin» deb yoziladi. Guruh qulflanmagan
 bo'lsa bot hech kimga cheklov qo'ymaydi.
 
 Adminlarga cheklov tegmaydi — Telegram adminlarni umumiy sozlamadan ozod qiladi.
+
+
+`/guruh_holat` a'zolarni **uch toifaga** ajratadi:
+
+| | |
+|---|---|
+| ✅ **Ro'yxatda va tasdiqlagan** | Telegram hisobi ishtirokchiga bog'langan |
+| 🟡 **Ro'yxatda bor** | Telegramdagi ismi ishtirokchiga to'g'ri keladi, lekin hisobi bog'lanmagan — botda hali tasdiqlamagan **yoki guruhda ikkinchi akkaunti turibdi** |
+| ❌ **Ro'yxatda yo'q** | Ismi ham hech kimga to'g'ri kelmadi |
+
+Ism solishtirishda transliteratsiya farqlari hisobga olinadi: `Farrux` = `Farrukh`,
+`Toshxo'jayev` = `Toshkhodjaev`, `Zhuraev` = `Juraev`, `Jumayev` = `Jumaev`.
+Ism tartibi ham muhim emas (`Farrux Abdulazizov` = `Abdulazizov Farrukh`).
+Lekin `Karimov` va `Karimova` ikki xil odam bo'lib qoladi.
+
+**`/guruh_tozala` faqat ❌ toifasini chiqaradi.** 🟡 dagilar ro'yxatdagi haqiqiy
+odamlar, ularga tegilmaydi — hisobotda alohida ko'rsatiladi va nima uchun
+tanilmagani yoziladi.
 
 Chiqarish uchun botda **«Foydalanuvchilarni bloklash»** huquqi bo'lishi shart.
 Buni faqat guruh admini Telegram ilovasidan beradi — bot o'ziga huquq qo'sha

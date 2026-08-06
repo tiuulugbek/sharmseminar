@@ -2204,15 +2204,25 @@ dp.edited_message.outer_middleware(GroupSilence())
 
 
 def _audit_lines(audit) -> str:
-    inside, outside = audit.get("in_list", []), audit.get("not_in_list", [])
+    inside = audit.get("in_list", [])
+    probable = audit.get("probable", [])
+    outside = audit.get("not_in_list", [])
     lines = ["👥 <b>Guruh holati</b>\n",
-             f"👁 Bot ko'rgan a'zolar: <b>{len(inside) + len(outside)}</b>",
-             f"✅ Ro'yxatda bor va tasdiqlangan: <b>{len(inside)}</b>",
+             f"👁 Bot ko'rgan a'zolar: <b>{len(inside) + len(probable) + len(outside)}</b>",
+             f"✅ Ro'yxatda va tasdiqlagan: <b>{len(inside)}</b>",
+             f"🟡 Ro'yxatda bor, boshqa akkaunt: <b>{len(probable)}</b>",
              f"❌ Ro'yxatda yo'q: <b>{len(outside)}</b>"]
     if audit.get("admins_skipped"):
         lines.append(f"🛡 Admin (tegilmaydi): <b>{len(audit['admins_skipped'])}</b>")
+    if probable:
+        lines.append("\n🟡 <b>Ro'yxatda bor — chiqarilmaydi:</b>")
+        for s in probable[:30]:
+            why = ("botda boshqa akkaunt bilan tasdiqlagan"
+                   if s.get("why") == "second_account" else "botda hali tasdiqlamagan")
+            lines.append(f"• {s.get('fio')} ({s.get('id')}) — Telegramda "
+                         f"<i>{s.get('full_name') or ''}</i>, {why}")
     if outside:
-        lines.append("\n<b>Ro'yxatda yo'qlar:</b>")
+        lines.append("\n❌ <b>Ro'yxatda yo'q:</b>")
         for s in outside[:40]:
             who = s.get("full_name") or s.get("username") or s["telegram_id"]
             lines.append(f"• {who} {s.get('username') or ''} <code>{s['telegram_id']}</code>")
@@ -2419,8 +2429,12 @@ async def cmd_group_clean(message: Message):
         return
     audit = await asyncio.to_thread(api_client.group_audit, config.GROUP_CHAT_ID)
     outside = audit.get("not_in_list", [])
+    probable = audit.get("probable", [])
     if not outside:
-        return await message.answer("✅ Bot ko'rgan a'zolar orasida ro'yxatda yo'qlari yo'q.")
+        return await message.answer(
+            "✅ Bot ko'rgan a'zolar orasida ro'yxatda yo'qlari yo'q."
+            + (f"\n\n🟡 <b>{len(probable)}</b> kishi ro'yxatda bor, lekin guruhda "
+               "boshqa akkaunti turibdi — ular chiqarilmaydi." if probable else ""))
     me = await bot.get_me()
     rights = await bot.get_chat_member(config.GROUP_CHAT_ID, me.id)
     if not getattr(rights, "can_restrict_members", False):
@@ -2429,7 +2443,10 @@ async def cmd_group_clean(message: Message):
             "Guruh sozlamalari → Administratorlar → @" + (me.username or "bot") +
             " → <b>Foydalanuvchilarni bloklash</b> ni yoqing va qaytadan urinib ko'ring.")
     await message.answer(
-        _audit_lines(audit) + f"\n\n<b>{len(outside)}</b> kishi guruhdan chiqariladi. Davom etamizmi?",
+        _audit_lines(audit)
+        + f"\n\n<b>{len(outside)}</b> kishi guruhdan chiqariladi."
+        + (f"\n🟡 Ro'yxatdagi <b>{len(probable)}</b> kishiga tegilmaydi." if probable else "")
+        + "\n\nDavom etamizmi?",
         reply_markup=_confirm_kb("grpclean:go"))
 
 

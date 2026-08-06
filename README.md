@@ -381,6 +381,30 @@ alohida qadam emas: odam tasdiqlanishi bilan o'z guruhini biladi, guruh mas'uli
 uni ro'yxatida ko'radi, mas'ul unga xabar yoza oladi va QR bilan check-in qiladi.
 Guruhni panelda o'zgartirsangiz, odamga botdan xabar boradi.
 
+## Yosh, saralash va Excel eksport
+
+**Yosh** tug'ilgan sanadan hisoblanadi va «Ishtirokchilar» jadvalida alohida
+ustunda turadi. Yoshni hamma ko'radi, lekin **tug'ilgan sananing o'zi** pasport
+ma'lumoti sifatida faqat rahbar va adminlarga qoladi.
+
+**Saralash** — ustun sarlavhasini bosasiz (ID · F.I.O. · Yosh · Xona turi · Xona
+bloki · Guruh), ikkinchi bosishda teskarisiga. Bo'sh qiymat doim oxirida turadi.
+
+**Excel** — «Ishtirokchilar» va «Guruhlar» bo'limlarida `⤓ Excel` tugmasi:
+
+| Fayl | Nima chiqadi |
+|---|---|
+| `acoustic2026-ishtirokchilar-<sana>.xlsx` | Bitta varaq: ID, ism, yosh, jinsi, fuqarolik, guruh va nomi, mas'ul, xona turi/bloki/raqami, xonadoshlar, mas'uliyati, til, botda bormi, voucher/chipta bormi |
+| `acoustic2026-guruhlar-<sana>.xlsx` | Har bir guruh **alohida varaqda**, mas'uli tepada |
+
+Eksport **rol qamroviga bo'ysunadi**: admin va rahbar hammasini, guruh mas'uli
+o'z guruhini, oddiy ishtirokchi faqat o'zini oladi. Pasport, tug'ilgan sana,
+amal muddati va telefon ustunlari faqat rahbar va adminlarga qo'shiladi. Guruhlar
+eksporti guruh mas'ulidan boshlab ochiq.
+
+Sarlavhalar panel tilida (`?lang=uz|ru|en`), birinchi qator qotirilgan va
+filtrli — Excelda darrov saralab ko'rish mumkin.
+
 ## Hujjatlar — voucher va chiptalar
 
 Har bir ishtirokchining o'z hujjatlari saqlanadi va bot ularni **faqat egasiga**

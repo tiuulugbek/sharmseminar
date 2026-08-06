@@ -604,6 +604,57 @@ class BotApiTest(unittest.TestCase):
         self.assertEqual(self.client.post(
             "/api/participant/unlink", json={"id": member["id"]}).status_code, 401)
 
+    # ------------------------------------------------------- yosh va eksport
+    def test_age_is_computed_and_visible_without_the_birth_date(self):
+        leader, member, _ = self.build_group()
+        born = datetime.date.today().replace(year=datetime.date.today().year - 30)
+        # Tug'ilgan kunidan bir kun keyin — yosh to'liq 30.
+        self.sql("UPDATE participants SET dob=? WHERE id=?",
+                 (born - datetime.timedelta(days=1)).strftime("%d.%m.%Y"), member["id"])
+        # Tug'ilgan kuni hali kelmagan — 29.
+        self.sql("UPDATE participants SET dob=? WHERE id=?",
+                 (born + datetime.timedelta(days=1)).strftime("%d.%m.%Y"), leader["id"])
+
+        seen = {p["id"]: p for p in
+                self.panel(leader["id"]).get("/api/bootstrap").get_json()["participants"]}
+        self.assertEqual(seen[member["id"]]["age"], 30)
+        self.assertEqual(seen[leader["id"]]["age"], 29)
+        # Guruh mas'uli a'zoning yoshini ko'radi, lekin tug'ilgan sanasini emas.
+        self.assertNotIn("dob", seen[member["id"]])
+        self.assertIsNone(server.compute_age("xato"))
+        self.assertIsNone(server.compute_age(""))
+
+    def test_excel_export_follows_the_role_scope(self):
+        leader, member, other = self.build_group()
+        admin = self.register("Panel Admin", "0000795")
+        os.environ["PANEL_ADMIN_IDS"] = admin["id"]
+        import openpyxl, io as _io
+
+        def sheet_of(response):
+            self.assertEqual(response.status_code, 200)
+            return openpyxl.load_workbook(_io.BytesIO(response.data)).active
+
+        full = sheet_of(self.panel(admin["id"]).get("/api/export/participants.xlsx"))
+        self.assertEqual(full.max_row - 1, 4)                 # hamma ishtirokchi
+        self.assertIn("Pasport", [c.value for c in full[1]])
+
+        # Guruh mas'uli o'z guruhini, pasport ustunlarisiz oladi.
+        own = sheet_of(self.panel(leader["id"]).get("/api/export/participants.xlsx"))
+        self.assertEqual(own.max_row - 1, 2)
+        self.assertNotIn("Pasport", [c.value for c in own[1]])
+        self.assertNotIn("Telefon", [c.value for c in own[1]])
+
+        # A'zo faqat o'zini ko'radi; guruh eksporti unga umuman yopiq.
+        mine = sheet_of(self.panel(member["id"]).get("/api/export/participants.xlsx"))
+        self.assertEqual(mine.max_row - 1, 1)
+        self.assertEqual(self.panel(member["id"]).get("/api/export/groups.xlsx").status_code, 403)
+        self.assertEqual(self.client.get("/api/export/participants.xlsx").status_code, 401)
+
+        # Guruhlar eksporti: har bir guruh alohida varaqda.
+        book = openpyxl.load_workbook(_io.BytesIO(
+            self.panel(admin["id"]).get("/api/export/groups.xlsx").data))
+        self.assertEqual(book.sheetnames, ["1-Sazanchik", "2-Meduza"])
+
     # ------------------------------------------------------------- hujjatlar
     def upload(self, client, names, **extra):
         import io

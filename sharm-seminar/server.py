@@ -276,10 +276,35 @@ def sset(con, key, value):
                 (key, json.dumps(value, ensure_ascii=False)))
 
 
+def _tx(value, lang="uz"):
+    """Uch tilli matn maydonidan kerakli tilni oladi."""
+    if isinstance(value, dict):
+        return value.get(lang) or value.get("uz") or value.get("ru") or value.get("en") or ""
+    return value or ""
+
+
+def compute_age(dob, on=None):
+    """Tug'ilgan sanadan yoshni hisoblaydi. Sana o'qilmasa ``None``."""
+    text = _date_key(dob)          # YYYY-MM-DD ga keltiradi
+    if not text:
+        return None
+    try:
+        born = datetime.date.fromisoformat(text)
+    except ValueError:
+        return None
+    today = on or datetime.date.today()
+    if born > today:
+        return None
+    return today.year - born.year - ((today.month, today.day) < (born.month, born.day))
+
+
 def part_dict(r):
     d = dict(r)
     d["leader"] = bool(d["leader"])
     d["group"] = d.pop("grp")
+    # Yosh tug'ilgan sanadan hisoblanadi va hammaga ko'rinadi; `dob` ning o'zi
+    # pasport ma'lumoti sifatida faqat rahbar va adminlarga qoladi.
+    d["age"] = compute_age(d.get("dob"))
     try: d["roles"] = json.loads(d.get("roles") or "[]")
     except Exception: d["roles"] = []
     return d
@@ -1340,6 +1365,161 @@ def bot_docs_hold():
     hold = bool(sget(con, "docs_hold", False))
     con.commit(); con.close()
     return jsonify(ok=True, hold=hold)
+
+
+# ═══════════════════════════ Excel eksport ═══════════════════════════
+EXPORT_HEADERS = {
+    "uz": ["ID", "F.I.O.", "Yosh", "Jinsi", "Fuqarolik", "Guruh", "Guruh nomi",
+           "Mas'ul", "Xona turi", "Xona bloki", "Xona №", "Xonadoshlar",
+           "Mas'uliyati", "Til", "Botda", "Voucher", "Chipta",
+           "Tug'ilgan sana", "Pasport", "Amal muddati", "Telefon"],
+    "ru": ["ID", "Ф.И.О.", "Возраст", "Пол", "Гражданство", "Группа", "Название группы",
+           "Староста", "Тип номера", "Блок", "Номер", "Соседи",
+           "Ответственность", "Язык", "В боте", "Ваучер", "Билет",
+           "Дата рождения", "Паспорт", "Срок действия", "Телефон"],
+    "en": ["ID", "Full name", "Age", "Sex", "Citizenship", "Group", "Group name",
+           "Leader", "Room type", "Room block", "Room no.", "Roommates",
+           "Responsibilities", "Language", "In bot", "Voucher", "Ticket",
+           "Date of birth", "Passport", "Expiry", "Phone"],
+}
+# Pasport ustunlari faqat rahbar va adminlarga chiqadi.
+PRIVATE_COLUMNS = 4
+
+
+def _export_workbook(title, headers, rows, widths=None):
+    """Bitta varaqli .xlsx tuzadi: sarlavha qotirilgan, ustunlar kengaytirilgan."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    book = Workbook()
+    sheet = book.active
+    sheet.title = title[:31]
+    sheet.append(headers)
+    head_fill = PatternFill("solid", fgColor="2E2C6E")
+    for cell in sheet[1]:
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = head_fill
+        cell.alignment = Alignment(vertical="center")
+    for row in rows:
+        sheet.append(row)
+    sheet.freeze_panes = "A2"
+    sheet.auto_filter.ref = sheet.dimensions
+    for index, header in enumerate(headers, 1):
+        longest = max([len(str(header))] + [len(str(r[index - 1] or "")) for r in rows] or [0])
+        sheet.column_dimensions[get_column_letter(index)].width = min(46, max(9, longest + 2))
+    stream = io.BytesIO()
+    book.save(stream)
+    stream.seek(0)
+    return stream
+
+
+def _xlsx(stream, name):
+    from flask import send_file
+    return send_file(stream, as_attachment=True, download_name=name,
+                     mimetype="application/vnd.openxmlformats-officedocument."
+                              "spreadsheetml.sheet")
+
+
+@app.get("/api/export/participants.xlsx")
+@panel_auth("member")
+def export_participants():
+    """Ishtirokchilar ro'yxati. Rol qamrovidagilar chiqadi, pasport — faqat rahbarga."""
+    user = request.panel_user
+    lang = request.args.get("lang") if request.args.get("lang") in LANGS else "uz"
+    con = db()
+    rows = _scope_rows(con, user)
+    names = _group_names(con)
+    roles_def = {r["id"]: r for r in sget(con, "roles", DEFAULT_ROLES)}
+    mates = {}
+    for r in con.execute("SELECT xona_guruhi,fio FROM participants "
+                         "WHERE xona_guruhi IS NOT NULL AND xona_guruhi<>''"):
+        mates.setdefault(r["xona_guruhi"], []).append(r["fio"])
+    docs = {}
+    for r in con.execute("SELECT pid,kind FROM documents"):
+        docs.setdefault(r["pid"], set()).add(r["kind"])
+
+    private = user["rank"] >= ROLE_RANK["manager"]
+    headers = EXPORT_HEADERS[lang]
+    if not private:
+        headers = headers[:-PRIVATE_COLUMNS]
+
+    out = []
+    for r in sorted(rows, key=lambda x: x["id"]):
+        p = part_dict(r)
+        mine = docs.get(p["id"], set())
+        line = [
+            p["id"], p["fio"], p.get("age"), p.get("jinsi"), p.get("fuqarolik"),
+            p.get("group"), names.get(str(p.get("group"))) if p.get("group") else "",
+            "★" if p.get("leader") else "",
+            p.get("xona_turi"), p.get("xona_guruhi"), p.get("room"),
+            ", ".join(x for x in mates.get(p.get("xona_guruhi") or "", []) if x != p["fio"]),
+            ", ".join(_tx(roles_def[rid].get("label"), lang)
+                      for rid in p.get("roles", []) if rid in roles_def),
+            (p.get("lang") or "").upper(),
+            "✓" if p.get("telegram_id") else "",
+            "✓" if "voucher" in mine else "",
+            "✓" if "ticket" in mine else "",
+        ]
+        if private:
+            line += [p.get("dob"),
+                     f"{p.get('passport_series') or ''}{p.get('passport_number') or ''}",
+                     p.get("passport_expiry"), p.get("phone")]
+        out.append(line)
+    con.close()
+    return _xlsx(_export_workbook("Ishtirokchilar", headers, out),
+                 f"acoustic2026-ishtirokchilar-{datetime.date.today():%Y-%m-%d}.xlsx")
+
+
+@app.get("/api/export/groups.xlsx")
+@panel_auth("leader")
+def export_groups():
+    """Guruhlar: har bir guruh alohida varaqda, mas'uli tepada."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    user = request.panel_user
+    lang = request.args.get("lang") if request.args.get("lang") in LANGS else "uz"
+    titles = {"uz": ["ID", "F.I.O.", "Yosh", "Xona turi", "Xona bloki", "Xona №", "Botda"],
+              "ru": ["ID", "Ф.И.О.", "Возраст", "Тип номера", "Блок", "Номер", "В боте"],
+              "en": ["ID", "Full name", "Age", "Room type", "Room block", "Room no.", "In bot"]}
+    con = db()
+    allowed = {r["id"] for r in _scope_rows(con, user)}
+    names = _group_names(con)
+    book = Workbook()
+    book.remove(book.active)
+    head_fill = PatternFill("solid", fgColor="2E2C6E")
+    groups = [g for g in sorted({r["grp"] for r in con.execute(
+        f"SELECT DISTINCT grp FROM participants WHERE {NOT_STAFF}") if r["grp"]})]
+    for gid in groups:
+        members = [r for r in con.execute(
+            f"SELECT * FROM participants WHERE grp=? AND {NOT_STAFF} "
+            "ORDER BY leader DESC, fio", (gid,)) if r["id"] in allowed]
+        if not members:
+            continue
+        name = names.get(str(gid)) or ""
+        sheet = book.create_sheet(f"{gid}-{name}"[:31] if name else f"{gid}-guruh")
+        sheet.append(titles[lang])
+        for cell in sheet[1]:
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = head_fill
+        for r in members:
+            sheet.append([r["id"], ("★ " if r["leader"] else "") + r["fio"],
+                          compute_age(r["dob"]), r["xona_turi"], r["xona_guruhi"],
+                          r["room"], "✓" if r["telegram_id"] else ""])
+        sheet.freeze_panes = "A2"
+        for index in range(1, len(titles[lang]) + 1):
+            longest = max(len(str(sheet.cell(row=row, column=index).value or ""))
+                          for row in range(1, sheet.max_row + 1))
+            sheet.column_dimensions[get_column_letter(index)].width = min(40, max(9, longest + 2))
+    con.close()
+    if not book.sheetnames:
+        book.create_sheet("bo'sh")
+    stream = io.BytesIO()
+    book.save(stream)
+    stream.seek(0)
+    return _xlsx(stream, f"acoustic2026-guruhlar-{datetime.date.today():%Y-%m-%d}.xlsx")
 
 
 # ---------------------------------------------------------------- admin API

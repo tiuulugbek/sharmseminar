@@ -1617,6 +1617,83 @@ def upd_participant():
     return jsonify(ok=True, notified=bool(moved))
 
 
+@app.post("/api/participant/replace")
+@panel_auth("admin")
+def replace_participant():
+    """Ishtirokchini o'rniga boshqasini qo'yish.
+
+    O'rin (ACO raqami, guruh, xona, xona bloki, toifa) saqlanadi — shu sababli
+    guruh taqsimoti buzilmaydi.  Shaxsga bog'liq hamma narsa ketadi: Telegram
+    bog'lanishi, hujjatlari, check-inlari, mas'ulligi va roli.
+
+    Pasport o'zgargani uchun **QR token ham yangilanadi** — eski beyjik
+    yaroqsiz bo'ladi, yangisini chop etish kerak.
+    """
+    d = request.get_json(silent=True) or {}
+    pid = str(d.get("id") or "").strip().upper()
+    fio = " ".join(str(d.get("fio") or "").split())
+    series, number = _passport(d.get("passport") or
+                               f"{d.get('passport_series','')}{d.get('passport_number','')}")
+    if not fio or not number:
+        return jsonify(error="fio_and_passport_required"), 400
+
+    con = db()
+    row = con.execute("SELECT * FROM participants WHERE id=?", (pid,)).fetchone()
+    if not row:
+        con.close()
+        return jsonify(error="participant_not_found"), 404
+    # Pasport bandmi — seriya alohida saqlangan holatlarni ham hisobga olamiz
+    # (ruscha pasportlarda "77" + "3408359" ko'rinishida).
+    wanted = re.sub(r"[^A-Z0-9]", "", (series + number).upper())
+    clash = next((r["id"] for r in con.execute("SELECT * FROM participants WHERE id<>?", (pid,))
+                  if wanted in _code_variants(r["passport_series"], r["passport_number"])), None)
+    if clash:
+        con.close()
+        return jsonify(error="passport_already_exists", participant_id=clash), 409
+
+    was = {"fio": row["fio"], "passport": f"{row['passport_series'] or ''}"
+                                          f"{row['passport_number'] or ''}",
+           "telegram_id": row["telegram_id"], "token": row["token"]}
+
+    # Ketgan odamning hujjatlari yangisiga o'tmaydi.
+    stored = [r["stored"] for r in con.execute("SELECT stored FROM documents WHERE pid=?", (pid,))]
+    con.execute("DELETE FROM documents WHERE pid=?", (pid,))
+    con.execute("DELETE FROM checkins WHERE pid=?", (pid,))
+
+    token = make_token(series, number, pid, con)
+    try:
+        con.execute(
+            "UPDATE participants SET fio=?,jinsi=?,fuqarolik=?,dob=?,phone=?,"
+            "passport_series=?,passport_number=?,passport_expiry=?,passport_issued=?,"
+            "passport_issuer=?,doc_type=?,token=?,"
+            "telegram_id=NULL,telegram_username=NULL,registered_at=NULL,"
+            "passport_file_url=NULL,leader=0,panel_role=NULL,roles='[]',lang=NULL,"
+            "roommate_series=NULL,main_series=NULL WHERE id=?",
+            (fio, d.get("jinsi") or row["jinsi"], d.get("fuqarolik") or row["fuqarolik"],
+             d.get("dob"), d.get("phone"), series, number, d.get("passport_expiry"),
+             d.get("passport_issued"), d.get("passport_issuer"), d.get("doc_type"),
+             token, pid))
+    except sqlite3.IntegrityError:
+        # Token pasportdan olinadi — bir xil token boshqa odamda bo'lsa, demak
+        # pasport ham o'shaniki. Hech narsa yozilmaydi.
+        con.rollback(); con.close()
+        return jsonify(error="passport_already_exists"), 409
+    con.commit()
+
+    # Boshqa hech kim ishlatmayotgan fayllarni diskdan olib tashlaymiz.
+    for name in set(stored):
+        if not con.execute("SELECT 1 FROM documents WHERE stored=?", (name,)).fetchone():
+            try:
+                os.remove(os.path.join(DOCS_FILES, name))
+            except OSError:
+                pass
+    fresh = con.execute("SELECT * FROM participants WHERE id=?", (pid,)).fetchone()
+    out = _bot_participant(fresh)
+    con.close()
+    app.logger.info("Ishtirokchi almashtirildi: %s %s -> %s", pid, was["fio"], fio)
+    return jsonify(ok=True, participant=out, was=was, documents_removed=len(stored))
+
+
 @app.post("/api/participant/unlink")
 @panel_auth("manager")
 def unlink_participant():

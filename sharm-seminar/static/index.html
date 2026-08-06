@@ -260,6 +260,19 @@ tbody tr:hover{background:#FAFAFE}
 .camwrap video{width:100%;max-width:340px;border-radius:12px;background:#000;display:block;
   aspect-ratio:1/1;object-fit:cover;margin:0 auto}
 .roomsel{max-width:190px}
+.swapx{cursor:pointer;color:var(--muted);font-size:12px;opacity:.5;margin-left:3px}
+.swapx:hover{opacity:1;color:var(--indigo)}
+.modal{position:fixed;inset:0;z-index:900;background:rgba(20,18,60,.45);display:flex;
+  align-items:center;justify-content:center;padding:20px}
+.modal .mbox{background:#fff;border-radius:16px;padding:22px;width:100%;max-width:430px;
+  max-height:92vh;overflow:auto;box-shadow:0 24px 60px rgba(20,18,60,.3)}
+.modal h3{font-size:17px;font-weight:800;color:var(--indigo);margin-bottom:4px}
+.modal .frow{margin-bottom:9px}
+.modal input,.modal select{flex:1;padding:9px 11px;border:1px solid var(--line-2);border-radius:9px;font:inherit}
+.modal label{min-width:118px;font-size:12.5px}
+.warnbox{background:#FFF4E5;color:#9A5B00;border-radius:10px;padding:10px 12px;
+  font-size:12px;font-weight:600;margin:12px 0}
+.mrow2{display:flex;gap:8px;justify-content:flex-end}
 .sortth{cursor:pointer;user-select:none;white-space:nowrap}
 .sortth:hover{color:var(--indigo)}
 .sortth i{font-style:normal;font-size:9px;opacity:.35;margin-left:4px}
@@ -282,6 +295,19 @@ tbody tr:hover{background:#FAFAFE}
   animation:campop .26s cubic-bezier(.2,.9,.3,1.2)}
 @keyframes campop{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.roomsel{max-width:190px}
+.swapx{cursor:pointer;color:var(--muted);font-size:12px;opacity:.5;margin-left:3px}
+.swapx:hover{opacity:1;color:var(--indigo)}
+.modal{position:fixed;inset:0;z-index:900;background:rgba(20,18,60,.45);display:flex;
+  align-items:center;justify-content:center;padding:20px}
+.modal .mbox{background:#fff;border-radius:16px;padding:22px;width:100%;max-width:430px;
+  max-height:92vh;overflow:auto;box-shadow:0 24px 60px rgba(20,18,60,.3)}
+.modal h3{font-size:17px;font-weight:800;color:var(--indigo);margin-bottom:4px}
+.modal .frow{margin-bottom:9px}
+.modal input,.modal select{flex:1;padding:9px 11px;border:1px solid var(--line-2);border-radius:9px;font:inherit}
+.modal label{min-width:118px;font-size:12.5px}
+.warnbox{background:#FFF4E5;color:#9A5B00;border-radius:10px;padding:10px 12px;
+  font-size:12px;font-weight:600;margin:12px 0}
+.mrow2{display:flex;gap:8px;justify-content:flex-end}
 .sortth{cursor:pointer;user-select:none;white-space:nowrap}
 .sortth:hover{color:var(--indigo)}
 .sortth i{font-style:normal;font-size:9px;opacity:.35;margin-left:4px}
@@ -376,7 +402,7 @@ const T = {
   roommate:"Sherik",roomAlone:"— yakka",roomNew:"+ yangi xona",roomNewQ:"Yangi xona blokining nomi (masalan D40):",roomFullQ:"%s xonasida allaqachon %n kishi bor. Baribir ko'chirilsinmi?",leaderCol:"Mas'ul",arrival:"Kelish",autoDist:"Avtomatik taqsimlash",draftPending:"%n ta saqlanmagan o'zgarish",draftSave:"Saqlash",draftClean:"Hammasi saqlangan",draftCancel:"Bekor qilish",draftSaved:"%n ta o'zgarish saqlandi",autoDistQ:"Barcha %n ishtirokchi guruhlarga QAYTA taqsimlanadi — hozirgi taqsimot yo'qoladi. Davom etamizmi?",clearAllQ:"Hamma guruh biriktirmalari va guruh mas'ullari o'chiriladi. Ishonchingiz komilmi?",grpLocked:"Guruhlarni faqat texnik admin o'zgartiradi",clearAll:"Tozalash",
   member:"a'zo",noMembers:"Hali a'zo yo'q",leaderTag:"Guruh mas'uli",noRight:"Buning uchun ruxsatingiz yo'q",
   qrAll:"Hammasini ZIP qilib yuklash",qrWithName:"Ism-familya bilan",
-  langCol:"Til",ageCol:"Yosh",exportHint:"Excel faylga yuklab olish",staffTag:"tashkilotchi",staffHint:"Safarda qatnashmaydi — ro'yxat, statistika va check-inga kirmaydi",tgCol:"Telegram",tgNone:"tasdiqlamagan",tgUnlink:"Bog'lanishni uzish",tgUnlinkQ:"%s — Telegram bog'lanishi uzilsinmi? Keyin u qaytadan /start bosib tasdiqlashi kerak.",editingIn:"Tahrirlanayotgan til:",allLangs:"Uchala tilni birdan",langAuto:"Avto",langHint:"Ishtirokchi QR ni skanlaganda sahifa shu tilda ochiladi",
+  langCol:"Til",ageCol:"Yosh",swap:"Ishtirokchini almashtirish",swapOut:"Ro'yxatdan chiqadi",swapName:"Yangi ism-familya",swapPassport:"Pasport (seriya+raqam)",swapDob:"Tug'ilgan sana",swapSex:"Jinsi",swapCitizen:"Fuqarolik",swapExpiry:"Amal muddati",swapGo:"Almashtirish",swapNeed:"Ism va pasport majburiy",swapWarn:"Guruh, xona va ACO raqami saqlanadi. Eski odamning Telegram bog'lanishi, hujjatlari va check-inlari o'chadi. Pasport o'zgargani uchun QR kod yangilanadi — beyjikni qayta chop eting.",swapConfirm:"%a o'rniga %b qo'yilsinmi? Bu amalni orqaga qaytarib bo'lmaydi.",swapDone:"Almashtirildi · %n ta hujjat o'chirildi",swapDupe:"Bu pasport allaqachon boshqa odamda (%s)",swapFail:"Almashtirib bo'lmadi",exportHint:"Excel faylga yuklab olish",staffTag:"tashkilotchi",staffHint:"Safarda qatnashmaydi — ro'yxat, statistika va check-inga kirmaydi",tgCol:"Telegram",tgNone:"tasdiqlamagan",tgUnlink:"Bog'lanishni uzish",tgUnlinkQ:"%s — Telegram bog'lanishi uzilsinmi? Keyin u qaytadan /start bosib tasdiqlashi kerak.",editingIn:"Tahrirlanayotgan til:",allLangs:"Uchala tilni birdan",langAuto:"Avto",langHint:"Ishtirokchi QR ni skanlaganda sahifa shu tilda ochiladi",
   camScan:"📷 Kamera bilan skanlash",camStop:"⏹ To'xtatish",
   camHint:"Beyjik QR ini ramkaga tuting — topilishi bilan belgilanadi",
   camErr:"Kameraga ruxsat berilmadi",camOk:"Ro'yxatga olindi",camAlready2:"Allaqachon ro'yxatda",camWait:"Vaqti mos emas",camErr2:"Xato",camAlready:"da belgilangan",camNotOpen:"dan boshlanadi",camClosed:"da tugagan",camMissed:"O'tkazib yuborilgan",cpFrom:"Boshlanishi",cpUp:"Chapga",cpDown:"O'ngga",cpOrderHint:"Nuqtalar tartibi — ‹ › bilan suriladi. Skaner oldingi nuqtalar o'tkazib yuborilganini shu tartib bo'yicha ogohlantiradi.",cpTo:"Tugashi",cpWindow:"Vaqt oynasi — bo'sh qoldirilsa har doim ochiq",
@@ -405,7 +431,7 @@ const T = {
   roommate:"Сосед",roomAlone:"— один",roomNew:"+ новый номер",roomNewQ:"Название нового блока (например D40):",roomFullQ:"В номере %s уже %n человек. Всё равно переселить?",leaderCol:"Староста",arrival:"Прибытие",autoDist:"Распределить автоматически",draftPending:"%n несохранённых изменений",draftSave:"Сохранить",draftClean:"Всё сохранено",draftCancel:"Отменить",draftSaved:"Сохранено изменений: %n",autoDistQ:"Все %n участников будут ПЕРЕраспределены — текущее распределение исчезнет. Продолжить?",clearAllQ:"Все группы и старосты будут удалены. Вы уверены?",grpLocked:"Группы меняет только тех. админ",clearAll:"Очистить",
   member:"чел.",noMembers:"Пока нет участников",leaderTag:"Староста группы",noRight:"Недостаточно прав",
   qrAll:"Скачать все в ZIP",qrWithName:"С именем и фамилией",
-  langCol:"Язык",ageCol:"Возраст",exportHint:"Скачать в Excel",staffTag:"организатор",staffHint:"Не едет — не входит в списки, статистику и check-in",tgCol:"Telegram",tgNone:"не подтвердил",tgUnlink:"Отвязать",tgUnlinkQ:"%s — отвязать Telegram? Затем нужно снова подтвердить через /start.",editingIn:"Язык редактирования:",allLangs:"Все три языка сразу",langAuto:"Авто",langHint:"На этом языке откроется страница при сканировании QR",
+  langCol:"Язык",ageCol:"Возраст",swap:"Заменить участника",swapOut:"Выбывает",swapName:"Новые Ф.И.О.",swapPassport:"Паспорт (серия+номер)",swapDob:"Дата рождения",swapSex:"Пол",swapCitizen:"Гражданство",swapExpiry:"Срок действия",swapGo:"Заменить",swapNeed:"Имя и паспорт обязательны",swapWarn:"Группа, номер и код ACO сохраняются. Привязка Telegram, документы и отметки прежнего участника удаляются. Паспорт изменился — QR обновится, бейдж нужно перепечатать.",swapConfirm:"Заменить %a на %b? Действие необратимо.",swapDone:"Заменено · удалено документов: %n",swapDupe:"Этот паспорт уже у другого участника (%s)",swapFail:"Не удалось заменить",exportHint:"Скачать в Excel",staffTag:"организатор",staffHint:"Не едет — не входит в списки, статистику и check-in",tgCol:"Telegram",tgNone:"не подтвердил",tgUnlink:"Отвязать",tgUnlinkQ:"%s — отвязать Telegram? Затем нужно снова подтвердить через /start.",editingIn:"Язык редактирования:",allLangs:"Все три языка сразу",langAuto:"Авто",langHint:"На этом языке откроется страница при сканировании QR",
   camScan:"📷 Сканировать камерой",camStop:"⏹ Остановить",
   camHint:"Наведите камеру на QR бейджа — отметка произойдёт сразу",
   camErr:"Доступ к камере не разрешён",camOk:"Отмечен",camAlready2:"Уже отмечен",camWait:"Не то время",camErr2:"Ошибка",camAlready:"уже отмечен",camNotOpen:"откроется",camClosed:"закрыто в",camMissed:"Пропущено",cpFrom:"Начало",cpUp:"Влево",cpDown:"Вправо",cpOrderHint:"Порядок точек — меняется стрелками ‹ ›. Пропущенные предыдущие точки сканер показывает по этому порядку.",cpTo:"Конец",cpWindow:"Временное окно — пусто значит всегда открыто",
@@ -434,7 +460,7 @@ const T = {
   roommate:"Roommate",roomAlone:"— alone",roomNew:"+ new room",roomNewQ:"Name of the new room block (e.g. D40):",roomFullQ:"Room %s already holds %n people. Move anyway?",leaderCol:"Leader",arrival:"Arrival",autoDist:"Distribute automatically",draftPending:"%n unsaved changes",draftSave:"Save",draftClean:"All saved",draftCancel:"Discard",draftSaved:"%n changes saved",autoDistQ:"All %n participants will be REdistributed — the current arrangement is lost. Continue?",clearAllQ:"Every group assignment and group leader will be cleared. Are you sure?",grpLocked:"Only a technical admin can change groups",clearAll:"Clear",
   member:"members",noMembers:"No members yet",leaderTag:"Group leader",noRight:"You do not have permission for this",
   qrAll:"Download all as ZIP",qrWithName:"With name",
-  langCol:"Language",ageCol:"Age",exportHint:"Download as Excel",staffTag:"organiser",staffHint:"Not travelling — excluded from rosters, statistics and check-in",tgCol:"Telegram",tgNone:"not verified",tgUnlink:"Unlink",tgUnlinkQ:"%s — unlink Telegram? They will have to verify again with /start.",editingIn:"Editing in:",allLangs:"All three languages",langAuto:"Auto",langHint:"The page opens in this language when the QR is scanned",
+  langCol:"Language",ageCol:"Age",swap:"Replace participant",swapOut:"Leaving",swapName:"New full name",swapPassport:"Passport (series+number)",swapDob:"Date of birth",swapSex:"Sex",swapCitizen:"Citizenship",swapExpiry:"Expiry",swapGo:"Replace",swapNeed:"Name and passport are required",swapWarn:"Group, room and ACO number are kept. The previous person's Telegram link, documents and check-ins are removed. The passport changed, so the QR is new — reprint the badge.",swapConfirm:"Replace %a with %b? This cannot be undone.",swapDone:"Replaced · %n documents removed",swapDupe:"That passport already belongs to somebody else (%s)",swapFail:"Could not replace",exportHint:"Download as Excel",staffTag:"organiser",staffHint:"Not travelling — excluded from rosters, statistics and check-in",tgCol:"Telegram",tgNone:"not verified",tgUnlink:"Unlink",tgUnlinkQ:"%s — unlink Telegram? They will have to verify again with /start.",editingIn:"Editing in:",allLangs:"All three languages",langAuto:"Auto",langHint:"The page opens in this language when the QR is scanned",
   camScan:"📷 Scan with camera",camStop:"⏹ Stop",
   camHint:"Point the camera at the badge QR — it checks in as soon as it reads",
   camErr:"Camera permission denied",camOk:"Checked in",camAlready2:"Already checked in",camWait:"Wrong time",camErr2:"Error",camAlready:"already marked",camNotOpen:"opens at",camClosed:"closed at",camMissed:"Missed",cpFrom:"Opens",cpUp:"Left",cpDown:"Right",cpOrderHint:"Checkpoint order — move with ‹ ›. The scanner warns about skipped earlier checkpoints in this order.",cpTo:"Closes",cpWindow:"Time window — leave empty to keep it always open",
@@ -655,7 +681,7 @@ function fillRows(){const tb=document.getElementById('tb');if(!tb)return;
       :`<span class="muted" style="font-size:12px">Umumiy</span>`;
     const roleChips=(p.roles||[]).map(rid=>{const r=roleById(rid);return r?`<span class="chip" style="background:${r.color}1f;color:${r.color};font-size:10px;padding:1px 7px">${escapeHtml(tx(r.label))}</span>`:'';}).join(' ');
     return `<tr><td><span class="id">${p.id}</span></td>
-      <td><b style="font-weight:600">${escapeHtml(p.fio)}</b> <a href="${pageUrl(p.id)}" target="_blank" title="${t('openPage')}" style="text-decoration:none;color:var(--muted);font-size:11px">↗</a>
+      <td><b style="font-weight:600">${escapeHtml(p.fio)}</b> <a href="${pageUrl(p.id)}" target="_blank" title="${t('openPage')}" style="text-decoration:none;color:var(--muted);font-size:11px">↗</a>${can('admin')?` <b class="swapx" title="${t('swap')}" onclick="openSwap('${p.id}')">⇄</b>`:''}
       <div style="margin-top:2px;display:flex;gap:4px;flex-wrap:wrap;align-items:center"><span class="muted" style="font-size:11px">${p.fuqarolik}</span>${p.staff?`<span class="chip" style="background:#EEF0FA;color:#2E2C6E" title="${t('staffHint')}">${t('staffTag')}</span>`:''}${roleChips}</div></td>
       <td class="tnum">${p.age==null?'<span class="muted">—</span>':p.age}</td>
       <td><span class="rg" style="background:${RTCOL[p.xona_turi]}">${p.xona_turi}</span></td>
@@ -1069,6 +1095,68 @@ async function setRoomBlock(id,val){
   if(ok===false)return fillRows();
   p.xona_guruhi=val;
   fillRows();toast(t('saved'));
+}
+
+/* ===== ishtirokchini almashtirish ===== */
+// O'rin (guruh, xona, ACO raqami) qoladi, odam almashadi. Pasport o'zgargani
+// uchun QR token ham yangilanadi — beyjikni qayta chop etish kerak.
+function openSwap(id){
+  const p=find(id); if(!p)return;
+  const box=document.createElement('div');
+  box.className='modal'; box.id='swapbox';
+  box.innerHTML=`<div class="mbox">
+    <h3>${t('swap')}</h3>
+    <div class="muted" style="font-size:12.5px;margin-bottom:12px">
+      ${t('swapOut')}: <b>${escapeHtml(p.fio)}</b> · ${p.id}
+      ${p.group?` · ${t('grp')} ${p.group}`:''}${p.xona_guruhi?` · ${escapeHtml(p.xona_guruhi)}`:''}</div>
+    <div class="frow"><label>${t('swapName')} *</label><input id="sw_fio" autocomplete="off"></div>
+    <div class="frow"><label>${t('swapPassport')} *</label><input id="sw_pass" placeholder="FA1234567" autocomplete="off"></div>
+    <div class="frow"><label>${t('swapDob')}</label><input id="sw_dob" placeholder="21.05.1990" autocomplete="off"></div>
+    <div class="frow"><label>${t('swapSex')}</label>
+      <select id="sw_sex"><option value="">—</option><option>MR</option><option>MRS</option></select></div>
+    <div class="frow"><label>${t('swapCitizen')}</label><input id="sw_cit" value="${escapeHtml(p.fuqarolik||'')}" autocomplete="off"></div>
+    <div class="frow"><label>${t('swapExpiry')}</label><input id="sw_exp" placeholder="13.05.2034" autocomplete="off"></div>
+    <div class="warnbox">${t('swapWarn')}</div>
+    <div class="mrow2">
+      <button class="btn" onclick="closeSwap()">${t('draftCancel')}</button>
+      <button class="btn pri" onclick="doSwap('${p.id}')">${t('swapGo')}</button></div>
+  </div>`;
+  document.body.appendChild(box);
+  document.getElementById('sw_fio').focus();
+}
+function closeSwap(){const b=document.getElementById('swapbox');if(b)b.remove();}
+
+async function doSwap(id){
+  const val=x=>(document.getElementById(x).value||'').trim();
+  const fio=val('sw_fio'), passport=val('sw_pass');
+  if(!fio||!passport)return toast(t('swapNeed'));
+  const p=find(id);
+  if(!confirm(t('swapConfirm').replace('%a',p.fio).replace('%b',fio)))return;
+  let r;
+  try{
+    r=await fetch('/api/participant/replace',{method:'POST',headers:H,body:JSON.stringify({
+      id, fio, passport, dob:val('sw_dob'), jinsi:val('sw_sex'),
+      fuqarolik:val('sw_cit'), passport_expiry:val('sw_exp')})});
+  }catch(e){ return toast(t('swapFail')); }
+  if(r.status===401){showGate();return;}
+  const body=await r.json().catch(()=>({}));
+  if(!r.ok){
+    return toast(body.error==='passport_already_exists'
+      ? t('swapDupe').replace('%s',body.participant_id||'') : (body.error||t('swapFail')));
+  }
+  closeSwap();
+  await reloadAll();
+  toast(t('swapDone').replace('%n',body.documents_removed||0));
+}
+
+// Almashtirishdan keyin ma'lumotni serverdan qaytadan olamiz.
+async function reloadAll(){
+  const data=await api.boot();
+  if(!data||data.unauthorized)return showGate();
+  S.user=data.user||S.user;
+  S.participants=(data.participants||[]).map(p=>({group:null,leader:false,room:'',branch:'',telegram:'',roles:[],...p}));
+  S.checkins=data.checkins||{};
+  render();
 }
 
 // Noto'g'ri odam ro'yxatdan o'tkazib qo'yilsa — bog'lanishni uzamiz, keyin

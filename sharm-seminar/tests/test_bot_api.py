@@ -575,6 +575,66 @@ class BotApiTest(unittest.TestCase):
         self.assertEqual(self.panel(leader["id"]).post("/api/participant", json={
             "id": member["id"], "patch": {"xona_guruhi": "D07"}}).status_code, 403)
 
+    def test_replacing_a_participant_keeps_the_seat_and_clears_the_person(self):
+        leader, member, other = self.build_group()
+        admin = self.register("Panel Admin", "0000796")
+        os.environ["PANEL_ADMIN_IDS"] = admin["id"]
+        server.DOCS_DIR = os.path.join(self.tmp.name, "docs")
+        server.DOCS_FILES = os.path.join(server.DOCS_DIR, "_files")
+        panel = self.panel(admin["id"])
+        self.sql("UPDATE participants SET xona_guruhi='D07',room='214' WHERE id=?", member["id"])
+        self.upload(panel, [f"{member['id']} voucher.pdf"])
+        self.post("/api/bot/checkin", {"token": member["token"], "checkpoint": "seminar",
+                                       "by_telegram_id": "555"})
+
+        response = panel.post("/api/participant/replace", json={
+            "id": member["id"], "fio": "Yangi Odam", "passport": "FA9990002",
+            "dob": "15.03.1995", "jinsi": "MR", "fuqarolik": "UZBEKISTAN"})
+        self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+        body = response.get_json()
+        self.assertEqual(body["was"]["fio"], "Member One")
+        self.assertEqual(body["documents_removed"], 1)
+
+        row = self.one("SELECT fio,grp,xona_guruhi,room,telegram_id,leader,token,"
+                       "passport_number FROM participants WHERE id=?", member["id"])
+        fio, grp, block, room, telegram, is_leader, token, passport = row
+        self.assertEqual(fio, "Yangi Odam")
+        self.assertEqual((grp, block, room), (1, "D07", "214"))      # o'rin saqlanadi
+        self.assertIsNone(telegram)                                   # odam almashdi
+        self.assertEqual(is_leader, 0)
+        self.assertEqual(passport, "9990002")
+        self.assertNotEqual(token, member["token"])                   # QR yangi
+        self.assertEqual(self.one("SELECT COUNT(*) FROM documents WHERE pid=?",
+                                  member["id"])[0], 0)
+        self.assertEqual(self.one("SELECT COUNT(*) FROM checkins WHERE pid=?",
+                                  member["id"])[0], 0)
+        self.assertEqual(len(self._all("SELECT id FROM participants")), 4)   # soni o'zgarmaydi
+
+    def test_replacement_refuses_a_passport_somebody_else_already_has(self):
+        leader, member, _ = self.build_group()
+        admin = self.register("Panel Admin", "0000797")
+        os.environ["PANEL_ADMIN_IDS"] = admin["id"]
+        panel = self.panel(admin["id"])
+        # Seriyasi alohida saqlangan pasport ham topilishi kerak.
+        self.sql("UPDATE participants SET passport_series='77',passport_number='3408359' "
+                 "WHERE id=?", leader["id"])
+
+        for code in ("773408359", "3408359", "77 3408359"):
+            taken = panel.post("/api/participant/replace", json={
+                "id": member["id"], "fio": "Test Kimdir", "passport": code})
+            self.assertEqual(taken.status_code, 409, code)
+            self.assertEqual(taken.get_json()["error"], "passport_already_exists")
+
+        self.assertEqual(panel.post("/api/participant/replace", json={
+            "id": member["id"], "fio": "", "passport": "FA1111111"}).status_code, 400)
+        # Hech narsa o'zgarmagan.
+        self.assertEqual(self.one("SELECT fio FROM participants WHERE id=?",
+                                  member["id"])[0], "Member One")
+
+        # Faqat admin qila oladi.
+        self.assertEqual(self.panel(leader["id"]).post("/api/participant/replace", json={
+            "id": member["id"], "fio": "X Y", "passport": "FA1111111"}).status_code, 403)
+
     def test_unlinking_frees_a_slot_for_the_real_person(self):
         leader, member, other = self.build_group()
         admin = self.register("Panel Admin", "0000779")

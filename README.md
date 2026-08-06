@@ -702,6 +702,28 @@ qatori ham darrov yangilanadi.
 Sig'im xona turidan olinadi: `1 kishilik` → 1, `2 kishilik` → 2, `3 kishilik`
 va `Posh club` → 3. Ustun `manager` va `admin` rollariga ko'rinadi.
 
+### Ishtirokchini almashtirish
+
+Kimdir bormay qolib, o'rniga boshqasi ketsa — «Ishtirokchilar» jadvalida ismning
+yonidagi **⇄** tugmasi (faqat admin).
+
+O'rin **saqlanadi**: `ACO` raqami, guruh, xona turi, xona bloki va raqami. Shu
+sababli guruh taqsimoti va xona joylashuvi buzilmaydi.
+
+Ketgan odamning hamma izi **o'chadi**: Telegram bog'lanishi, hujjatlari
+(voucher/chipta), check-inlari, mas'ulligi, paneldagi roli va tili. Fayl boshqa
+odamga ham tegishli bo'lsa diskda qoladi.
+
+⚠️ **QR kod yangilanadi** — token pasportdan olinadi, pasport esa boshqa odamniki.
+Eski beyjik yaroqsiz bo'ladi, «QR kodlar» bo'limidan yangisini chop eting.
+
+Pasport allaqachon boshqa ishtirokchida bo'lsa almashtirish rad etiladi va kim
+ekani aytiladi — seriyasi alohida saqlangan (masalan `77` + `3408359`) pasportlar
+ham topiladi.
+
+Kerak bo'ladigan ma'lumot: ism-familya va pasport majburiy; tug'ilgan sana,
+jinsi, fuqarolik va amal muddati ixtiyoriy (keyin xlsx importidan ham keladi).
+
 ### Noto'g'ri bog'lanishni tuzatish
 
 Kimdir boshqa odamning pasporti bilan ro'yxatdan o'tib qo'ysa (masalan ikkita

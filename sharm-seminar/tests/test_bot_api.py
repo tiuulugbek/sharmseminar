@@ -664,6 +664,45 @@ class BotApiTest(unittest.TestCase):
         self.assertEqual(self.client.post(
             "/api/participant/unlink", json={"id": member["id"]}).status_code, 401)
 
+    def test_scanner_roster_shows_who_is_still_missing(self):
+        leader, member, other = self.build_group()
+        self.post("/api/bot/checkin", {"token": member["token"], "checkpoint": "seminar",
+                                       "by_telegram_id": "9001"})
+
+        # Guruh mas'uli — faqat o'z guruhi.
+        mine = self.client.post("/api/webapp/roster", json={
+            "init_data": self.init_data(9001), "checkpoint": "seminar"}).get_json()
+        self.assertEqual(mine["scope"]["group"], 1)
+        self.assertEqual((mine["done"], mine["total"]), (1, 2))
+        # Belgilanmaganlar tepada turadi.
+        self.assertIsNone(mine["members"][0]["ts"])
+        self.assertEqual(mine["members"][0]["id"], leader["id"])
+
+        # Admin — hamma guruh, yig'indisi bilan.
+        everyone = self.client.post("/api/webapp/roster", json={
+            "init_data": self.init_data(555), "checkpoint": "seminar"}).get_json()
+        self.assertEqual(everyone["total"], 3)
+        self.assertEqual({g["group"]: (g["done"], g["total"]) for g in everyone["groups"]},
+                         {1: (1, 2), 2: (0, 1)})
+
+        # Oddiy a'zoga yopiq, imzosizga ham.
+        self.assertEqual(self.client.post("/api/webapp/roster", json={
+            "init_data": self.init_data(9100), "checkpoint": "seminar"}).status_code, 403)
+        self.assertEqual(self.client.post("/api/webapp/roster", json={}).status_code, 401)
+
+    def test_checkin_time_follows_the_configured_zone(self):
+        admin = self.register("Panel Admin", "0000798")
+        os.environ["PANEL_ADMIN_IDS"] = admin["id"]
+        panel = self.panel(admin["id"])
+        self.assertEqual(panel.post("/api/timezone", json={"offset": 5}).status_code, 200)
+        self.assertEqual(panel.post("/api/timezone", json={"offset": 99}).status_code, 400)
+
+        _, member, _ = self.build_group()
+        stamped = self.scan(member["token"], "seminar").get_json()["ts"]
+        expected = (datetime.datetime.now(datetime.timezone.utc)
+                    + datetime.timedelta(hours=5)).strftime("%H:%M")
+        self.assertEqual(stamped, expected)
+
     # ------------------------------------------------ Telegram guruh nazorati
     def seen_in_group(self, telegram_id, full_name, chat="-100777"):
         return self.post("/api/bot/group/seen", {

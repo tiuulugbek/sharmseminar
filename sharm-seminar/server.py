@@ -1564,6 +1564,7 @@ def bootstrap():
         if r["pid"] in visible_ids:
             checkins.setdefault(r["checkpoint"], {})[r["pid"]] = r["ts"]
     out = {"user": user, "build": _build_stamp(),
+           "tz": sget(con, "tz_offset", DEFAULT_TZ_OFFSET),
            "participants": parts, "checkins": checkins,
            "checkpoints": cps, "program": sget(con, "program", []),
            "groups": sget(con, "groups", DEFAULT_GROUPS),
@@ -1810,6 +1811,20 @@ def save_roles(): return _save("roles")
 @app.post("/api/meta")
 @panel_auth("admin")
 def save_meta(): return _save("meta")
+
+@app.post("/api/timezone")
+@panel_auth("admin")
+def save_timezone():
+    """Check-in vaqtlari qaysi mintaqada yozilishi (Toshkent +5, Misr +3)."""
+    try:
+        offset = float((request.get_json(force=True) or {}).get("offset"))
+    except (TypeError, ValueError):
+        return jsonify(error="bad_offset"), 400
+    if not -12 <= offset <= 14:
+        return jsonify(error="bad_offset"), 400
+    con = db(); sset(con, "tz_offset", offset); con.commit(); con.close()
+    return jsonify(ok=True, offset=offset)
+
 
 @app.post("/api/groups")
 @panel_auth("admin")
@@ -2649,6 +2664,49 @@ def webapp_checkin():
     out = _checkin_payload(con, row, cp, decision, ts)
     con.close()
     return jsonify(out)
+
+
+@app.post("/api/webapp/roster")
+def webapp_roster():
+    """Skaner ostidagi ro'yxat: kim belgilangan, kim yo'q.
+
+    Guruh mas'uliga o'z guruhi, admin va rahbarga esa guruhlar bo'yicha
+    yig'indi va hali belgilanmaganlar chiqadi.
+    """
+    user = webapp_user()
+    if not user:
+        return jsonify(error="invalid_init_data"), 401
+    cp = str((request.get_json(silent=True) or {}).get("checkpoint") or "").strip()
+    con = db()
+    actor = _whoami(con, user.get("id"))
+    if actor["role"] not in {"admin", "leader"}:
+        con.close()
+        return jsonify(error="forbidden"), 403
+    marks = {r["pid"]: r["ts"] for r in
+             con.execute("SELECT pid,ts FROM checkins WHERE checkpoint=?", (cp,))}
+    names = _group_names(con)
+
+    if actor["role"] == "leader" and actor["group"]:
+        rows = con.execute(f"SELECT id,fio,grp FROM participants WHERE grp=? AND {NOT_STAFF} "
+                           "ORDER BY leader DESC,fio", (actor["group"],)).fetchall()
+        scope = {"group": actor["group"], "name": names.get(str(actor["group"]))}
+    else:
+        rows = con.execute(f"SELECT id,fio,grp FROM participants WHERE {NOT_STAFF} "
+                           "ORDER BY grp,fio").fetchall()
+        scope = {"group": None, "name": None}
+    members = [{"id": r["id"], "fio": r["fio"], "group": r["grp"],
+                "group_name": names.get(str(r["grp"])) if r["grp"] else None,
+                "ts": marks.get(r["id"])} for r in rows]
+    by_group = {}
+    for m in members:
+        entry = by_group.setdefault(m["group"], {"group": m["group"],
+                                                 "name": m["group_name"], "total": 0, "done": 0})
+        entry["total"] += 1
+        entry["done"] += 1 if m["ts"] else 0
+    con.close()
+    return jsonify(scope=scope, checkpoint=cp, members=members,
+                   groups=sorted(by_group.values(), key=lambda g: (g["group"] or 99)),
+                   total=len(members), done=sum(1 for m in members if m["ts"]))
 
 
 @app.get("/scan")

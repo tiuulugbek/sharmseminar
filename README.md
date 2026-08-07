@@ -302,9 +302,19 @@ qolsa, yahtada bemalol belgilanadi; skanerda «⚠️ O'tkazib yuborilgan: Aerop
 deb yozilib turadi. O'tkazib yuborilgani o'tkazib yuborilganicha qoladi —
 haqiqatan bormagan odam keyingi nuqtada belgilanaveradi.
 
-**Vaqt mintaqasi.** Barcha vaqtlar tadbir vaqtida (Misr, UTC+3) hisoblanadi va
-yoziladi, server qayerda turganidan qat'i nazar. Boshqa mintaqa kerak bo'lsa
-`settings.tz_offset` ni o'zgartiring.
+**Vaqt mintaqasi.** «Check-in» bo'limining tepasidagi ro'yxatdan tanlanadi va
+yonida hozirgi vaqt ko'rinib turadi. Toshkentda tarqatma berilayotganda `UTC+5`,
+Misrga yetgach `UTC+3` qilib qo'yiladi — check-in vaqtlari ham, nuqta oynalari
+ham shu mintaqada hisoblanadi.
+
+**Nuqta nomi va belgisi** chipdagi **✎** tugmasi bilan o'zgartiriladi (nomi
+tanlangan tilda saqlanadi). Yangi nuqta qo'shilsa darrov ishlaydi — vaqt oynasi
+bo'sh bo'lgani uchun har doim ochiq bo'ladi.
+
+**Skanerda ro'yxat.** Mini-appda kamera ostida guruh ro'yxati turadi:
+belgilanmaganlar tepada, belgilanganlar vaqti bilan pastda. Har skandan keyin
+o'zi yangilanadi. Guruh mas'uli o'z guruhini, admin va rahbar hamma guruhni
+(yig'indisi bilan) ko'radi.
 
 ## Bot rollari
 

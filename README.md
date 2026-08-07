@@ -604,6 +604,7 @@ Admin buyruqlari (botga shaxsiy chatda):
 |---|---|
 | `/guruh_chaqiruv` | Guruhga tasdiqlash chaqiruvini yuboradi — tugma bosilsa bot ochiladi |
 | `/guruh_taklif` | Tasdiqlagan, lekin guruhda yo'q odamlarga taklif havolasi |
+| `/guruh_adminlar` | Guruh mas'ullarini Telegram guruhida ham administrator qilish |
 | `/guruh_holat` | Hisobot: guruhda jami nechta, bot nechtasini taniydi, uch toifaga bo'lib |
 | `/guruh_tozala` | Ro'yxatda yo'qlarni guruhdan chiqaradi (tasdiqlashdan keyin) |
 
@@ -629,6 +630,25 @@ Guruh qulflangan bo'lsa, ruxsat berilgan odamning Telegramdagi statusi
 
 Botda **«Foydalanuvchilarni taklif qilish»** huquqi bo'lishi kerak; bo'lmasa
 buyruq shuni aytadi va hech narsa yubormaydi.
+
+### Mas'ullarni Telegram guruhida administrator qilish
+
+`/guruh_adminlar` beshala guruh mas'ulini Telegram guruhida administrator qiladi
+va har biriga «N-guruh mas'uli» degan sarlavha qo'yadi.
+
+Beriladigan huquqlar: xabarlarni o'chirish, xabarlarni qadash, foydalanuvchilarni
+taklif qilish, video chatlarni boshqarish. **A'zolarni chiqarish va yangi admin
+tayinlash berilmaydi** — ular adminda qoladi.
+
+⚠️ **Telegram qoidasi: bot faqat o'zida bor huquqni ulasha oladi.** Shuning uchun
+botga ham shu huquqlar berilishi kerak:
+
+> Guruh → Administratorlar → `@sharmseminarbot` →
+> **Administratorlarni tayinlash**, **Xabarlarni o'chirish**,
+> **Xabarlarni qadash**, **Video chatlarni boshqarish**
+
+Huquq bo'lmasa buyruq qaysi biri yetishmayotganini aniq aytadi va hech narsa
+qilmaydi. Mas'ul o'zgarsa buyruqni qayta yuborasiz.
 
 ### Faqat tasdiqlaganlar yozsin
 

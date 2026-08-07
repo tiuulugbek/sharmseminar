@@ -2371,6 +2371,80 @@ async def group_invite_go(call: CallbackQuery):
     await call.message.edit_text(text + "\n\n/guruh_holat")
 
 
+# Guruh mas'uliga beriladigan Telegram huquqlari. Telegram qoidasi: bot faqat
+# o'zida bor huquqni ulasha oladi, shuning uchun botda ham shular bo'lishi kerak.
+LEADER_RIGHTS = ("can_delete_messages", "can_pin_messages", "can_invite_users",
+                 "can_manage_video_chats")
+RIGHT_LABEL = {"can_delete_messages": "Xabarlarni o'chirish",
+               "can_pin_messages": "Xabarlarni qadash",
+               "can_invite_users": "Foydalanuvchilarni taklif qilish",
+               "can_manage_video_chats": "Video chatlarni boshqarish",
+               "can_promote_members": "Administratorlarni tayinlash"}
+
+
+@dp.message(Command("guruh_adminlar"), F.chat.type == "private")
+async def cmd_group_admins(message: Message):
+    """Guruh mas'ullarini Telegram guruhida ham administrator qiladi."""
+    if not _is_admin(message.from_user.id):
+        return
+    me = await bot.get_me()
+    mine = await bot.get_chat_member(config.GROUP_CHAT_ID, me.id)
+    missing = [f for f in ("can_promote_members",) + LEADER_RIGHTS
+               if not getattr(mine, f, False)]
+    if "can_promote_members" in missing:
+        return await message.answer(
+            "⛔ Botda <b>administratorlarni tayinlash</b> huquqi yo'q.\n\n"
+            "Guruh → Administratorlar → @" + (me.username or "bot") + " → quyidagilarni yoqing:\n"
+            + "\n".join(f"• {RIGHT_LABEL[f]}" for f in ["can_promote_members"] + list(LEADER_RIGHTS))
+            + "\n\n<i>Telegram qoidasi: bot faqat o'zida bor huquqni ulasha oladi, "
+              "shuning uchun hammasi kerak.</i>")
+
+    grantable = [f for f in LEADER_RIGHTS if getattr(mine, f, False)]
+    groups = await asyncio.to_thread(api_client.groups)
+    promoted, skipped, failed = [], [], []
+    for g in groups:
+        leader = g.get("leader") or {}
+        tid = leader.get("telegram_id")
+        if not tid:
+            who = leader.get("fio") or "mas'ul yo'q"
+            skipped.append(f"{g['id']}-guruh: {who} — botda tasdiqlamagan")
+            continue
+        try:
+            member = await bot.get_chat_member(config.GROUP_CHAT_ID, int(tid))
+            status = getattr(member.status, "value", member.status)
+            if status in {"left", "kicked"}:
+                skipped.append(f"{g['id']}-guruh: {leader['fio']} — guruhda yo'q")
+                continue
+            await bot.promote_chat_member(config.GROUP_CHAT_ID, int(tid),
+                                          **{f: True for f in grantable})
+            try:
+                await bot.set_chat_administrator_custom_title(
+                    config.GROUP_CHAT_ID, int(tid), f"{g['id']}-guruh mas'uli"[:16])
+            except Exception:
+                pass          # sarlavha ixtiyoriy
+            promoted.append(f"{g['id']}-guruh: {leader['fio']}")
+        except Exception as exc:
+            failed.append(f"{g['id']}-guruh: {leader.get('fio')} — {exc}")
+        await asyncio.sleep(0.2)
+
+    lines = ["👑 <b>Guruh mas'ullari — Telegram admini</b>\n"]
+    if promoted:
+        lines.append(f"✅ Tayinlandi ({len(promoted)}):")
+        lines += [f"• {x}" for x in promoted]
+    if skipped:
+        lines.append(f"\n⏳ Tayinlanmadi ({len(skipped)}):")
+        lines += [f"• {x}" for x in skipped]
+    if failed:
+        lines.append(f"\n⚠️ Xato ({len(failed)}):")
+        lines += [f"• {x}" for x in failed]
+    lines.append("\n<b>Berilgan huquqlar:</b> "
+                 + (", ".join(RIGHT_LABEL[f] for f in grantable) or "—"))
+    if missing:
+        lines.append("⚠️ Botda yo'qligi uchun berilmadi: "
+                     + ", ".join(RIGHT_LABEL[f] for f in missing))
+    await message.answer("\n".join(lines))
+
+
 @dp.message(Command("guruh_qulf"), F.chat.type == "private")
 async def cmd_group_lock(message: Message):
     """Guruhni yopadi: faqat tasdiqlaganlar yoza oladi."""

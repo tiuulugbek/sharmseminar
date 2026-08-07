@@ -129,7 +129,7 @@ bazadan qayta o'qiladi, ya'ni rolni o'zgartirsangiz darhol kuchga kiradi.
 | Rol | Nimani ko'radi va qila oladi |
 |---|---|
 | `member` — ishtirokchi | faqat **o'zi** haqidagi ma'lumot (xonasi, guruhi, mas'uliyati) + dastur |
-| `leader` — guruh mas'uli | **o'z guruhi** ro'yxati, QR kodlari va check-in (faqat o'z guruhini) |
+| `leader` — guruh mas'uli | **o'z guruhi**: ro'yxat, QR kodlari, check-in, xona raqami va tilini o'zgartirish, noto'g'ri Telegram bog'lanishini uzish |
 | `manager` — rahbar | **barcha guruhlar**, xona va til tahriri, check-in, pasport ma'lumoti |
 | `admin` — texnik admin | hammasi: sozlamalar, dastur, mas'uliyatlar, guruh nomlari |
 
@@ -348,6 +348,12 @@ emas, ya'ni chop etilgan beyjik hech qachon yaroqsiz bo'lmaydi.
 Har bir yuborilgan nusxa `msg_targets` jadvaliga `telegram_msg_id` bilan
 yoziladi, javob shu orqali manzilini topadi. Rahbar boshqa guruhga, a'zo esa
 hammaga yoza olmaydi — buni server rad etadi (`403 forbidden`).
+
+
+Xabar turlari: **matn, rasm, video, ovozli xabar, audio, hujjat, GIF, doiraviy
+video va stiker**. Izoh qabul qiladigan turlarga («kimdan» sarlavhasi) fayl
+izohiga qo'shiladi; doiraviy video va stikerga izoh qo'yib bo'lmagani uchun
+sarlavha alohida xabar bo'lib oldin ketadi.
 
 `settings.copy_member_questions=true` bo'lsa adminlar a'zo savollarining
 nusxasini oladi. `settings.leader_scope="all"` bo'lsa rahbar istalgan
@@ -696,6 +702,16 @@ darrov yozilmaydi — ular **qoralama** sifatida yig'iladi:
 
 «Avtomatik taqsimlash» va «Tozalash» ham shu qoralamaga tushadi: natijani ko'rib,
 keyin saqlaysiz yoki bekor qilasiz. Saqlash — `admin` roli uchun.
+
+### Guruh mas'uli o'z guruhida nima qila oladi
+
+Panelda: guruh ro'yxati, QR kodlari, check-in, **xona raqami** (`room`) va
+**tilini** o'zgartirish, noto'g'ri **Telegram bog'lanishini uzish** — faqat o'z
+guruhi ichida. Guruh taqsimoti, xona bloki va mas'ullik unga yopiq, ular admin
+qo'lida.
+
+Botda: guruhiga xabar, guruh ro'yxati, check-in skaneri, kim kelgani,
+tasdiqlanmaganlar ro'yxati.
 
 ### Guruh taqsimotini himoyalash
 

@@ -634,7 +634,7 @@ function renderParts(v){
       <th>${t('arrival')}</th>
       ${sortTh('group',t('grp'),'width:96px')}<th style="width:70px">${t('leaderCol')}</th>
       <th style="width:86px" title="${t('langHint')}">${t('langCol')}</th>
-      ${can('manager')?`<th style="width:150px">${t('tgCol')}</th>`:''}</tr></thead><tbody id="tb"></tbody></table></div>`;
+      ${can('leader')?`<th style="width:150px">${t('tgCol')}</th>`:''}</tr></thead><tbody id="tb"></tbody></table></div>`;
   document.getElementById('q').oninput=e=>{fSearch=e.target.value;fillRows();};
   document.getElementById('fg').onchange=e=>{fGroup=e.target.value;fillRows();};
   document.getElementById('fr').onchange=e=>{fRoom=e.target.value;fillRows();};
@@ -696,7 +696,7 @@ function fillRows(){const tb=document.getElementById('tb');if(!tb)return;
       <td><select class="gsel" onchange="setPartLang('${p.id}',this.value)" title="${t('langHint')}">
         <option value="" ${!p.lang?'selected':''}>${t('langAuto')}</option>
         ${UI_LANGS.map(l=>`<option value="${l}" ${p.lang===l?'selected':''}>${l.toUpperCase()}</option>`).join('')}</select></td>
-      ${can('manager')?`<td>${p.telegram_id
+      ${can('leader')?`<td>${p.telegram_id
         ? `<span class="tgchip" title="${escapeHtml(String(p.telegram_id))}">${escapeHtml(p.telegram_username||('id '+p.telegram_id))}</span>
            <b class="tgx" title="${t('tgUnlink')}" onclick="unlinkTg('${p.id}')">✕</b>`
         : `<span class="muted" style="font-size:11.5px">${t('tgNone')}</span>`}</td>`:''}</tr>`;

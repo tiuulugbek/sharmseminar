@@ -511,11 +511,18 @@ class BotApiTest(unittest.TestCase):
         for client in (as_manager, as_leader, as_member):
             self.assertEqual(client.post("/api/meta", json={"title": "x"}).status_code, 403)
 
-        # Participant edits: manager and above.
+        # Xona raqami va til: guruh mas'ulidan boshlab, faqat o'z guruhida.
         patch = {"id": member["id"], "patch": {"room": "101"}}
         self.assertEqual(as_manager.post("/api/participant", json=patch).status_code, 200)
-        self.assertEqual(as_leader.post("/api/participant", json=patch).status_code, 403)
+        self.assertEqual(as_leader.post("/api/participant", json=patch).status_code, 200)
         self.assertEqual(as_member.post("/api/participant", json=patch).status_code, 403)
+        # Mas'ul begona guruhga va ruxsat etilmagan maydonga tegolmaydi.
+        self.assertEqual(as_leader.post("/api/participant", json={
+            "id": other["id"], "patch": {"room": "9"}}).status_code, 403)
+        self.assertEqual(as_leader.post("/api/participant", json={
+            "id": member["id"], "patch": {"xona_guruhi": "D40"}}).status_code, 403)
+        self.assertEqual(as_leader.post("/api/participant", json={
+            "id": member["id"], "patch": {"staff": True}}).status_code, 403)
 
         # Check-in: a leader only inside their own group, a member never.
         own = {"id": member["id"], "checkpoint": "seminar", "on": True}
@@ -657,10 +664,15 @@ class BotApiTest(unittest.TestCase):
             "id": member["id"], "telegram_id": "9300"}).status_code, 200)
         self.assertEqual(self.whoami("9300")["id"], member["id"])
 
-        # Guruh mas'uli va oddiy ishtirokchi buni qila olmaydi.
-        for pid in (leader["id"], other["id"]):
-            self.assertEqual(self.panel(pid).post(
-                "/api/participant/unlink", json={"id": member["id"]}).status_code, 403)
+        # Guruh mas'uli o'z guruhida uza oladi, begonaga tegolmaydi.
+        self.post("/api/bot/link", {"id": member["id"], "telegram_id": "9400"})
+        self.assertEqual(self.panel(leader["id"]).post(
+            "/api/participant/unlink", json={"id": member["id"]}).status_code, 200)
+        self.assertEqual(self.panel(leader["id"]).post(
+            "/api/participant/unlink", json={"id": other["id"]}).status_code, 403)
+        # Oddiy ishtirokchiga va imzosizga yopiq.
+        self.assertEqual(self.panel(other["id"]).post(
+            "/api/participant/unlink", json={"id": member["id"]}).status_code, 403)
         self.assertEqual(self.client.post(
             "/api/participant/unlink", json={"id": member["id"]}).status_code, 401)
 

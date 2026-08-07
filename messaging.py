@@ -25,6 +25,9 @@ SEND_DELAY = 0.06
 
 ROLE_TITLE = {"admin": "Administrator", "leader": "Guruh rahbari", "member": "Ishtirokchi"}
 
+KIND_LABEL = {"photo": "🖼", "video": "🎬", "audio": "🎵", "voice": "🎤",
+              "video_note": "⭕️", "animation": "🎞", "sticker": "🙂", "document": "📎"}
+
 SCOPE_TITLE = {
     "all":    "📢 Umumiy xabar",
     "group":  "📢 Guruh xabari",
@@ -94,14 +97,28 @@ def header(scope: str, role: str, label: str) -> str:
     return f"{title}\n<b>{label}</b>{suffix}"
 
 
-def kind_of(source: Message | None) -> str:
+# Telegram qo'llab-quvvatlaydigan turlar. `caption` — sarlavhani faylning
+# izohiga qo'shib bo'ladimi; video_note va sticker izoh qabul qilmaydi,
+# ular uchun sarlavha alohida xabar bo'lib ketadi.
+MEDIA_KINDS = (
+    ("photo", True), ("video", True), ("document", True), ("audio", True),
+    ("voice", True), ("animation", True), ("video_note", False), ("sticker", False),
+)
+
+
+def media_of(source: Message | None):
+    """Xabardagi media turi va izoh qo'yish mumkinligini qaytaradi."""
     if source is None:
-        return "text"
-    if source.photo:
-        return "photo"
-    if source.document:
-        return "document"
-    return "text"
+        return None, False
+    for name, captionable in MEDIA_KINDS:
+        if getattr(source, name, None):
+            return name, captionable
+    return None, False
+
+
+def kind_of(source: Message | None) -> str:
+    kind, _ = media_of(source)
+    return kind or "text"
 
 
 def _text_of(source: Message | None) -> str:
@@ -111,15 +128,25 @@ def _text_of(source: Message | None) -> str:
 
 
 async def _send_one(bot: Bot, chat_id: int, body: str, msg_id: int, source: Message | None):
-    """Bitta manzilga yuboradi. Rasm/hujjat bo'lsa — sarlavhani izohga qo'shib nusxalaydi."""
+    """Bitta manzilga yuboradi.
+
+    Rasm, video, ovoz, hujjat — hammasi nusxalanadi.  Izoh qabul qiladiganlarga
+    sarlavha izohga qo'shiladi; qabul qilmaydiganlarga (video_note, sticker)
+    sarlavha alohida xabar bo'lib oldin ketadi.
+    """
     markup = reply_kb(msg_id)
-    if source is not None and (source.photo or source.document):
+    kind, captionable = media_of(source)
+    if not kind:
+        return await bot.send_message(chat_id, body, reply_markup=markup,
+                                      disable_web_page_preview=True)
+    if captionable:
         caption = body if len(body) <= 1024 else body[:1021] + "…"
         return await bot.copy_message(chat_id=chat_id, from_chat_id=source.chat.id,
                                       message_id=source.message_id, caption=caption,
                                       reply_markup=markup)
-    return await bot.send_message(chat_id, body, reply_markup=markup,
-                                  disable_web_page_preview=True)
+    await bot.send_message(chat_id, body, disable_web_page_preview=True)
+    return await bot.copy_message(chat_id=chat_id, from_chat_id=source.chat.id,
+                                  message_id=source.message_id, reply_markup=markup)
 
 
 async def deliver(bot: Bot, actor_tg: int, scope: str, value, source: Message | None,

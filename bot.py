@@ -1512,7 +1512,8 @@ async def _ask_text(message: Message, state: FSMContext, scope: str, value=None,
     await state.update_data(scope=scope, value=value)
     await message.answer(
         (prompt or "✍️ Xabar matnini yozing.") +
-        "\n\n<i>Rasm yoki hujjat ham yuborishingiz mumkin. Bekor qilish — /bekor</i>",
+        "\n\n<i>Rasm, video, ovoz yoki hujjat ham yuborishingiz mumkin. "
+        "Bekor qilish — /bekor</i>",
         reply_markup=ReplyKeyboardRemove())
 
 
@@ -2031,7 +2032,7 @@ async def cmd_pending(message: Message, state: FSMContext):
 
 
 # ── Xabar matnini qabul qilish va yuborish ──
-@dp.message(Msg.body, F.text | F.photo | F.document)
+@dp.message(Msg.body, F.text | F.photo | F.video | F.document | F.audio | F.voice | F.video_note | F.animation | F.sticker)
 async def msg_body(message: Message, state: FSMContext):
     data = await state.get_data()
     await state.clear()
@@ -2043,7 +2044,8 @@ async def msg_body(message: Message, state: FSMContext):
 
 @dp.message(Msg.body)
 async def msg_body_invalid(message: Message):
-    await message.answer("Iltimos, matn, rasm yoki hujjat yuboring. Bekor qilish — /bekor")
+    await message.answer("Iltimos, matn, rasm, video, ovoz yoki hujjat yuboring. "
+                         "Bekor qilish — /bekor")
 
 
 # ── "↩️ Javob berish" — javob DOIM asl yuboruvchiga qaytadi ──
@@ -2062,7 +2064,7 @@ async def reply_start(call: CallbackQuery, state: FSMContext):
                            reply_markup=ReplyKeyboardRemove())
 
 
-@dp.message(Msg.reply, F.text | F.photo | F.document)
+@dp.message(Msg.reply, F.text | F.photo | F.video | F.document | F.audio | F.voice | F.video_note | F.animation | F.sticker)
 async def reply_send(message: Message, state: FSMContext):
     data = await state.get_data()
     await state.clear()
@@ -2074,7 +2076,8 @@ async def reply_send(message: Message, state: FSMContext):
 
 @dp.message(Msg.reply)
 async def reply_invalid(message: Message):
-    await message.answer("Iltimos, javobni matn, rasm yoki hujjat ko'rinishida yuboring. /bekor")
+    await message.answer("Iltimos, javobni matn, rasm, video, ovoz yoki hujjat "
+                         "ko'rinishida yuboring. /bekor")
 
 
 # ═══════════════════════ Telegram guruhini nazorat qilish ════════════════════

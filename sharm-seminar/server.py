@@ -1575,8 +1575,13 @@ def bootstrap():
     return jsonify(out)
 
 
+# Guruh mas'uli o'z guruhida boshqara oladigan maydonlar. Guruh va mas'ullik
+# bunga kirmaydi — taqsimot faqat adminda.
+LEADER_FIELDS = {"room", "lang"}
+
+
 @app.post("/api/participant")
-@panel_auth("manager")
+@panel_auth("leader")
 def upd_participant():
     d = request.get_json(force=True)
     pid, patch = d["id"], d.get("patch", {})
@@ -1586,12 +1591,24 @@ def upd_participant():
         grp = patch.get("group", row["grp"] if row else None)
         if grp:
             con.execute("UPDATE participants SET leader=0 WHERE grp=?", (grp,))
+    user = request.panel_user
     # Guruh va guruh mas'uli — faqat texnik admin o'zgartiradi. Bir marta
     # to'g'rilangan taqsimot tasodifan aralashib ketmasligi kerak.
-    if request.panel_user["rank"] < ROLE_RANK["admin"] and ({"group", "leader"} & set(patch)):
+    if user["rank"] < ROLE_RANK["admin"] and ({"group", "leader"} & set(patch)):
         con.close()
         return jsonify(error="forbidden", field="group",
                        detail="guruhni faqat admin o'zgartira oladi"), 403
+    if user["rank"] < ROLE_RANK["manager"]:
+        # Guruh mas'uli: faqat o'z guruhi va faqat ruxsat etilgan maydonlar.
+        target = con.execute("SELECT grp FROM participants WHERE id=?", (pid,)).fetchone()
+        if not target or not user["group"] or target["grp"] != user["group"]:
+            con.close()
+            return jsonify(error="forbidden", detail="faqat o'z guruhingiz"), 403
+        extra = set(patch) - LEADER_FIELDS
+        if extra:
+            con.close()
+            return jsonify(error="forbidden", field=sorted(extra)[0],
+                           detail="guruh mas'uli xona raqami va tilni o'zgartira oladi"), 403
     before = con.execute("SELECT grp,xona_guruhi FROM participants WHERE id=?", (pid,)).fetchone()
     m = {"group": "grp", "leader": "leader", "room": "room", "branch": "branch",
          "telegram": "telegram", "lang": "lang", "staff": "staff",
@@ -1699,7 +1716,7 @@ def replace_participant():
 
 
 @app.post("/api/participant/unlink")
-@panel_auth("manager")
+@panel_auth("leader")
 def unlink_participant():
     """Bitta ishtirokchining Telegram bog'lanishini uzadi.
 
@@ -1708,11 +1725,16 @@ def unlink_participant():
     rol va QR token tegilmaydi.
     """
     pid = str((request.get_json(silent=True) or {}).get("id") or "").strip()
+    user = request.panel_user
     con = db()
     row = con.execute("SELECT * FROM participants WHERE id=?", (pid,)).fetchone()
     if not row:
         con.close()
         return jsonify(error="participant_not_found"), 404
+    if user["rank"] < ROLE_RANK["manager"] and (
+            not user["group"] or row["grp"] != user["group"]):
+        con.close()
+        return jsonify(error="forbidden", detail="faqat o'z guruhingiz"), 403
     was = {"telegram_id": row["telegram_id"], "telegram_username": row["telegram_username"]}
     con.execute("UPDATE participants SET telegram_id=NULL, telegram_username=NULL, "
                 "registered_at=NULL WHERE id=?", (pid,))

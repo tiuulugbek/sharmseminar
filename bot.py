@@ -325,8 +325,17 @@ async def send_group_card(user_id: int, participant_id: str):
 
 @dp.message(Command("bekor"), F.chat.type == "private")
 async def cmd_cancel(message: Message, state: FSMContext):
+    """Bekor qilib, foydalanuvchini o'z menyusiga qaytaradi.
+
+    Avval klaviatura o'chirilib "/start bosing" deyilardi — odam menyusiz
+    qolib ketardi.
+    """
     await state.clear()
-    await message.answer("❌ Bekor qilindi. Qaytadan boshlash uchun /start", reply_markup=ReplyKeyboardRemove())
+    me = await whoami(message.from_user.id)
+    if me.get("role") in {"admin", "leader", "member"}:
+        return await show_menu(message.from_user.id, me, "❌ Bekor qilindi.")
+    await message.answer("❌ Bekor qilindi. Boshlash uchun /start",
+                         reply_markup=ReplyKeyboardRemove())
 
 
 @dp.message(Command("royxat"), F.chat.type == "private")
@@ -1080,7 +1089,12 @@ async def upd_find(message: Message, state: FSMContext):
 @dp.message(Upd.menu, F.text.contains("Bekor"))
 async def upd_cancel(message: Message, state: FSMContext):
     await state.clear()
-    await message.answer("❌ Yangilash bekor qilindi. Boshlash uchun /start", reply_markup=ReplyKeyboardRemove())
+    await state.clear()
+    me = await whoami(message.from_user.id)
+    if me.get("role") in {"admin", "leader", "member"}:
+        return await show_menu(message.from_user.id, me, "❌ Yangilash bekor qilindi.")
+    await message.answer("❌ Yangilash bekor qilindi. Boshlash uchun /start",
+                         reply_markup=ReplyKeyboardRemove())
 
 
 @dp.message(Upd.menu, F.text.contains("Saqlash"))
@@ -1268,8 +1282,9 @@ async def adm_cancel(call: CallbackQuery, state: FSMContext):
     if not _is_admin(call.from_user.id):
         return await call.answer("Ruxsat yo'q", show_alert=True)
     await state.clear()
-    await call.message.edit_text("❌ Bekor qilindi. /admin")
+    await call.message.edit_text("❌ Bekor qilindi.")
     await call.answer()
+    await show_menu(call.from_user.id)
 
 
 # ── E'lon yuborish ──
@@ -1507,14 +1522,29 @@ async def cmd_scanner(message: Message, state: FSMContext):
         reply_markup=messaging.scan_inline_kb())
 
 
+CANCEL_KB = InlineKeyboardMarkup(inline_keyboard=[
+    [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="cancel:menu")]])
+
+
 async def _ask_text(message: Message, state: FSMContext, scope: str, value=None, prompt: str = ""):
     await state.set_state(Msg.body)
     await state.update_data(scope=scope, value=value)
     await message.answer(
         (prompt or "✍️ Xabar matnini yozing.") +
-        "\n\n<i>Rasm, video, ovoz yoki hujjat ham yuborishingiz mumkin. "
-        "Bekor qilish — /bekor</i>",
-        reply_markup=ReplyKeyboardRemove())
+        "\n\n<i>Rasm, video, ovoz yoki hujjat ham yuborishingiz mumkin.</i>",
+        reply_markup=CANCEL_KB)
+
+
+@dp.callback_query(F.data == "cancel:menu")
+async def cancel_to_menu(call: CallbackQuery, state: FSMContext):
+    """Bekor qilib menyuga qaytaradi — klaviaturasiz qolib ketmasin."""
+    await state.clear()
+    await call.answer()
+    try:
+        await call.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+    await show_menu(call.from_user.id, note="❌ Bekor qilindi.")
 
 
 # ── Admin tugmalari ──
@@ -1554,8 +1584,9 @@ async def menu_group_pick(call: CallbackQuery, state: FSMContext):
     await state.set_state(Msg.body)
     await state.update_data(scope="group", value=value)
     await bot.send_message(call.from_user.id,
-                           "✍️ Xabar matnini yozing.\n\n<i>Rasm/hujjat ham mumkin. Bekor — /bekor</i>",
-                           reply_markup=ReplyKeyboardRemove())
+                           "✍️ Xabar matnini yozing.\n\n"
+                           "<i>Rasm, video, ovoz, hujjat ham mumkin.</i>",
+                           reply_markup=CANCEL_KB)
 
 
 @dp.message(StateFilter(None), F.chat.type == "private", F.text == messaging.BTN_ONE)
@@ -1565,7 +1596,7 @@ async def menu_one(message: Message, state: FSMContext):
         return await show_menu(message.from_user.id, me, "⛔ Bu bo'lim faqat adminlar uchun.")
     await state.set_state(Msg.person)
     await message.answer("👤 Kimga? <b>ACO-042</b> ko'rinishidagi ID, QR token yoki ism-familya yozing.",
-                         reply_markup=ReplyKeyboardRemove())
+                         reply_markup=CANCEL_KB)
 
 
 @dp.message(Msg.person, F.text)
@@ -2059,9 +2090,8 @@ async def reply_start(call: CallbackQuery, state: FSMContext):
     await state.update_data(parent=parent)
     await call.answer()
     await bot.send_message(call.from_user.id,
-                           "↩️ <b>Javobingizni yozing</b> — u faqat xabarni yuborgan odamga boradi.\n"
-                           "<i>Bekor qilish — /bekor</i>",
-                           reply_markup=ReplyKeyboardRemove())
+                           "↩️ <b>Javobingizni yozing</b> — u faqat xabarni yuborgan odamga boradi.",
+                           reply_markup=CANCEL_KB)
 
 
 @dp.message(Msg.reply, F.text | F.photo | F.video | F.document | F.audio | F.voice | F.video_note | F.animation | F.sticker)

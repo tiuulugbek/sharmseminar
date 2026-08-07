@@ -834,7 +834,9 @@ chop etilgan beyjiklar ishlashda davom etadi.
 - `/hujjat_holat` — nechta fayl bor, kimda nima yetishmayapti (admin).
 - `/royxat` — yangi ishtirokchi/oila a'zosini to'liq ro'yxatga olish.
 - `/yangilash` — mavjud ma'lumotni pasport orqali yangilash.
-- `/bekor` — joriy jarayonni bekor qilish.
+- `/bekor` — joriy jarayonni bekor qilib, o'z menyusiga qaytish.
+  Xabar yozish va javob berish oynalarida **«❌ Bekor qilish»** tugmasi ham bor —
+  bosilsa menyu darrov qaytadi, klaviaturasiz qolib ketilmaydi.
 - `/admin` — eski admin paneli (e'lon, xona xabarlari, guruh takliflari).
 - `/joyla` — legacy buyruq; SQLite'da xona guruhlari API orqali saqlanadi.
 
